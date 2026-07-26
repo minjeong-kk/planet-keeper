@@ -15,7 +15,7 @@ import './Planet-ui.css'
  * ─────────────────────────────────────────────────────────────
  */
 // public/ 폴더는 Vite 가 루트(/)로 서빙하므로 same-origin → CORS 문제 없음
-const EARTH_TEXTURE_URL = '/assets/earth.jpg'
+const PLANET_TEXTURE_URL = '/assets/earth.jpg'
 
 /* ── 대기 글로우: 프레넬 셰이더(외곽 림에서 푸른빛이 은은하게 번짐) ── */
 const atmosphereVertex = /* glsl */ `
@@ -34,9 +34,9 @@ const atmosphereFragment = /* glsl */ `
   }
 `
 
-/* ── 세련된 실사 지구: 단일 mesh + 고화질 지구 텍스처 ── */
-function Earth() {
-  const map = useTexture(EARTH_TEXTURE_URL)
+/* ── 가상/외계 행성: 단일 mesh + 고화질 행성 텍스처 ── */
+function Planet() {
+  const map = useTexture(PLANET_TEXTURE_URL)
   map.colorSpace = THREE.SRGBColorSpace
   map.anisotropy = 8
 
@@ -86,7 +86,7 @@ function PlanetUI() {
 
         <Atmosphere />
         <Suspense fallback={null}>
-          <Earth />
+          <Planet />
         </Suspense>
 
         <OrbitControls
