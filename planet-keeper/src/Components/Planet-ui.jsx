@@ -1,26 +1,72 @@
-import { Canvas } from '@react-three/fiber'
-import { OrbitControls, Sphere } from '@react-three/drei'
+import { Suspense, useEffect } from 'react'
+import * as THREE from 'three'
+import { Canvas, invalidate } from '@react-three/fiber'
+import { OrbitControls, useTexture } from '@react-three/drei'
 import './Planet-ui.css'
 
-/**
- * 재사용 가능한 독립형 3D 행성 뷰어.
- *
- * - 배경/크기를 스스로 고정하지 않는다. 항상 부모 div 의 크기(100%)를 따르고
- *   배경은 투명(alpha)하므로, 어느 페이지에 넣어도 부모 레이아웃에 녹아든다.
- * - frameloop="demand" 로 동작한다: 상호작용이 있을 때만 다시 렌더링하여
- *   GPU/CPU 를 놀릴 때는 전혀 점유하지 않는다(윈도우 캡처 렉 방지).
+/*
+ * ─────────────────────────────────────────────────────────────
+ *  Texture Source (저작권 출처)
+ *  Earth day map: Solar System Scope (2k_earth_daymap.jpg), CC BY 4.0
+ *  https://www.solarsystemscope.com/textures/
+ *  → 프로젝트 내부(public/assets/earth.jpg)에 로컬 저장하여 외부 URL/CORS 의존 제거.
+ *  → CC BY 4.0 출처표기는 README 에 명시함.
+ *  대기 글로우는 공개된 Three.js 프레넬 셰이더 "기법"으로 저작 에셋이 아님.
+ * ─────────────────────────────────────────────────────────────
  */
-function Planet() {
+// public/ 폴더는 Vite 가 루트(/)로 서빙하므로 same-origin → CORS 문제 없음
+const EARTH_TEXTURE_URL = '/assets/earth.jpg'
+
+/* ── 대기 글로우: 프레넬 셰이더(외곽 림에서 푸른빛이 은은하게 번짐) ── */
+const atmosphereVertex = /* glsl */ `
+  varying vec3 vNormal;
+  void main() {
+    vNormal = normalize(normalMatrix * normal);
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`
+const atmosphereFragment = /* glsl */ `
+  varying vec3 vNormal;
+  void main() {
+    // 시선(view-space +z)과 법선의 각도가 클수록(가장자리) 밝게 → 림 글로우
+    float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 2.4);
+    gl_FragColor = vec4(0.3, 0.6, 1.0, 1.0) * intensity;
+  }
+`
+
+/* ── 세련된 실사 지구: 단일 mesh + 고화질 지구 텍스처 ── */
+function Earth() {
+  const map = useTexture(EARTH_TEXTURE_URL)
+  map.colorSpace = THREE.SRGBColorSpace
+  map.anisotropy = 8
+
+  // demand 모드: 텍스처 로드가 끝난 시점에 한 번 렌더를 트리거해 지구를 표시
+  useEffect(() => {
+    invalidate()
+  }, [map])
+
   return (
-    // args={[반지름, 가로 세그먼트, 세로 세그먼트]} — 세그먼트가 높을수록 표면이 매끄럽다.
-    <Sphere args={[1.5, 64, 64]}>
-      {/*
-        기본 질감. 추후 이슈에서 실제 텍스처를 입힐 자리:
-        const tex = useTexture('/textures/earth.jpg')
-        <meshStandardMaterial map={tex} ... />
-      */}
-      <meshStandardMaterial color="#4a90d9" roughness={0.7} metalness={0.1} />
-    </Sphere>
+    <mesh>
+      <sphereGeometry args={[1.5, 64, 64]} />
+      <meshStandardMaterial map={map} roughness={1} metalness={0} />
+    </mesh>
+  )
+}
+
+/* ── 외곽 대기 아우라 ── */
+function Atmosphere() {
+  return (
+    <mesh scale={1.18}>
+      <sphereGeometry args={[1.5, 64, 64]} />
+      <shaderMaterial
+        vertexShader={atmosphereVertex}
+        fragmentShader={atmosphereFragment}
+        side={THREE.BackSide}
+        blending={THREE.AdditiveBlending}
+        transparent
+        depthWrite={false}
+      />
+    </mesh>
   )
 }
 
@@ -29,27 +75,20 @@ function PlanetUI() {
     <div className="planet-viewport">
       <Canvas
         camera={{ position: [0, 0, 5], fov: 45 }}
-        // demand: invalidate() 가 호출될 때만 렌더 → 유휴 시 프레임 0
+        // demand: invalidate() 호출 시에만 렌더 → 유휴 시 프레임 0 (캡처 렉 없음)
         frameloop="demand"
-        // 픽셀 밀도 상한을 1.5 로 제한해 고해상도 화면에서의 과도한 렌더 부담 완화
         dpr={[1, 1.5]}
-        // alpha: 배경 투명 처리 → 부모 배경이 그대로 비쳐 보인다
         gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
       >
-        {/* 전역적으로 은은하게 깔리는 빛 — 그림자 영역이 완전히 검게 죽지 않도록 함 */}
-        <ambientLight intensity={0.6} />
-        {/* 특정 방향에서 들어오는 주광 — 구체에 명암을 만들어 입체감을 살림 */}
-        <directionalLight position={[5, 5, 5]} intensity={1.2} />
+        {/* 환경광을 올려 밤 영역 지형도 은은하게 보이도록 + 방향광으로 낮/밤 경계 입체감 유지 */}
+        <ambientLight intensity={0.45} />
+        <directionalLight position={[5, 2, 5]} intensity={2.2} />
 
-        <Planet />
+        <Atmosphere />
+        <Suspense fallback={null}>
+          <Earth />
+        </Suspense>
 
-        {/*
-          makeDefault: drei 가 이 컨트롤을 기본으로 등록하면서 'change' 이벤트마다
-          invalidate() 를 자동 호출한다. 덕분에 demand 모드에서도 드래그/감쇠 중에만
-          프레임이 발생하고, 멈추면 렌더 루프가 스스로 정지한다.
-          enableDamping: 관성 회전. 감쇠가 끝날 때까지 내부 useFrame 이
-          controls.update() 를 돌려 프레임을 이어주므로 demand 모드와 문제없이 연동된다.
-        */}
         <OrbitControls
           makeDefault
           enableDamping
