@@ -1,12 +1,21 @@
-import PlanetUI from './Components/Planet-ui.jsx'
+import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
+
+import StartPage from "./Components/Start-Page/StartPage";
+import PlanetCreatePage from "./Components/Planet-Create-Page/PlanetCreatePage";
+import GamePage from "./Components/Game-Page/GamePage";
+import ReportPage from "./Components/Report-Page/ReportPage";
 
 function App() {
   return (
-    // TODO: 우측 슬라이더 패널 이슈 병합 시 좌/우 분할 레이아웃으로 교체
-    // width/height 100% → #root(=100%)를 그대로 채워 좌측 정렬, 스크롤바 없음
-    <div style={{ width: '100%', height: '100%', border: 'none', outline: 'none' }}>
-      <PlanetUI />
-    </div>
+    <Router>
+      <Routes>
+        <Route path="/" element={<StartPage />} />
+        <Route path="/planet-create" element={<PlanetCreatePage />} />
+        <Route path="/game" element={<GamePage />} />
+        <Route path="/report" element={<ReportPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Router>
   )
 }
 
