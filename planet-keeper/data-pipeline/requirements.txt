@@ -1,0 +1,6 @@
+requests
+numpy
+scipy
+xarray
+netCDF4
+python-dotenv

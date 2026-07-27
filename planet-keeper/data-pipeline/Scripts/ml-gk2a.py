@@ -2,9 +2,12 @@
 
 import os
 import csv
+import sys
+import time
 import requests
 import numpy as np
 import xarray as xr
+from datetime import date, timedelta
 from dotenv import load_dotenv
 from scipy.spatial import cKDTree
 
@@ -23,11 +26,60 @@ PRODUCTS = [
 
 BASE_URL = "https://apihub.kma.go.kr/api/typ05/api/GK2A/LE2"
 
-TMFC = "2026070100"   # ml-kim.py와 동일한 분석시간(UTC)
+DATASETS_DIR = "../Datasets"
+os.makedirs(DATASETS_DIR, exist_ok=True)
+OUTPUT_FILE = os.path.join(DATASETS_DIR, "ml_gk2a_dataset.csv")
+
+# KIM API가 최근 180일까지만 조회 가능 -> 그 범위를 N_TARGET_DATES개로 균등 분산.
+N_TARGET_DATES = 30
+KIM_LOOKBACK_DAYS = 179  # 오늘 포함 180일 안쪽으로 여유를 둠
+
+
+def target_dates():
+    today = date.today()
+    start = today - timedelta(days=KIM_LOOKBACK_DAYS)
+    span = (today - start).days
+    return [
+        (start + timedelta(days=round(i * span / (N_TARGET_DATES - 1)))).strftime("%Y%m%d") + "00"
+        for i in range(N_TARGET_DATES)
+    ]
+
+
+def already_fetched_dates():
+    if not os.path.exists(OUTPUT_FILE):
+        return set()
+    with open(OUTPUT_FILE, newline="") as f:
+        return {row["tmfc"] for row in csv.DictReader(f)}
+
+
+def next_tmfc():
+    done = already_fetched_dates()
+    for candidate in target_dates():
+        if candidate not in done:
+            return candidate
+    return None  # 계획된 30일 전부 완료
+
+
+# 인자로 날짜를 직접 줄 수도 있고(예: python3 ml-gk2a.py 2026060100),
+# 안 주면 180일 범위 안에서 아직 안 받은 다음 날짜를 자동으로 고른다.
+# 단, 하루 호출 상한은 "실제 오늘"을 기준으로 걸리므로 실행 자체는 여전히 하루 1번씩만.
+if len(sys.argv) > 1:
+    TMFC = sys.argv[1]
+else:
+    TMFC = next_tmfc()
+    if TMFC is None:
+        print(f"계획된 {N_TARGET_DATES}개 날짜를 이미 다 받았습니다. 더 필요하면 N_TARGET_DATES를 늘리세요.")
+        sys.exit(0)
+
 DATE = TMFC + "00"    # GK2A는 분(mm) 단위까지 포함 (YYYYMMDDHHmm)
 
-# 샘플 개수 (ml-kim.py와 동일)
-SAMPLE_SIZE = 10  # ponytail: 테스트용 임시값, 검증 끝나면 5000으로 되돌릴 것
+# 하루당 샘플 개수 (ml-kim.py와 동일). 하루 개수를 줄이고 날짜 종류를 늘려서
+# 계절/날씨 편차를 줄이는 쪽으로 (150x10일 대신 50x30일 등).
+SAMPLE_SIZE = 50
+
+
+NC_CACHE_DIR = "../nc_cache"
+os.makedirs(NC_CACHE_DIR, exist_ok=True)
 
 
 def download_product(product):
@@ -37,10 +89,20 @@ def download_product(product):
         f"&authKey={API_KEY}"
     )
 
-    filename = f"{product}_{DATE}.nc"
+    filename = os.path.join(NC_CACHE_DIR, f"{product}_{DATE}.nc")
 
-    r = requests.get(url)
-    r.raise_for_status()
+    # ponytail: 429(속도 제한)만 짧게 재시도. 403(할당량 초과) 등은 그대로 올림.
+    for attempt in range(3):
+        r = requests.get(url)
+        if r.status_code == 429:
+            wait = 5 * (attempt + 1)
+            print(f"{product}: 429 Too Many Requests, {wait}초 대기 후 재시도")
+            time.sleep(wait)
+            continue
+        r.raise_for_status()
+        break
+    else:
+        r.raise_for_status()
 
     with open(filename, "wb") as f:
         f.write(r.content)
@@ -123,6 +185,7 @@ latlon = {}
 for product in PRODUCTS:
     print(f"Downloading {product}...")
     filename = download_product(product)
+    time.sleep(2)  # 연달아 요청하면 429(속도 제한) 나서 상품 사이 텀을 둠
 
     data[product] = grid_values(filename, product)
     latlon[product] = grid_latlon(filename, product)
@@ -154,17 +217,21 @@ for product in PRODUCTS:
 
     product_values[product] = data[product][valid_p_indices[nearest]]
 
-with open("ml_gk2a_dataset.csv", "w", newline="") as f:
+# 날짜별로 나눠 여러 번 실행하는 구조라, 실행할 때마다 덮어쓰지 않고 이어붙인다.
+file_exists = os.path.exists(OUTPUT_FILE)
+
+with open(OUTPUT_FILE, "a", newline="") as f:
 
     writer = csv.writer(f)
 
-    writer.writerow(["lat", "lon"] + PRODUCTS)
+    if not file_exists:
+        writer.writerow(["tmfc", "lat", "lon"] + PRODUCTS)
 
     for i in range(SAMPLE_SIZE):
 
         writer.writerow(
-            [float(sample_lat[i]), float(sample_lon[i])] +
+            [TMFC, float(sample_lat[i]), float(sample_lon[i])] +
             [float(product_values[p][i]) for p in PRODUCTS]
         )
 
-print("ML Dataset(GK2A) 저장 완료 (위경도 포함, KIM 매칭용)")
+print(f"ML Dataset(GK2A) 저장 완료 (tmfc={TMFC}, {SAMPLE_SIZE}개 추가)")
