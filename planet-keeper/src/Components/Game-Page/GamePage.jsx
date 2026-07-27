@@ -1,5 +1,6 @@
 import { useState } from "react";
 import QuizModal from "./QuizModal";
+import PlanetUI from "../Planet-ui.jsx";
 import "./GamePage.css";
 
 function GamePage() {
@@ -18,8 +19,9 @@ function GamePage() {
         </div>
 
         <div className="game-page__arena">
-          {/* 3D 행성 뷰어는 별도 컴포넌트로 연결 예정 */}
-          <div className="game-page__planet-placeholder">행성</div>
+          <div className="game-page__planet-placeholder">
+            <PlanetUI />
+          </div>
 
           <button
             className="game-page__quiz-trigger"

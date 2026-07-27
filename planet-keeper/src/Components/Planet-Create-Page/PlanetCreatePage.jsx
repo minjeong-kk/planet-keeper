@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import PlanetUI from "../Planet-ui.jsx";
 import "./PlanetCreatePage.css";
 
 const VARIABLES = [
@@ -24,8 +25,9 @@ function PlanetCreatePage() {
     <>
       <div className="planet-create-page">
         <div className="planet-create-page__planet">
-          {/* 3D 행성 뷰어는 별도 컴포넌트로 연결 예정 */}
-          <div className="planet-create-page__planet-placeholder">행성</div>
+          <div className="planet-create-page__planet-placeholder">
+            <PlanetUI />
+          </div>
         </div>
 
         <div className="planet-create-page__controls">
