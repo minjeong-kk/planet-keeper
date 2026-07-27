@@ -12,7 +12,7 @@ function StartPage() {
       <div className="start-page__visual">
         <div className="start-page__planet">기상 이미지</div>
 
-        <button className="start-page__cta" onClick={() => navigate("/planet-create")}>
+        <button className="start-page__cta btn-primary" onClick={() => navigate("/planet-create")}>
           행성 만들러 가기
         </button>
       </div>

@@ -1,0 +1,57 @@
+.planet-create-page {
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 40px;
+  flex: 1;
+}
+
+.planet-create-page__planet {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.planet-create-page__planet-placeholder {
+  width: 320px;
+  height: 320px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow);
+}
+
+.planet-create-page__controls {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--shadow);
+}
+
+.planet-create-page__control label {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.planet-create-page__control input[type="range"] {
+  width: 100%;
+}
+
+.planet-create-page__actions {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 40px 40px;
+}
+
+.planet-create-page__actions button {
+  padding: 12px 20px;
+}

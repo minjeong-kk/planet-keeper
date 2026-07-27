@@ -16,8 +16,9 @@
 
 .start-page__box {
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 20px;
+  box-shadow: var(--shadow);
 }
 
 .start-page__box button {
@@ -37,20 +38,17 @@
   height: 220px;
   border-radius: 50%;
   background: var(--accent);
-  color: var(--bg);
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
+  box-shadow: var(--shadow);
 }
 
 .start-page__cta {
-  border: 1px solid var(--border);
-  border-radius: 8px;
   padding: 12px 24px;
-  background: var(--bg);
-  color: var(--text-h);
-  cursor: pointer;
+  font-size: 1.05em;
 }
 
 .start-page__modal-overlay {
@@ -66,7 +64,8 @@
   background: var(--bg);
   color: var(--text-h);
   padding: 32px;
-  border-radius: 8px;
+  border-radius: 12px;
   max-width: 400px;
   border: 1px solid var(--border);
+  box-shadow: var(--shadow);
 }

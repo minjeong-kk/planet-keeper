@@ -1,9 +1,9 @@
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
 
-import StartPage from "./components/start-page/StartPage";
-import PlanetCreatePage from "./components/planet-create-page/PlanetCreatePage";
-import GamePage from "./components/game-page/GamePage";
-import ReportPage from "./components/report-page/ReportPage";
+import StartPage from "./Components/Start-Page/StartPage";
+import PlanetCreatePage from "./Components/Planet-Create-Page/PlanetCreatePage";
+import GamePage from "./Components/Game-Page/GamePage";
+import ReportPage from "./Components/Report-Page/ReportPage";
 
 function App() {
   return (
