@@ -28,8 +28,12 @@ VARIABLES = [
 ]
 
 N_DAYS = 7
+START_OFFSET = 1  # 오늘(0)은 KIM 발행 지연으로 데이터가 없을 때가 많아 어제부터 시작
 today = date.today()
-TMFC_LIST = [(today - timedelta(days=i)).strftime("%Y%m%d") + "00" for i in range(N_DAYS)]
+TMFC_LIST = [
+    (today - timedelta(days=i)).strftime("%Y%m%d") + "00"
+    for i in range(START_OFFSET, START_OFFSET + N_DAYS)
+]
 
 
 def fetch_variable(var_name, tmfc):

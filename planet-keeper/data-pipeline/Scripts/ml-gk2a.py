@@ -36,9 +36,10 @@ KIM_LOOKBACK_DAYS = 179  # 오늘 포함 180일 안쪽으로 여유를 둠
 
 
 def target_dates():
-    today = date.today()
-    start = today - timedelta(days=KIM_LOOKBACK_DAYS)
-    span = (today - start).days
+    # 오늘은 발행 지연으로 데이터가 없을 때가 많아 어제까지만 범위로 잡는다.
+    end = date.today() - timedelta(days=1)
+    start = end - timedelta(days=KIM_LOOKBACK_DAYS)
+    span = (end - start).days
     return [
         (start + timedelta(days=round(i * span / (N_TARGET_DATES - 1)))).strftime("%Y%m%d") + "00"
         for i in range(N_TARGET_DATES)

@@ -11,10 +11,10 @@ KIM_FILE = os.path.join(DATASETS_DIR, "physics_dataset.csv")
 GK2A_FILE = os.path.join(DATASETS_DIR, "physics_gk2a_dataset.csv")
 OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_reference.csv")
 
-with open(KIM_FILE, newline="") as f:
+with open(KIM_FILE, newline="", encoding="utf-8-sig") as f:
     kim_row = next(csv.DictReader(f))
 
-with open(GK2A_FILE, newline="") as f:
+with open(GK2A_FILE, newline="", encoding="utf-8-sig") as f:
     gk2a_row = next(csv.DictReader(f))
 
 kim_vars = [c for c in kim_row if c not in ("date_range", "n_days")]
