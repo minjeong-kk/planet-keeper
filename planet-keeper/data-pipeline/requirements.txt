@@ -5,3 +5,10 @@ xarray
 netCDF4
 pyproj
 python-dotenv
+
+# ML 파이프라인 (ML-Scripts/)
+pandas
+scikit-learn
+skl2onnx
+onnxruntime
+matplotlib
