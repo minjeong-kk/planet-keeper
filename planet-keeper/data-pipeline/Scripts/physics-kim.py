@@ -40,7 +40,7 @@ TMFC_LIST = [
 DATASETS_DIR = "../Datasets"
 os.makedirs(DATASETS_DIR, exist_ok=True)
 CACHE_FILE = os.path.join(DATASETS_DIR, "physics_kim_monthly_cache.csv")
-OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_dataset.csv")
+OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_kim_dataset.csv")
 
 
 def fetch_variable(var_name, tmfc):
