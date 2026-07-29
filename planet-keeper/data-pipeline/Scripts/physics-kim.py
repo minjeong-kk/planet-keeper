@@ -37,6 +37,11 @@ TMFC_LIST = [
     "2026072800",
 ]
 
+DATASETS_DIR = "../Datasets"
+os.makedirs(DATASETS_DIR, exist_ok=True)
+CACHE_FILE = os.path.join(DATASETS_DIR, "physics_kim_monthly_cache.csv")
+OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_dataset.csv")
+
 
 def fetch_variable(var_name, tmfc):
     params = {
@@ -53,9 +58,18 @@ def fetch_variable(var_name, tmfc):
         "authKey": API_KEY
     }
 
-    # ponytail: 429(속도 제한)만 짧게 재시도. 403(할당량 초과) 등은 그대로 올림.
+    # ponytail: 429(속도 제한)나 순간적인 네트워크 오류만 짧게 재시도.
+    # 403(할당량 초과) 등 실제 HTTP 에러는 재시도해봐야 소용없어서 그대로 올림.
+    response = None
     for attempt in range(3):
-        response = requests.get(BASE_URL, params=params)
+        try:
+            response = requests.get(BASE_URL, params=params, timeout=30)
+        except requests.exceptions.RequestException as e:
+            wait = 5 * (attempt + 1)
+            print(f"{var_name} {tmfc}: 네트워크 오류({e.__class__.__name__}), {wait}초 대기 후 재시도")
+            time.sleep(wait)
+            continue
+
         if response.status_code == 429:
             wait = 5 * (attempt + 1)
             print(f"{var_name} {tmfc}: 429 Too Many Requests, {wait}초 대기 후 재시도")
@@ -75,23 +89,50 @@ def fetch_variable(var_name, tmfc):
     return float(np.array(numbers, dtype=np.float64).mean())
 
 
-daily_means = {var: [] for var in VARIABLES}
+def load_cache():
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    with open(CACHE_FILE, newline="") as f:
+        return {row["tmfc"]: row for row in csv.DictReader(f)}
 
-for tmfc in TMFC_LIST:
-    print(f"=== {tmfc} ===")
+
+# 이미 받아둔 달은 캐시에서 그대로 쓰고, 아직 없는 달만 새로 받는다.
+# (달 하나 다 받을 때마다 바로 저장하므로, 중간에 에러가 나도 그 전까지는 안 날아감)
+cache = load_cache()
+cache_file_exists = os.path.exists(CACHE_FILE)
+
+with open(CACHE_FILE, "a", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["tmfc"] + VARIABLES)
+    if not cache_file_exists:
+        writer.writeheader()
+
+    for tmfc in TMFC_LIST:
+        if tmfc in cache:
+            print(f"=== {tmfc} (캐시에 이미 있음, 건너뜀) ===")
+            continue
+
+        print(f"=== {tmfc} ===")
+        row = {"tmfc": tmfc}
+        for var in VARIABLES:
+            value = fetch_variable(var, tmfc)
+            row[var] = value
+            if value is not None:
+                print(f"{var:10s}  {tmfc} 평균 = {value:.3f}")
+            time.sleep(1)
+
+        writer.writerow(row)
+        f.flush()
+        cache[tmfc] = row
+
+# 캐시에 쌓인 전체 달(이번 실행 + 예전 실행 합쳐서)로 최종 평균을 낸다.
+daily_means = {var: [] for var in VARIABLES}
+for tmfc, row in cache.items():
     for var in VARIABLES:
-        value = fetch_variable(var, tmfc)
-        if value is not None:
-            daily_means[var].append(value)
-            print(f"{var:10s}  {tmfc} 평균 = {value:.3f}")
-        time.sleep(1)
+        value = row.get(var)
+        if value not in (None, ""):
+            daily_means[var].append(float(value))
 
 results = {var: float(np.mean(values)) for var, values in daily_means.items() if values}
-
-# CSV 저장
-DATASETS_DIR = "../Datasets"
-os.makedirs(DATASETS_DIR, exist_ok=True)
-OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_dataset.csv")
 
 with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
     writer = csv.writer(f)
@@ -99,8 +140,8 @@ with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
     writer.writerow(["date_range", "n_days"] + VARIABLES)
 
     writer.writerow(
-        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", len(TMFC_LIST)] +
+        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", len(cache)] +
         [results.get(v) for v in VARIABLES]
     )
 
-print(f"\nCSV 저장 완료 : {OUTPUT_FILE} ({len(TMFC_LIST)}개월 평균)")
+print(f"\nCSV 저장 완료 : {OUTPUT_FILE} (캐시 {len(cache)}/{len(TMFC_LIST)}개월 기준 평균)")

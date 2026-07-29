@@ -36,9 +36,13 @@ TMFC_LIST = [
     "2026072800",
 ]
 
-
 NC_CACHE_DIR = "../nc_cache"
 os.makedirs(NC_CACHE_DIR, exist_ok=True)
+
+DATASETS_DIR = "../Datasets"
+os.makedirs(DATASETS_DIR, exist_ok=True)
+CACHE_FILE = os.path.join(DATASETS_DIR, "physics_gk2a_monthly_cache.csv")
+OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_gk2a_dataset.csv")
 
 
 def download_product(product, tmfc):
@@ -52,9 +56,18 @@ def download_product(product, tmfc):
 
     filename = os.path.join(NC_CACHE_DIR, f"{product}_{date_str}.nc")
 
-    # ponytail: 429(속도 제한)만 짧게 재시도. 403(할당량 초과) 등은 그대로 올림.
+    # ponytail: 429(속도 제한)나 순간적인 네트워크 오류만 짧게 재시도.
+    # 403(할당량 초과) 등 실제 HTTP 에러는 재시도해봐야 소용없어서 그대로 올림.
+    r = None
     for attempt in range(3):
-        r = requests.get(url)
+        try:
+            r = requests.get(url, timeout=60)
+        except requests.exceptions.RequestException as e:
+            wait = 5 * (attempt + 1)
+            print(f"{product} {tmfc}: 네트워크 오류({e.__class__.__name__}), {wait}초 대기 후 재시도")
+            time.sleep(wait)
+            continue
+
         if r.status_code == 429:
             wait = 5 * (attempt + 1)
             print(f"{product} {tmfc}: 429 Too Many Requests, {wait}초 대기 후 재시도")
@@ -127,23 +140,50 @@ def average_product(filename, product):
     return mean_value
 
 
-daily_means = {p: [] for p in PRODUCTS}
+def load_cache():
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    with open(CACHE_FILE, newline="") as f:
+        return {row["tmfc"]: row for row in csv.DictReader(f)}
 
-for tmfc in TMFC_LIST:
-    print(f"=== {tmfc} ===")
+
+# 이미 받아둔 달은 캐시에서 그대로 쓰고, 아직 없는 달만 새로 받는다.
+# (달 하나 다 받을 때마다 바로 저장하므로, 중간에 에러가 나도 그 전까지는 안 날아감)
+cache = load_cache()
+cache_file_exists = os.path.exists(CACHE_FILE)
+
+with open(CACHE_FILE, "a", newline="") as f:
+    writer = csv.DictWriter(f, fieldnames=["tmfc"] + PRODUCTS)
+    if not cache_file_exists:
+        writer.writeheader()
+
+    for tmfc in TMFC_LIST:
+        if tmfc in cache:
+            print(f"=== {tmfc} (캐시에 이미 있음, 건너뜀) ===")
+            continue
+
+        print(f"=== {tmfc} ===")
+        row = {"tmfc": tmfc}
+        for product in PRODUCTS:
+            filename = download_product(product, tmfc)
+            value = average_product(filename, product)
+            row[product] = value
+            print(f"{product:10s}  {tmfc} 평균 = {value:.3f}")
+            time.sleep(2)
+
+        writer.writerow(row)
+        f.flush()
+        cache[tmfc] = row
+
+# 캐시에 쌓인 전체 달(이번 실행 + 예전 실행 합쳐서)로 최종 평균을 낸다.
+daily_means = {p: [] for p in PRODUCTS}
+for tmfc, row in cache.items():
     for product in PRODUCTS:
-        filename = download_product(product, tmfc)
-        value = average_product(filename, product)
-        daily_means[product].append(value)
-        print(f"{product:10s}  {tmfc} 평균 = {value:.3f}")
-        time.sleep(2)
+        value = row.get(product)
+        if value not in (None, ""):
+            daily_means[product].append(float(value))
 
 results = {p: float(np.mean(values)) for p, values in daily_means.items() if values}
-
-# CSV 저장
-DATASETS_DIR = "../Datasets"
-os.makedirs(DATASETS_DIR, exist_ok=True)
-OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_gk2a_dataset.csv")
 
 with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
     writer = csv.writer(f)
@@ -151,8 +191,8 @@ with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
     writer.writerow(["date_range", "n_days"] + PRODUCTS)
 
     writer.writerow(
-        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", len(TMFC_LIST)] +
+        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", len(cache)] +
         [results.get(p) for p in PRODUCTS]
     )
 
-print(f"\nCSV 저장 완료 : {OUTPUT_FILE} ({len(TMFC_LIST)}개월 평균)")
+print(f"\nCSV 저장 완료 : {OUTPUT_FILE} (캐시 {len(cache)}/{len(TMFC_LIST)}개월 기준 평균)")
