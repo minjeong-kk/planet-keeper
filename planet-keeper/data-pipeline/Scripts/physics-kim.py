@@ -1,8 +1,8 @@
-# 물리 엔진 데이터 기준점 수치모델 (최근 7일 평균)
+# 물리 엔진 데이터 기준점 수치모델 (월별 1일씩, 7개월 평균)
 #
-# 물리엔진 기준값은 학습 데이터가 아니라 "현재 지구는 대략 이렇다"는 기준점 하나만
-# 있으면 되므로, 여러 날에 나눠 실행할 필요 없이 최근 7일치를 한 번에 돌려서
-# 평균낸다 (날짜별 날씨 노이즈만 줄이는 목적, 계절 분산은 필요 없음).
+# 물리엔진 기준값이 특정 계절/한 주에 편향되지 않도록, 최근 연속 7일이 아니라
+# 1월~7월까지 달마다 하루씩 뽑아서 평균낸다. physics-gk2a.py와 반드시 같은
+# 날짜를 써야 물리엔진 기준값이 일관되므로, 자동 계산 대신 고정 목록을 공유한다.
 
 import csv
 import os
@@ -10,7 +10,6 @@ import re
 import time
 import requests
 import numpy as np
-from datetime import date, timedelta
 from dotenv import load_dotenv
 
 load_dotenv()  # .env 파일 읽기
@@ -27,12 +26,15 @@ VARIABLES = [
     "ulwrtoa"   # TOA 상향장파복사
 ]
 
-N_DAYS = 7
-START_OFFSET = 1  # 오늘(0)은 KIM 발행 지연으로 데이터가 없을 때가 많아 어제부터 시작
-today = date.today()
+# physics-gk2a.py와 공유하는 고정 날짜 목록 (1월~7월, 달마다 하루씩)
 TMFC_LIST = [
-    (today - timedelta(days=i)).strftime("%Y%m%d") + "00"
-    for i in range(START_OFFSET, START_OFFSET + N_DAYS)
+    "2026013100",
+    "2026022800",
+    "2026033100",
+    "2026043000",
+    "2026053100",
+    "2026063000",
+    "2026072800",
 ]
 
 
@@ -97,8 +99,8 @@ with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
     writer.writerow(["date_range", "n_days"] + VARIABLES)
 
     writer.writerow(
-        [f"{TMFC_LIST[-1]}~{TMFC_LIST[0]}", len(TMFC_LIST)] +
+        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", len(TMFC_LIST)] +
         [results.get(v) for v in VARIABLES]
     )
 
-print(f"\nCSV 저장 완료 : {OUTPUT_FILE} ({N_DAYS}일 평균)")
+print(f"\nCSV 저장 완료 : {OUTPUT_FILE} ({len(TMFC_LIST)}개월 평균)")

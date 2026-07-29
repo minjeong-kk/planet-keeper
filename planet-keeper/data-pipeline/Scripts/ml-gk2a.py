@@ -7,6 +7,7 @@ import time
 import requests
 import numpy as np
 import xarray as xr
+import pyproj
 from datetime import date, timedelta
 from dotenv import load_dotenv
 from scipy.spatial import cKDTree
@@ -31,8 +32,12 @@ os.makedirs(DATASETS_DIR, exist_ok=True)
 OUTPUT_FILE = os.path.join(DATASETS_DIR, "ml_gk2a_dataset.csv")
 
 # KIM API가 최근 180일까지만 조회 가능 -> 그 범위를 N_TARGET_DATES개로 균등 분산.
-N_TARGET_DATES = 30
+N_TARGET_DATES = 50
 KIM_LOOKBACK_DAYS = 179  # 오늘 포함 180일 안쪽으로 여유를 둠
+
+# 친구와 나눠서 작업할 때 쓰는 구간. 이 브랜치는 앞 절반(0~25),
+# 다른 브랜치는 뒷 절반(slice(25, 50))으로 바꿔서 쓰면 날짜가 안 겹친다.
+MY_DATE_RANGE = slice(0, 25)
 
 
 def target_dates():
@@ -40,10 +45,11 @@ def target_dates():
     end = date.today() - timedelta(days=1)
     start = end - timedelta(days=KIM_LOOKBACK_DAYS)
     span = (end - start).days
-    return [
+    all_dates = [
         (start + timedelta(days=round(i * span / (N_TARGET_DATES - 1)))).strftime("%Y%m%d") + "00"
         for i in range(N_TARGET_DATES)
     ]
+    return all_dates[MY_DATE_RANGE]
 
 
 def already_fetched_dates():
@@ -69,14 +75,14 @@ if len(sys.argv) > 1:
 else:
     TMFC = next_tmfc()
     if TMFC is None:
-        print(f"계획된 {N_TARGET_DATES}개 날짜를 이미 다 받았습니다. 더 필요하면 N_TARGET_DATES를 늘리세요.")
+        print(f"내 담당 구간({MY_DATE_RANGE})의 날짜를 이미 다 받았습니다.")
         sys.exit(0)
 
 DATE = TMFC + "00"    # GK2A는 분(mm) 단위까지 포함 (YYYYMMDDHHmm)
 
 # 하루당 샘플 개수 (ml-kim.py와 동일). 하루 개수를 줄이고 날짜 종류를 늘려서
-# 계절/날씨 편차를 줄이는 쪽으로 (150x10일 대신 50x30일 등).
-SAMPLE_SIZE = 50
+# 계절/날씨 편차를 줄이는 쪽으로 (30개 x 50일 = 1500개, 하루 호출 60회).
+SAMPLE_SIZE = 30
 
 
 NC_CACHE_DIR = "../nc_cache"
@@ -131,7 +137,8 @@ def grid_values(filename, product):
 def grid_latlon(filename, product):
     """GK2A는 lat/lon을 직접 안 주고 정지궤도 투영 정보(x/y 픽셀 좌표)만 준다.
     gk2a_imager_projection의 실제 파라미터로 위경도를 계산한다.
-    (CGMS LRIT/HRIT 표준 지오스테이셔너리 투영 역변환 공식, GK2A/Himawari 공통)
+    (pyproj의 geos 투영 사용 - 직접 만든 수식은 스케일링 버그로 전부 위성
+    바로 아래 지점 근처로 뭉치는 문제가 있었음, 검증된 라이브러리로 교체)
     """
     ds = xr.open_dataset(filename)
     proj = ds["gk2a_imager_projection"].attrs
@@ -140,39 +147,54 @@ def grid_latlon(filename, product):
     loff = proj["line_offset"]                                 # 영상 중심 라인(픽셀) 위치
     cfac = proj["column_scale_factor"]                          # 컬럼 -> 라디안 변환 계수
     lfac = proj["line_scale_factor"]                            # 라인 -> 라디안 변환 계수
-    lon_0 = np.radians(proj["longitude_of_projection_origin"])  # 위성이 바라보는 기준 경도(라디안)
+    lon_0 = proj["longitude_of_projection_origin"]              # 위성이 바라보는 기준 경도(도)
     req = proj["semi_major_axis"]                               # 지구 적도 반지름(m)
     rpol = proj["semi_minor_axis"]                              # 지구 극 반지름(m)
-    h = proj["perspective_point_height"] + req                  # 지구 중심 ~ 위성까지 거리(m)
+    h = proj["perspective_point_height"]                        # 지표면 ~ 위성까지 거리(m)
+    sweep = proj.get("sweep_angle_axis", "y")
 
     ydim, xdim = ds[PRODUCT_VARIABLE[product]].shape
     col, line = np.meshgrid(np.arange(xdim), np.arange(ydim))   # 픽셀 index 격자 (컬럼, 라인)
 
-    x = (col - coff) / cfac   # 위성 시야각 x성분(라디안) - 동서 스캔각
-    y = (line - loff) / lfac  # 위성 시야각 y성분(라디안) - 남북 스캔각
+    # CGMS LRIT/HRIT 표준: (col-coff)*2^16/CFAC 가 "도(degree)" 단위 시야각.
+    # (여기 2^16 배율을 빼먹은 게 처음 버그의 원인이었음 - 라디안값이 실제보다
+    # 1000배 가까이 작게 나와서 전체 원반이 위성 바로 아래 한 점으로 뭉쳤었음)
+    x_deg = (col - coff) * 65536.0 / cfac
+    y_deg = (line - loff) * 65536.0 / lfac
+    x_rad = np.radians(x_deg)
+    y_rad = np.radians(y_deg)
 
-    cos_x, sin_x = np.cos(x), np.sin(x)
-    cos_y, sin_y = np.cos(y), np.sin(y)
-    ecc = (req / rpol) ** 2   # 지구 타원체 이심률 보정항 (적도/극 반지름 비의 제곱)
+    # geos 투영은 실제 평면좌표(m) 기준이라 시야각의 tan에 위성고도를 곱해서 변환
+    x_m = np.tan(x_rad) * h
+    y_m = np.tan(y_rad) * h
 
-    # sd: 위성 시선과 지구 타원체 표면의 교점까지 거리(제곱) - 지구 밖을 보는
-    # 픽셀(우주 배경)은 이 값이 음수가 되어 이후 NaN으로 마스킹됨
-    sd = (h * cos_x * cos_y) ** 2 - (cos_y ** 2 + ecc * sin_y ** 2) * (h ** 2 - req ** 2)
+    geos_crs = pyproj.CRS.from_proj4(
+        f"+proj=geos +h={h} +lon_0={lon_0} +a={req} +b={rpol} +sweep={sweep} +units=m +no_defs"
+    )
+    transformer = pyproj.Transformer.from_crs(geos_crs, "EPSG:4326", always_xy=True)
 
     with np.errstate(invalid="ignore"):
-        sd_sqrt = np.sqrt(np.where(sd >= 0, sd, np.nan))
-        sn = (h * cos_x * cos_y - sd_sqrt) / (cos_y ** 2 + ecc * sin_y ** 2)  # 위성->지표 교점까지 거리
-
-        s1 = h - sn * cos_x * cos_y   # 지구 중심 기준 지표 교점의 위성 방향 성분(m)
-        s2 = sn * sin_x * cos_y       # 지구 중심 기준 지표 교점의 동서 성분(m)
-        s3 = -sn * sin_y              # 지구 중심 기준 지표 교점의 남북(자전축) 성분(m)
-        sxy = np.sqrt(s1 ** 2 + s2 ** 2)  # 적도면에 투영한 거리(m)
-
-        lon = np.degrees(np.arctan2(s2, s1) + lon_0)     # 최종 경도(도)
-        lat = np.degrees(np.arctan(ecc * s3 / sxy))       # 최종 위도(도)
+        lon, lat = transformer.transform(x_m, y_m)
 
     ds.close()
-    return lat.astype(np.float32).ravel(), lon.astype(np.float32).ravel()
+
+    # 지구 원반 밖(우주 배경) 픽셀은 lat/lon이 NaN이 아니라 inf로 나오므로
+    # isfinite 기준으로 따로 걸러서 NaN 처리한다.
+    invalid = ~np.isfinite(lat) | ~np.isfinite(lon) | (np.abs(lat) > 90)
+    lat = np.where(invalid, np.nan, lat).astype(np.float32).ravel()
+    lon = np.where(invalid, np.nan, lon).astype(np.float32).ravel()
+
+    # ponytail: 위경도 계산 공식을 손으로 검증하기 어려워서, 최소한
+    # "전체 원반에 걸쳐 넓게 퍼져야 한다"는 것만이라도 자동 확인한다.
+    # (예전 버그는 전부 위성 바로 아래 한 점 근처로 뭉쳐서 이 조건이 깨졌었음)
+    valid_lat = lat[~np.isnan(lat)]
+    lat_span = valid_lat.max() - valid_lat.min() if valid_lat.size else 0
+    assert lat_span > 10, (
+        f"{product}: 위도 범위가 {lat_span:.4f}도밖에 안 됨 -> 투영 계산이 "
+        f"위성 근처로 뭉쳤을 가능성이 높음 (정상이면 수십 도 범위여야 함)"
+    )
+
+    return lat, lon
 
 
 # 상품마다 실제 해상도가 다름(예: SAL 5500x5500, TPW 1833x1833) -> 인덱스로
