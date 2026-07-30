@@ -19,3 +19,12 @@ pip install -r requirements.txt
 - **CO2 데이터의 시차**: 기후변화감시소에서 받은 CO2 실측치는 2024년 말까지만 있고, KIM/GK2A 샘플은 그보다 최근 시점이라 약 1~2년 시차가 있습니다. CO2는 변화가 느린 값이라 근사치로 사용합니다.
 - **이상 기후 클래스(온실폭주/스노우볼/데드플래닛)는 전부 물리엔진 합성 데이터**: 실측이 존재할 수 없는 상태라 물리엔진 공식으로 생성합니다. 즉 이 3개 클래스의 정확도는 실측 검증이 아니라 물리엔진 공식 자체의 정확도에 전적으로 의존합니다.
 - **위성 상품 간 격자 매칭은 최근접 이웃 근사**: GK2A 상품마다 해상도가 달라(SAL 5500×5500 vs TPW 1833×1833) 완전히 같은 지점이 아니라 가장 가까운 픽셀을 매칭합니다.
+
+## Assets & Licensing
+- **Earth surface texture** (`public/assets/earth.jpg`): "Earth Day Map" (2k) by
+  **Solar System Scope**, licensed under **CC BY 4.0**.
+  Source: https://www.solarsystemscope.com/textures/
+  License: https://creativecommons.org/licenses/by/4.0/
+  The file is bundled locally (not hot-linked) to avoid runtime/CORS dependency.
+- **Atmosphere glow:** Implemented with the well-known Fresnel rim-glow *shader technique*
+  from public Three.js examples (a technique, not a copyrighted asset).
