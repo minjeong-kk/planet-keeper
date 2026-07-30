@@ -9,6 +9,8 @@ import csv
 DATASETS_DIR = "../Datasets"
 KIM_FILE = os.path.join(DATASETS_DIR, "physics_kim_dataset.csv")
 GK2A_FILE = os.path.join(DATASETS_DIR, "physics_gk2a_dataset.csv")
+CO2_FILE = os.path.join(DATASETS_DIR, "co2_data.csv")
+
 OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_reference.csv")
 
 with open(KIM_FILE, newline="", encoding="utf-8-sig") as f:
@@ -16,6 +18,18 @@ with open(KIM_FILE, newline="", encoding="utf-8-sig") as f:
 
 with open(GK2A_FILE, newline="", encoding="utf-8-sig") as f:
     gk2a_row = next(csv.DictReader(f))
+
+# CO2 평균 계산
+co2_values = []
+
+with open(CO2_FILE, newline="", encoding="utf-8-sig") as f:
+    reader = csv.DictReader(f)
+
+    for row in reader:
+        co2_values.append(float(row["Atmospheric_CO2_ppm"]))
+
+co2_mean = round(sum(co2_values) / len(co2_values), 2)
+
 
 kim_vars = [c for c in kim_row if c not in ("date_range", "n_days")]
 gk2a_vars = [c for c in gk2a_row if c not in ("date_range", "n_days")]
@@ -25,6 +39,7 @@ merged = {
     "kim_n_days": kim_row["n_days"],
     "gk2a_date_range": gk2a_row["date_range"],
     "gk2a_n_days": gk2a_row["n_days"],
+    "co2": co2_mean,
 }
 for var in kim_vars:
     merged[var] = kim_row[var]
@@ -35,5 +50,7 @@ with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
     writer = csv.DictWriter(f, fieldnames=list(merged.keys()))
     writer.writeheader()
     writer.writerow(merged)
+
+print(f"CO₂ 평균 : {co2_mean:.2f} ppm")
 
 print(f"CSV 저장 완료 : {OUTPUT_FILE} (물리엔진 기준값 {len(kim_vars) + len(gk2a_vars)}개 변수)")
