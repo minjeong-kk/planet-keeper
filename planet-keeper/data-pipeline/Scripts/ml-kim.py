@@ -78,25 +78,32 @@ def fetch_point(var_name, tmfc, lat, lon):
 with open(GK2A_SAMPLE_FILE, newline="") as f:
     gk2a_samples = list(csv.DictReader(f))
 
+
 # 이미 처리된 행 수만큼 건너뛰고, 새로 추가된 행만 이어서 매칭한다.
+file_exists = os.path.exists(OUTPUT_FILE)
+
 already_done = 0
-if os.path.exists(OUTPUT_FILE):
+if file_exists:
     with open(OUTPUT_FILE, newline="") as f:
         already_done = sum(1 for _ in csv.DictReader(f))
 
-    new_samples = gk2a_samples[already_done:]
-    extra_columns = [c for c in gk2a_samples[0].keys() if c not in ("tmfc", "lat", "lon")]
-    total = len(new_samples)
+# ponytail: 이 세 줄이 예전엔 위 if 블록 안에 있어서, OUTPUT_FILE이 아직
+# 없는 첫 실행(파일 없음)에는 total이 정의조차 안 돼서 바로 NameError로 죽었음.
+new_samples = gk2a_samples[already_done:]
+extra_columns = [c for c in gk2a_samples[0].keys() if c not in ("tmfc", "lat", "lon")]
+total = len(new_samples)
 
 if total == 0:
     print("새로 매칭할 샘플이 없습니다 (ml_gk2a_dataset.csv에 새 행을 추가한 뒤 다시 실행하세요).")
 else:
-    file_exists = os.path.exists(OUTPUT_FILE)
     fieldnames = ["tmfc", "lat", "lon"] + VARIABLES + extra_columns
 
     with open(OUTPUT_FILE, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
-        writer.writeheader()
+        # ponytail: 예전엔 무조건 writeheader()를 호출해서, 이어쓰기(append)할
+        # 때마다 데이터 중간에 헤더 줄이 하나씩 더 끼어드는 문제가 있었음.
+        if not file_exists:
+            writer.writeheader()
 
         done = 0
         for i, sample in enumerate(new_samples):
