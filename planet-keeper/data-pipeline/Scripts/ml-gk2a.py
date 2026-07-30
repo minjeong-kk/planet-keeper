@@ -37,7 +37,7 @@ KIM_LOOKBACK_DAYS = 179  # 오늘 포함 180일 안쪽으로 여유를 둠
 
 # 친구와 나눠서 작업할 때 쓰는 구간. 이 브랜치는 앞 절반(0~25),
 # 다른 브랜치는 뒷 절반(slice(25, 50))으로 바꿔서 쓰면 날짜가 안 겹친다.
-MY_DATE_RANGE = slice(0, 25)
+MY_DATE_RANGE = slice(25, 50)
 
 
 def target_dates():
