@@ -9,6 +9,7 @@
 // 번들된다. RandomForest는 GPU 가속 대상이 아니므로 CPU 전용 서브패스로 import해
 // webgpu 코드 자체를 번들에서 빼고, wasm(13MB)만 받게 한다.
 import * as ort from 'onnxruntime-web/wasm'
+import { albedoOf } from './physicsEngine.js'
 
 // 스레드는 꺼둔다(모델이 작아 이득 없고, dev 서버에 COOP/COEP 헤더가 없어
 // SharedArrayBuffer를 못 쓰는 환경에서도 그대로 동작하게 하기 위함).
@@ -22,13 +23,6 @@ const FEATURE_ORDER = [
   'co2', 'absorbedRadiation', 'outgoingRadiation', 'deltaEnergy',
   'greenhouseStrength', 'albedo',
 ]
-
-// SAL(지표면 반사도, Black-Sky Albedo)은 구름/대기 효과가 빠진 순수 지표 반사율.
-// physicsEngine.js의 albedoOf() 공식(0.12 + 0.45*glacier + 0.3*cloud - 0.05*ocean)에서
-// 구름 항만 뺀 것 - 같은 계수를 재사용해 지표 성분(빙하/바다)에만 반응하게 함.
-function surfaceAlbedo(glacierRatio, oceanRatio) {
-  return Math.min(0.9, Math.max(0.05, 0.12 + 0.45 * glacierRatio - 0.05 * oceanRatio))
-}
 
 // ponytail: TPW(가강수량)·psl(해면기압)은 게임 슬라이더 5개 중 어느 것과도
 // 물리적으로 이어지는 근거가 없다(대기두께는 온실효과 배율일 뿐 실제 기압/수증기량과
@@ -67,7 +61,7 @@ export async function predictClimateState(climateInputs, physics) {
   const featureValues = FEATURE_ORDER.map((key) => {
     if (key === 't2m' || key === 'SST') return physics.currentTemperature
     if (key === 'CLA') return climateInputs.cloudRatio
-    if (key === 'SAL') return surfaceAlbedo(climateInputs.glacierRatio, climateInputs.oceanRatio)
+    if (key === 'SAL') return albedoOf({ ...climateInputs, cloudRatio: 0 })
     if (key === 'co2') return climateInputs.co2Ppm
     if (key in REAL_WORLD_DEFAULTS) return REAL_WORLD_DEFAULTS[key]
     return physics[key]

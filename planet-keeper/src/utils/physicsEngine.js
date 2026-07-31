@@ -56,7 +56,7 @@ const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x))
  * 지표/대기 구성에 따른 행성 알베도(반사율, 0~1).
  * 빙하·구름은 반사율을 높이고, 바다는 어두워 반사율을 살짝 낮춘다.
  */
-function albedoOf({ glacierRatio, oceanRatio, cloudRatio }) {
+export function albedoOf({ glacierRatio, oceanRatio, cloudRatio }) {
   return clamp(
     0.12 + 0.45 * glacierRatio + 0.3 * cloudRatio - 0.05 * oceanRatio,
     0.05,
@@ -153,6 +153,12 @@ export function computeClimateV2(inputs = {}) {
  *
  * @param {{iceThickness:number, ocean:number, cloud:number, atmThickness:number, co2:number}} sliders
  */
+// CO₂ 슬라이더(0~100)를 ppm으로 변환한다(≈130~1296 ppm). climateVisual.js의
+// co2Ppm() 표시용 변환도 이 함수를 그대로 써서 물리엔진과 항상 같은 값을 쓴다.
+export function sliderToCO2Ppm(co2Slider) {
+  return CO2_BASELINE_PPM * (0.3 + clamp((co2Slider ?? 0) / 100, 0, 1) * 2.7)
+}
+
 export function mapSlidersToClimateInputs(sliders = {}) {
   const s = (v) => clamp((v ?? 0) / 100, 0, 1)
   return {
@@ -160,6 +166,16 @@ export function mapSlidersToClimateInputs(sliders = {}) {
     oceanRatio: s(sliders.ocean),
     cloudRatio: s(sliders.cloud),
     atmThickness: 0.4 + s(sliders.atmThickness) * 1.6, // 0.4 ~ 2.0 (1≈지구)
-    co2Ppm: CO2_BASELINE_PPM * (0.3 + s(sliders.co2) * 2.7), // ≈130 ~ 1296 ppm
+    co2Ppm: sliderToCO2Ppm(sliders.co2),
   }
+}
+
+// GamePage/ReportPage가 공유하는 에너지 상태 판정 기준.
+// label_rules.py의 EPSILON_ENERGY_BALANCE와 같은 값(게임 UI 판정용).
+export const ENERGY_BALANCE_EPSILON = 5
+
+export function energyStateOf(deltaEnergy) {
+  if (deltaEnergy > ENERGY_BALANCE_EPSILON) return "Energy Surplus"
+  if (deltaEnergy < -ENERGY_BALANCE_EPSILON) return "Energy Deficit"
+  return "Stable"
 }

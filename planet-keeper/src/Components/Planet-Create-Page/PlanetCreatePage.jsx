@@ -1,17 +1,23 @@
+import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
-import useClimateStore from "../../store/useClimateStore";
+import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
+import { computeClimateV2, mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
 import "./PlanetCreatePage.css";
 
-const VARIABLES = [
-  { key: "ocean", label: "바다 수위", Icon: Waves, unit: "%" },
-  { key: "iceThickness", label: "빙하 면적", Icon: Snowflake, unit: "%" },
-  { key: "cloud", label: "구름 양", Icon: Cloud, unit: "%" },
-  { key: "atmThickness", label: "대기 두께", Icon: Wind, unit: "%" },
-  { key: "co2", label: "CO₂ 농도", Icon: Factory, unit: "ppm" },
+// label은 CLIMATE_VARIABLES(store)가 원본 - GamePage/ReportPage와 항상 같은 문구를 쓴다.
+// 여기 순서(바다 먼저)만 표시 순서로 별도 유지.
+const VARIABLE_ICONS = [
+  { key: "ocean", Icon: Waves, unit: "%" },
+  { key: "iceThickness", Icon: Snowflake, unit: "%" },
+  { key: "cloud", Icon: Cloud, unit: "%" },
+  { key: "atmThickness", Icon: Wind, unit: "%" },
+  { key: "co2", Icon: Factory, unit: "ppm" },
 ];
+const LABEL_BY_KEY = Object.fromEntries(CLIMATE_VARIABLES.map((v) => [v.key, v.label]));
+const VARIABLES = VARIABLE_ICONS.map((v) => ({ ...v, label: LABEL_BY_KEY[v.key] }));
 
 // 첫 로드 시 '아름다운 지구' 기본값으로 초기화. (공유 store 기본은 all-50 이지만,
 // store 파일은 팀원과 바이트 동일하게 유지하고 초기값은 여기서만 override → store 충돌 방지)
@@ -23,8 +29,18 @@ function PlanetCreatePage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
   const setValue = useClimateStore((state) => state.setValue);
+  const currentTemperature = useClimateStore((state) => state.currentTemperature);
+  const setPhysicsResult = useClimateStore((state) => state.setPhysicsResult);
 
   const visual = slidersToVisual(values);
+
+  // 슬라이더가 바뀔 때마다 Physics Engine을 여기서만 실행하고, 결과는
+  // Store(physicsResult)에 저장해서 GamePage/ReportPage/ML 추론이 재계산 없이 공유한다.
+  useEffect(() => {
+    const climateInputs = mapSlidersToClimateInputs(values);
+    const physics = computeClimateV2({ ...climateInputs, currentTemperature });
+    setPhysicsResult(physics);
+  }, [values, currentTemperature, setPhysicsResult]);
 
   // 대시보드 수치 표시(단위 포함). CO₂ 는 실제 ppm 으로 환산해 보여준다.
   const displayValue = (v) =>

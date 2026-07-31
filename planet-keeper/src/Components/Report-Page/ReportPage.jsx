@@ -1,14 +1,16 @@
 import { useNavigate } from "react-router-dom";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import { energyStateOf } from "../../utils/physicsEngine.js";
 import "./ReportPage.css";
 
 function ReportPage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
-  const reset = useClimateStore((state) => state.reset);
+  const physicsResult = useClimateStore((state) => state.physicsResult);
+  const resetClimate = useClimateStore((state) => state.resetClimate);
 
   const handleRestart = () => {
-    reset();
+    resetClimate();
     navigate("/planet-create");
   };
 
@@ -34,6 +36,41 @@ function ReportPage() {
         </div>
 
         <p>피드백 루프 한줄 정리</p>
+
+        {/* Physics Engine 결과 (PlanetCreatePage에서 계산해 Store에 저장한 값 그대로 사용) */}
+        <div className="report-page__values-box">
+          <h3>Physics 진단</h3>
+          <ul className="report-page__values-list">
+            <li className="report-page__value-item">
+              <span className="label">Current Temperature</span>
+              <span className="value">{physicsResult ? `${physicsResult.currentTemperature.toFixed(1)} K` : "-"}</span>
+            </li>
+            <li className="report-page__value-item">
+              <span className="label">ASR</span>
+              <span className="value">{physicsResult ? physicsResult.absorbedRadiation.toFixed(2) : "-"}</span>
+            </li>
+            <li className="report-page__value-item">
+              <span className="label">OLR</span>
+              <span className="value">{physicsResult ? physicsResult.outgoingRadiation.toFixed(2) : "-"}</span>
+            </li>
+            <li className="report-page__value-item">
+              <span className="label">Delta Energy</span>
+              <span className="value">{physicsResult ? physicsResult.deltaEnergy.toFixed(2) : "-"}</span>
+            </li>
+            <li className="report-page__value-item">
+              <span className="label">Albedo</span>
+              <span className="value">{physicsResult ? physicsResult.albedo.toFixed(2) : "-"}</span>
+            </li>
+            <li className="report-page__value-item">
+              <span className="label">Greenhouse Strength</span>
+              <span className="value">{physicsResult ? physicsResult.greenhouseStrength.toFixed(2) : "-"}</span>
+            </li>
+            <li className="report-page__value-item">
+              <span className="label">Energy State</span>
+              <span className="value">{physicsResult ? energyStateOf(physicsResult.deltaEnergy) : "-"}</span>
+            </li>
+          </ul>
+        </div>
       </div>
 
       <div className="report-page__section">

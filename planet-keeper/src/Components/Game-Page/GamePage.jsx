@@ -1,19 +1,11 @@
 import { useEffect, useState } from "react";
 import QuizModal from "./QuizModal";
 import PlanetUI from "../Planet-ui.jsx";
-import useClimateStore from "../../store/useClimateStore";
+import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
-import { computeClimateV2, mapSlidersToClimateInputs, REFERENCE_TEMP_K } from "../../utils/physicsEngine.js";
+import { mapSlidersToClimateInputs, ENERGY_BALANCE_EPSILON, energyStateOf } from "../../utils/physicsEngine.js";
 import { predictClimateState } from "../../utils/climateClassifier.js";
 import "./GamePage.css";
-
-const ENERGY_BALANCE_EPSILON = 5;
-
-function energyStateOf(deltaEnergy) {
-  if (deltaEnergy > ENERGY_BALANCE_EPSILON) return "Energy Surplus";
-  if (deltaEnergy < -ENERGY_BALANCE_EPSILON) return "Energy Deficit";
-  return "Stable";
-}
 
 function energyStateDescription(deltaEnergy) {
   if (deltaEnergy > ENERGY_BALANCE_EPSILON) {
@@ -27,19 +19,20 @@ function energyStateDescription(deltaEnergy) {
 
 function GamePage() {
   const [showQuiz, setShowQuiz] = useState(false);
-  // 제작 페이지에서 만든 행성 상태를 그대로 이어받는다.
+  // 제작 페이지에서 만든 행성 상태 + Physics 결과를 그대로 이어받는다.
+  // Physics Engine은 PlanetCreatePage에서만 실행하고, 여기서는 재호출하지 않는다.
   const values = useClimateStore((state) => state.values);
+  const physicsResult = useClimateStore((state) => state.physicsResult);
   const visual = slidersToVisual(values);
-
-  const climateInputs = mapSlidersToClimateInputs(values);
-  const physics = computeClimateV2({ ...climateInputs, currentTemperature: REFERENCE_TEMP_K });
 
   const [climateState, setClimateState] = useState(null);
 
   useEffect(() => {
+    if (!physicsResult) return;
     let cancelled = false;
+    const climateInputs = mapSlidersToClimateInputs(values);
 
-    predictClimateState(climateInputs, physics)
+    predictClimateState(climateInputs, physicsResult)
       .then((result) => {
         if (!cancelled) setClimateState(result);
       })
@@ -48,27 +41,24 @@ function GamePage() {
     return () => {
       cancelled = true;
     };
-    // climateInputs/physics는 values로부터 매 렌더마다 새로 파생되는 값이라
-    // deps에 넣으면 setClimateState -> 재렌더 -> 새 객체 -> 재실행의 무한 루프가 된다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values]);
+  }, [values, physicsResult]);
 
   return (
     <div className="game-page">
       <div className="game-page__main">
         <div className="game-page__stats-bar">
-          <span>빙하: {values.iceThickness}%</span>
-          <span>바다: {values.ocean}%</span>
-          <span>구름: {values.cloud}%</span>
-          <span>대기: {values.atmThickness}%</span>
-          <span>CO₂: {co2Ppm(values.co2)} ppm</span>
-          <span>현재 온도: {physics.currentTemperature.toFixed(1)} K</span>
-          <span>ASR: {physics.absorbedRadiation.toFixed(2)}</span>
-          <span>OLR: {physics.outgoingRadiation.toFixed(2)}</span>
-          <span>ΔE: {physics.deltaEnergy.toFixed(2)}</span>
-          <span>Albedo: {physics.albedo.toFixed(2)}</span>
-          <span>Greenhouse: {physics.greenhouseStrength.toFixed(2)}</span>
-          <span>ε: {physics.effectiveEmissivity.toFixed(2)}</span>
+          {CLIMATE_VARIABLES.map(({ key, label }) => (
+            <span key={key}>
+              {label}: {key === "co2" ? `${co2Ppm(values.co2)} ppm` : `${values[key]}%`}
+            </span>
+          ))}
+          <span>현재 온도: {physicsResult ? physicsResult.currentTemperature.toFixed(1) : "-"} K</span>
+          <span>ASR: {physicsResult ? physicsResult.absorbedRadiation.toFixed(2) : "-"}</span>
+          <span>OLR: {physicsResult ? physicsResult.outgoingRadiation.toFixed(2) : "-"}</span>
+          <span>ΔE: {physicsResult ? physicsResult.deltaEnergy.toFixed(2) : "-"}</span>
+          <span>Albedo: {physicsResult ? physicsResult.albedo.toFixed(2) : "-"}</span>
+          <span>Greenhouse: {physicsResult ? physicsResult.greenhouseStrength.toFixed(2) : "-"}</span>
+          <span>ε: {physicsResult ? physicsResult.effectiveEmissivity.toFixed(2) : "-"}</span>
           <span>ML 상태: {climateState ? climateState.label : "계산 중..."}</span>
         </div>
 
@@ -91,8 +81,8 @@ function GamePage() {
       <div className="game-page__side">
         <div className="game-page__side-box">
           <h3>에너지 상태</h3>
-          <h2>{energyStateOf(physics.deltaEnergy)}</h2>
-          <p>{energyStateDescription(physics.deltaEnergy)}</p>
+          <h2>{physicsResult ? energyStateOf(physicsResult.deltaEnergy) : "계산 중..."}</h2>
+          <p>{physicsResult ? energyStateDescription(physicsResult.deltaEnergy) : ""}</p>
         </div>
         <div className="game-page__side-box">틀린 횟수 (하트가 깨지는 느낌)</div>
       </div>
