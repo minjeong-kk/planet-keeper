@@ -1,13 +1,14 @@
 import { useState } from "react";
 import QuizModal from "./QuizModal";
 import PlanetUI from "../Planet-ui.jsx";
-import { useClimate, slidersToVisual, co2Ppm } from "../../store/ClimateContext.jsx";
+import useClimateStore from "../../store/useClimateStore";
+import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import "./GamePage.css";
 
 function GamePage() {
   const [showQuiz, setShowQuiz] = useState(false);
   // 제작 페이지에서 만든 행성 상태를 그대로 이어받는다.
-  const { values } = useClimate();
+  const values = useClimateStore((state) => state.values);
   const visual = slidersToVisual(values);
 
   return (

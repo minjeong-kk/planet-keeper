@@ -1,11 +1,8 @@
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
-import {
-  useClimate,
-  slidersToVisual,
-  co2Ppm,
-} from "../../store/ClimateContext.jsx";
+import useClimateStore from "../../store/useClimateStore";
+import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import "./PlanetCreatePage.css";
 
 const VARIABLES = [
@@ -16,9 +13,16 @@ const VARIABLES = [
   { key: "co2", label: "CO₂ 농도", Icon: Factory, unit: "ppm" },
 ];
 
+// 첫 로드 시 '아름다운 지구' 기본값으로 초기화. (공유 store 기본은 all-50 이지만,
+// store 파일은 팀원과 바이트 동일하게 유지하고 초기값은 여기서만 override → store 충돌 방지)
+useClimateStore.setState({
+  values: { ocean: 50, iceThickness: 20, cloud: 30, atmThickness: 50, co2: 20 },
+});
+
 function PlanetCreatePage() {
   const navigate = useNavigate();
-  const { values, setValue } = useClimate();
+  const values = useClimateStore((state) => state.values);
+  const setValue = useClimateStore((state) => state.setValue);
 
   const visual = slidersToVisual(values);
 
