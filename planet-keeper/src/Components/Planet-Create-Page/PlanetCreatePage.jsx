@@ -1,7 +1,11 @@
-import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
+import {
+  useClimate,
+  slidersToVisual,
+  co2Ppm,
+} from "../../store/ClimateContext.jsx";
 import "./PlanetCreatePage.css";
 
 const VARIABLES = [
@@ -12,40 +16,11 @@ const VARIABLES = [
   { key: "co2", label: "CO₂ 농도", Icon: Factory, unit: "ppm" },
 ];
 
-// 아름다운 지구 첫인상을 주는 기본 세팅
-const INITIAL_VALUES = {
-  ocean: 50,
-  iceThickness: 20,
-  cloud: 30,
-  atmThickness: 50,
-  co2: 20,
-};
-
-const s01 = (v) => Math.min(1, Math.max(0, (v ?? 0) / 100)); // 0~100 → 0~1
-
-// CO₂ 슬라이더(%) → 실제 ppm (physicsEngine 매핑과 동일: 432 * (0.3 ~ 3.0))
-const co2Ppm = (v) => Math.round(432 * (0.3 + s01(v) * 2.7));
-
-/** 슬라이더 값을 PlanetUI 의 물리 요소별 3D props 로 매핑 */
-function slidersToVisual(sliders) {
-  return {
-    oceanRatio: s01(sliders.ocean),
-    glacierRatio: s01(sliders.iceThickness),
-    cloudRatio: s01(sliders.cloud),
-    co2Level: s01(sliders.co2),
-    atmosphereScale: 1.05 + s01(sliders.atmThickness) * 0.4,
-  };
-}
-
 function PlanetCreatePage() {
   const navigate = useNavigate();
-  const [values, setValues] = useState(INITIAL_VALUES);
-  const [activeKey, setActiveKey] = useState("ocean");
+  const { values, setValue } = useClimate();
 
   const visual = slidersToVisual(values);
-
-  const handleChange = (key, value) =>
-    setValues((prev) => ({ ...prev, [key]: value }));
 
   // 대시보드 수치 표시(단위 포함). CO₂ 는 실제 ppm 으로 환산해 보여준다.
   const displayValue = (v) =>
@@ -76,14 +51,8 @@ function PlanetCreatePage() {
           <div className="planet-create-page__sliders">
             {VARIABLES.map((v) => {
               const Icon = v.Icon;
-              const active = v.key === activeKey;
               return (
-                <div
-                  key={v.key}
-                  className={
-                    "planet-create-page__control" + (active ? " is-active" : "")
-                  }
-                >
+                <div key={v.key} className="planet-create-page__control">
                   <div className="planet-create-page__control-header">
                     <label
                       htmlFor={v.key}
@@ -104,37 +73,9 @@ function PlanetCreatePage() {
                     max={100}
                     value={values[v.key]}
                     style={{ "--fill": `${values[v.key]}%` }}
-                    onFocus={() => setActiveKey(v.key)}
-                    onChange={(e) => handleChange(v.key, Number(e.target.value))}
+                    onChange={(e) => setValue(v.key, Number(e.target.value))}
                   />
                 </div>
-              );
-            })}
-          </div>
-
-          {/* ── 하단 아이콘 탭바 (글래스모피즘 · 활성 네온 · 호버 툴팁) ── */}
-          <div className="planet-create-page__tabbar" role="tablist">
-            {VARIABLES.map((v) => {
-              const Icon = v.Icon;
-              const active = v.key === activeKey;
-              return (
-                <button
-                  key={v.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={active}
-                  aria-label={v.label}
-                  data-label={v.label}
-                  className={
-                    "planet-create-page__tab" + (active ? " is-active" : "")
-                  }
-                  onClick={() => {
-                    setActiveKey(v.key);
-                    document.getElementById(v.key)?.focus();
-                  }}
-                >
-                  <Icon size={20} aria-hidden />
-                </button>
               );
             })}
           </div>

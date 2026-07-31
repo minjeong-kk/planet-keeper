@@ -1,5 +1,6 @@
 .planet-create-page {
   display: flex;
+  align-items: center; /* 패널을 내용 높이로 수직 중앙 정렬 → 탭바 제거로 생긴 하단 공백 제거 */
   justify-content: space-between;
   gap: 40px;
   padding: 40px;
@@ -82,12 +83,6 @@
 .planet-create-page__control {
   padding: 10px 12px;
   border-radius: 12px;
-  border: 1px solid transparent;
-  transition: border-color 0.2s ease, background 0.2s ease;
-}
-.planet-create-page__control.is-active {
-  border-color: rgba(88, 224, 255, 0.4);
-  background: rgba(88, 224, 255, 0.06);
 }
 
 /* 헤더: 아이콘+라벨(좌) / 수치(우) */
@@ -181,63 +176,6 @@
 }
 .planet-create-page__slider:hover::-moz-range-thumb {
   transform: scale(1.25);
-}
-
-/* ── 하단 아이콘 탭바 (글래스모피즘 · 활성 네온 · 호버 툴팁) ── */
-.planet-create-page__tabbar {
-  margin-top: auto;
-  display: flex;
-  gap: 10px;
-  padding-top: 18px;
-  border-top: 1px solid rgba(255, 255, 255, 0.1);
-}
-.planet-create-page__tab {
-  position: relative;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 44px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.05);
-  color: #aeb8cc;
-  cursor: pointer;
-  transition: transform 0.18s ease, color 0.18s ease, border-color 0.18s ease,
-    background 0.18s ease, box-shadow 0.18s ease;
-}
-.planet-create-page__tab:hover {
-  transform: translateY(-2px);
-  color: #e8ecf5;
-  border-color: rgba(88, 224, 255, 0.35);
-}
-.planet-create-page__tab.is-active {
-  color: #ffffff;
-  border-color: var(--neon);
-  background: rgba(88, 224, 255, 0.14);
-  box-shadow: 0 0 14px var(--neon-glow), inset 0 0 6px var(--neon-glow);
-}
-/* 호버 툴팁 */
-.planet-create-page__tab::after {
-  content: attr(data-label);
-  position: absolute;
-  bottom: calc(100% + 8px);
-  left: 50%;
-  transform: translateX(-50%) translateY(4px);
-  padding: 5px 9px;
-  border-radius: 8px;
-  background: rgba(10, 14, 24, 0.95);
-  border: 1px solid rgba(88, 224, 255, 0.3);
-  color: #e8ecf5;
-  font-size: 0.72rem;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.18s ease, transform 0.18s ease;
-}
-.planet-create-page__tab:hover::after {
-  opacity: 1;
-  transform: translateX(-50%) translateY(0);
 }
 
 .planet-create-page__actions {
