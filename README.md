@@ -11,18 +11,43 @@ pip install -r requirements.txt
 ```
 
 ## 알려진 한계 (Known Limitations)
+### 1. Physics Engine 기준값의 한계
+- `physics_reference.csv`는 최근 7일 평균 데이터를 기반으로 생성됩니다.
+- 특정 계절과 동아시아(GK2A 관측 영역) 데이터를 사용하므로, 전 지구 연평균이 아닌 해당 기간·지역의 대표값입니다.
+- 따라서 절대적인 지구 기준값이 아닌, 물리 엔진 계산을 위한 기준값으로 사용합니다.
 
-데이터/모델 관련해서 미리 인지하고 있는 방법론적 한계들입니다.
+### 2. 머신러닝 학습 데이터의 한계
+- `ml_dataset.csv`는 KMA API 조회 기간(최대 약 180일)의 제약을 받습니다.
+- 모든 계절을 포함하지 못하며, 특정 기간의 실제 기상 특성을 반영합니다.
 
-- **물리엔진 기준값(`physics_reference.csv`)의 계절·지역 편향**: 최근 7일 평균으로 뽑는데, 이 7일이 특정 계절(현재는 여름)에 몰려있고, GK2A 위성 특성상 동아시아 권역 시야만 반영합니다. 즉 "지구 전체 연평균"이 아니라 "그 계절·그 지역·그 시각"의 스냅샷에 가깝습니다. 정밀한 전지구 연평균이 필요한 게 아니라 대략적인 기준점 용도로만 사용합니다.
-- **ML 실측 데이터(`ml_dataset.csv`)도 최대 반년치**: KMA API가 최근 180일까지만 조회 가능해서, 사계절 전체가 아니라 그중 절반 정도만 반영됩니다.
-- **CO2 데이터의 시차**: 기후변화감시소에서 받은 CO2 실측치는 2024년 말까지만 있고, KIM/GK2A 샘플은 그보다 최근 시점이라 약 1~2년 시차가 있습니다. CO2는 변화가 느린 값이라 근사치로 사용합니다.
-- **이상 기후 클래스(온실폭주/스노우볼/데드플래닛)는 전부 물리엔진 합성 데이터**: 실측이 존재할 수 없는 상태라 물리엔진 공식으로 생성합니다. 즉 이 3개 클래스의 정확도는 실측 검증이 아니라 물리엔진 공식 자체의 정확도에 전적으로 의존합니다.
-- **위성 상품 간 격자 매칭은 최근접 이웃 근사**: GK2A 상품마다 해상도가 달라(SAL 5500×5500 vs TPW 1833×1833) 완전히 같은 지점이 아니라 가장 가까운 픽셀을 매칭합니다.
+### 3. CO₂ 데이터 시차
+- CO₂는 기후변화감시소의 실측 자료를 사용합니다.
+- KIM/GK2A 데이터보다 약 1~2년 이전 자료를 사용하지만, CO₂는 단기간 변화가 비교적 작아 근사값으로 활용합니다.
 
-SWRAD 
-240까지는 더 안 좁혀지는 이유가 있습니다 — 2가지
-- **계절·반구 편향**: GK2A 중심점(0°N, 128.2°E)은 지금(7월) 북반구 여름철이라, 이 화면에 보이는 영역이 태양이 가장 강하게 내리쬐는 시기·지역 쪽에 쏠려있습니다. 240은 "지구 전체 연평균"이라 계절/지역을 다 섞은 값인데, 우리 건 "여름철 이 반구" 스냅샷이라 구조적으로 더 높게 나올 수밖에 없습니다.
-- **더 근본적인 문제**: 위성 이미지는 픽셀이 실제 면적 기준이 아니라 촬영 각도 기준으로 찍힙니다. 위성 바로 아래(중심, 저위도)는 픽셀 하나가 좁은 실제 면적을 담고, 가장자리(고위도)로 갈수록 픽셀 하나가 훨씬 넓은 실제 면적을 담습니다. 근데 지금은 픽셀 개수로 그냥 평균내고 있어서, 실제보다 중심부(저위도=일사량 강한 지역)에 가중치가 쏠려 평균이 부풀려집니다.
+### 4. 이상 기후 데이터
+- 온실폭주(Runaway Greenhouse), 스노우볼(Snowball), 극한 고온·저온 등 실제 관측이 어려운 기후 상태는 물리 엔진을 이용한 합성 데이터로 생성합니다.
+- 따라서 해당 클래스의 품질은 물리 엔진 모델의 정확도에 의존합니다.
 
-2번은 실제 면적 기준 가중평균으로 고쳐야 하는데, 계산이 꽤 복잡해집니다. 지금 240에 정확히 맞추는 게 목적이 아니라 "대략적인 기준점"이면 되는 거라, 이 정도(330, 이유가 설명되는 편향)면 README에 이미 적어둔 한계 범위 안에서 받아들이고 넘어가는 걸 추천합니다.
+### 5. 위성 데이터 격자 매칭
+- GK2A 산출물(SAL, TPW, CLA 등)은 서로 다른 공간 해상도를 가지므로, 최근접 이웃(Nearest Neighbor) 방식으로 동일 위치를 매칭합니다.
+- 이 과정에서 작은 공간 오차가 발생할 수 있습니다.
+
+### 6. SWRAD(태양복사) 평균값 편향
+- 계산된 SWRAD 평균은 일반적으로 알려진 지구 평균(약 240 W/m²)보다 높게 나타날 수 있습니다.
+- 주요 원인은 다음과 같습니다.
+  - 여름철 및 동아시아 영역 중심의 자료를 사용하여 계절·지역 편향이 존재함
+  - 위성 영상의 픽셀을 동일 가중치로 평균하여, 실제 면적보다 저위도(태양복사가 강한 지역)의 영향이 크게 반영됨
+- 본 프로젝트에서는 절대적인 전 지구 평균을 재현하기보다, 물리 엔진 계산을 위한 대표 기준값으로 활용합니다.
+
+## Assets & Licensing
+All textures are bundled locally (not hot-linked) to avoid runtime/CORS dependency.
+- **Earth day map** (`public/assets/earth.jpg`) — "Earth Day Map" (2k) by
+  **Solar System Scope**, **CC BY 4.0**. https://www.solarsystemscope.com/textures/
+- **Earth clouds** (`public/assets/earth-clouds.jpg`) — "Earth Clouds" (2k) by
+  **Solar System Scope**, **CC BY 4.0**. https://www.solarsystemscope.com/textures/
+- **Earth elevation / height map** (`public/assets/earth-height.jpg`) — grayscale
+  elevation map derived from **NASA Visible Earth** (Public Domain), via
+  `turban/webgl-earth` (MIT). https://github.com/turban/webgl-earth
+- CC BY 4.0 license: https://creativecommons.org/licenses/by/4.0/
+- **Atmosphere / CO₂ glow:** the Fresnel rim-glow *shader technique* from public
+  Three.js examples (a technique, not a copyrighted asset).

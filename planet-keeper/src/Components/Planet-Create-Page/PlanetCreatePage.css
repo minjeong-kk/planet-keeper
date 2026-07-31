@@ -1,0 +1,189 @@
+.planet-create-page {
+  display: flex;
+  align-items: center; /* 패널을 내용 높이로 수직 중앙 정렬 → 탭바 제거로 생긴 하단 공백 제거 */
+  justify-content: space-between;
+  gap: 40px;
+  padding: 40px;
+  flex: 1;
+}
+
+.planet-create-page__planet {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.planet-create-page__planet-placeholder {
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* ── 글래스모피즘 다크 컨트롤 패널 ── */
+.planet-create-page__controls {
+  --neon: #58e0ff;
+  --neon-glow: rgba(88, 224, 255, 0.55);
+  flex: 1;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 26px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  background: linear-gradient(160deg, rgba(28, 36, 58, 0.72), rgba(14, 18, 30, 0.72));
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  color: #e8ecf5;
+  /* 슬라이더 드래그 중 텍스트 선택 개입(금지 커서/끊김) 차단 */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── 타이틀 영역 (STEP 서브텍스트 + 액센트 바) ── */
+.planet-create-page__titlebar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.planet-create-page__step {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--neon);
+  opacity: 0.85;
+}
+.planet-create-page__title {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #f2f5fb;
+}
+.planet-create-page__title-accent {
+  width: 4px;
+  height: 20px;
+  border-radius: 2px;
+  background: var(--neon);
+  box-shadow: 0 0 10px var(--neon-glow);
+}
+
+/* ── 슬라이더 목록 ── */
+.planet-create-page__sliders {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.planet-create-page__control {
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+/* 헤더: 아이콘+라벨(좌) / 수치(우) */
+.planet-create-page__control-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.planet-create-page__control-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #e8ecf5;
+}
+.planet-create-page__control-icon {
+  color: var(--neon);
+  opacity: 0.9;
+  flex-shrink: 0;
+}
+.planet-create-page__control-value {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--neon);
+  text-shadow: 0 0 8px var(--neon-glow);
+}
+
+/* ── 글래스모피즘 네온 슬라이더 ── */
+.planet-create-page__slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  outline: none;
+  /* 채워지는 왼쪽(네온) + 반투명 다크 트랙(우측). --fill 은 인라인 스타일로 주입 */
+  background: linear-gradient(
+    to right,
+    var(--neon) 0 var(--fill, 50%),
+    rgba(255, 255, 255, 0.15) var(--fill, 50%) 100%
+  );
+  box-shadow: 0 0 6px rgba(88, 224, 255, 0.15) inset;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-user-drag: none;
+  touch-action: none;
+}
+
+/* WebKit 손잡이 */
+.planet-create-page__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--neon);
+  box-shadow: 0 0 8px var(--neon-glow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.planet-create-page__slider::-webkit-slider-thumb:hover {
+  transform: scale(1.25);
+  box-shadow: 0 0 16px var(--neon-glow);
+}
+.planet-create-page__slider:active::-webkit-slider-thumb {
+  transform: scale(1.2);
+}
+
+/* Firefox 트랙/진행/손잡이 */
+.planet-create-page__slider::-moz-range-track {
+  height: 6px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.15);
+}
+.planet-create-page__slider::-moz-range-progress {
+  height: 6px;
+  border-radius: 10px;
+  background: var(--neon);
+}
+.planet-create-page__slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--neon);
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 0 8px var(--neon-glow);
+  transition: transform 0.2s ease;
+}
+.planet-create-page__slider:hover::-moz-range-thumb {
+  transform: scale(1.25);
+}
+
+.planet-create-page__actions {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 40px 40px;
+}
+
+.planet-create-page__actions button {
+  padding: 12px 20px;
+}

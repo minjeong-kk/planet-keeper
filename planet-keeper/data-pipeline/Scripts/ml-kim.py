@@ -16,7 +16,7 @@ from dotenv import load_dotenv
 load_dotenv()  # .env 파일 읽기
 API_KEY = os.getenv("API_KEY")
 
-BASE_URL = "https://apihub.kma.go.kr/api/typ06/cgi-bin/url/nph-kim_nc_xy_txt2_std"
+BASE_URL = "https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph-kim_nc_pt_txt2"
 
 # ML용 변수 (KIM 수치모델, GK2A 샘플 좌표 기준 조회)
 VARIABLES = [
@@ -37,56 +37,77 @@ def fetch_point(var_name, tmfc, lat, lon):
         "data": "U",
         "name": var_name,
         "tmfc": tmfc,
+        "hf": "0",
         "lat": lat,
         "lon": lon,
+        "disp": "A",
         "help": "0",
-        "authKey": API_KEY
+        "authKey": API_KEY,
     }
 
     # ponytail: API 문서에 lat/lon으로 임의 격자점을 조회할 수 있다고만 나와 있고
     # 응답 형식(1개 값만 오는지, map 파라미터가 별도로 필요한지)은 미검증.
     # 429(속도 제한)만 짧게 재시도. 403(할당량 초과) 등은 그대로 올림.
     for attempt in range(3):
-        response = requests.get(BASE_URL, params=params)
+        response = requests.get(BASE_URL, params=params, timeout=30)
+
         if response.status_code == 429:
             wait = 5 * (attempt + 1)
-            print(f"{var_name}: 429 Too Many Requests, {wait}초 대기 후 재시도")
+            print(f"{var_name}: 429 Too Many Requests ({wait}s)")
             time.sleep(wait)
             continue
+
         response.raise_for_status()
         break
     else:
         response.raise_for_status()
 
-    numbers = re.findall(r'[-+]?\d+\.\d+e[+-]\d+', response.text)
+    text = response.text
 
-    return float(numbers[0]) if numbers else None
+    # 숫자 추출
+    for line in text.splitlines():
+        if f"{var_name}(" in line:
+            return float(line.split()[4])
+
+    print("========== API 응답 ==========")
+    print(text[:1000])
+    print("=============================")
+    return None
 
 
 with open(GK2A_SAMPLE_FILE, newline="") as f:
     gk2a_samples = list(csv.DictReader(f))
 
+
 # 이미 처리된 행 수만큼 건너뛰고, 새로 추가된 행만 이어서 매칭한다.
+file_exists = os.path.exists(OUTPUT_FILE)
+
 already_done = 0
-if os.path.exists(OUTPUT_FILE):
+if file_exists:
     with open(OUTPUT_FILE, newline="") as f:
         already_done = sum(1 for _ in csv.DictReader(f))
 
+
+# ponytail: 이 세 줄이 예전엔 위 if 블록 안에 있어서, OUTPUT_FILE이 아직
+# 없는 첫 실행(파일 없음)에는 total이 정의조차 안 돼서 바로 NameError로 죽었음.
 new_samples = gk2a_samples[already_done:]
 extra_columns = [c for c in gk2a_samples[0].keys() if c not in ("tmfc", "lat", "lon")]
 total = len(new_samples)
 
+
 if total == 0:
     print("새로 매칭할 샘플이 없습니다 (ml_gk2a_dataset.csv에 새 행을 추가한 뒤 다시 실행하세요).")
 else:
-    file_exists = os.path.exists(OUTPUT_FILE)
     fieldnames = ["tmfc", "lat", "lon"] + VARIABLES + extra_columns
 
-    # 한 개씩 바로 저장 -> 중간에 할당량 초과 등으로 멈춰도 그때까지 성공한 만큼은 남는다.
     with open(OUTPUT_FILE, "a", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+        # ponytail: 예전엔 무조건 writeheader()를 호출해서, 이어쓰기(append)할
+        # 때마다 데이터 중간에 헤더 줄이 하나씩 더 끼어드는 문제가 있었음.
         if not file_exists:
             writer.writeheader()
+
 
         done = 0
         for i, sample in enumerate(new_samples):
