@@ -11,9 +11,9 @@
   border: none;
   outline: none;
   box-shadow: none;
-  /* 다크 우주 배경: 투명 Canvas의 프레넬 글로우가 어둠 위에 선명히 합성되어
-     밝은 배경에서 생기던 희끄무레한 사각형 잔상을 근본적으로 제거한다. */
-  background: radial-gradient(circle at 50% 42%, #101a30 0%, #070b16 62%, #04060d 100%);
+  /* 배경 완전 투명: Canvas(gl.alpha)도 투명이라 뒤 배경이 그대로 비침.
+     검은 배경 박스/틀 없음. 글로우 셰이더는 premultiplied+clamp라 흰 테두리도 없음. */
+  background: transparent;
 }
 
 /* R3F가 생성하는 canvas 요소가 뷰포트를 빈틈없이 채우도록 강제 */
