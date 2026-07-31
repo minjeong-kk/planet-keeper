@@ -1,16 +1,13 @@
 """ML 파이프라인 공용 설정.
 
 FEATURES 리스트만 수정하면 train_rf.py / evaluate.py / export_onnx.py /
-inference.py는 전부 그대로 재사용할 수 있다. 물리엔진 결과(surface_temp,
-greenhouse, absorbed_energy 등)가 나오면 아래 FEATURES에 추가만 하면 됨.
+inference.py는 전부 그대로 재사용할 수 있다.
 """
 
 from pathlib import Path
 
 # ── 피처 정의 (여기만 수정하면 됨) ─────────────────────────────────────
-# 지금은 실측 KIM/GK2A 변수만 있는 임시 피처 목록.
-# 물리엔진 결과가 나오면 예: "surface_temp", "greenhouse", "absorbed_energy"
-# 를 이 리스트에 추가하기만 하면 나머지 스크립트는 손댈 필요 없음.
+# 실측 KIM/GK2A 변수 + 물리엔진(computeClimateV2) 출력.
 FEATURES: list[str] = [
     "SAL",  # Black-Sky Albedo = 지표면 반사도
     "TPW",  # Total Precipitable Water = 가강수량
@@ -18,7 +15,12 @@ FEATURES: list[str] = [
     "SST",  # Sea Surface Temperature = 해수면온도
     "t2m",  # 기온(2m)
     "psl",  # 해면기압
-    "co2",
+    "co2",  # 시뮬레이션에 쓰인 CO2 농도(ppm)
+    "absorbedRadiation",  # 물리엔진: ASR
+    "outgoingRadiation",  # 물리엔진: OLR (현재 온도 기준)
+    "deltaEnergy",        # 물리엔진: ASR - OLR
+    "greenhouseStrength",  # 물리엔진
+    "albedo",              # 물리엔진
 ]
 
 LABEL_COLUMN: str = "state"
