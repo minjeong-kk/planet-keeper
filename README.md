@@ -40,10 +40,14 @@ pip install -r requirements.txt
 - 본 프로젝트에서는 절대적인 전 지구 평균을 재현하기보다, 물리 엔진 계산을 위한 대표 기준값으로 활용합니다.
 
 ## Assets & Licensing
-- **Earth surface texture** (`public/assets/earth.jpg`): "Earth Day Map" (2k) by
-  **Solar System Scope**, licensed under **CC BY 4.0**.
-  Source: https://www.solarsystemscope.com/textures/
-  License: https://creativecommons.org/licenses/by/4.0/
-  The file is bundled locally (not hot-linked) to avoid runtime/CORS dependency.
-- **Atmosphere glow:** Implemented with the well-known Fresnel rim-glow *shader technique*
-  from public Three.js examples (a technique, not a copyrighted asset).
+All textures are bundled locally (not hot-linked) to avoid runtime/CORS dependency.
+- **Earth day map** (`public/assets/earth.jpg`) — "Earth Day Map" (2k) by
+  **Solar System Scope**, **CC BY 4.0**. https://www.solarsystemscope.com/textures/
+- **Earth clouds** (`public/assets/earth-clouds.jpg`) — "Earth Clouds" (2k) by
+  **Solar System Scope**, **CC BY 4.0**. https://www.solarsystemscope.com/textures/
+- **Earth elevation / height map** (`public/assets/earth-height.jpg`) — grayscale
+  elevation map derived from **NASA Visible Earth** (Public Domain), via
+  `turban/webgl-earth` (MIT). https://github.com/turban/webgl-earth
+- CC BY 4.0 license: https://creativecommons.org/licenses/by/4.0/
+- **Atmosphere / CO₂ glow:** the Fresnel rim-glow *shader technique* from public
+  Three.js examples (a technique, not a copyrighted asset).

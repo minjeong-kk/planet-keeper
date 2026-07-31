@@ -42,7 +42,6 @@
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  box-shadow: var(--shadow);
 }
 
 .game-page__quiz-trigger {
