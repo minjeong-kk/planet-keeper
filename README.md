@@ -10,6 +10,33 @@ pip install -r requirements.txt
 
 ```
 
+## ML 모델 학습 파이프라인
+`data-pipeline/ML-Scripts/` 안에서 실행합니다(상대경로 `../Datasets`, `../Models` 기준).
+
+```
+cd data-pipeline/ML-Scripts
+
+python3 generate_dataset.py   # 실측 데이터 + 물리엔진 시뮬레이션 → final_ml_dataset.csv
+python3 train_rf.py           # RandomForest 학습 → climate_rf.pkl, test_split.csv
+python3 export_onnx.py        # climate_rf.pkl → climate_rf.onnx (브라우저용 변환)
+python3 evaluate.py           # test_split.csv로 성능 평가 → confusion_matrix.png
+
+cp ../Models/climate_rf.onnx ../../public/models/climate_rf.onnx  # 게임(프론트)에 반영
+```
+
+`train_rf.py`/`export_onnx.py`/`evaluate.py`를 수정했으면 이 순서대로 다시 실행해야
+모델·ONNX·평가 결과·프론트 반영본이 서로 어긋나지 않습니다.
+
+### 파일별 역할
+- **config.py** — 피처 목록, 경로, 학습 설정을 모아둔 공용 설정. 이 파일만 고치면 나머지 스크립트는 그대로 재사용됨.
+- **label_rules.py** — 물리엔진 출력(deltaEnergy·온도)으로 5-class 라벨(state 0~4)을 매기는 규칙.
+- **generate_dataset.py** — 실측 데이터 각 행마다 슬라이더 조합을 무작위로 만들어 물리엔진에 돌리고, 라벨까지 붙여 최종 학습 데이터셋을 만듦.
+- **run_physics_engine.mjs** — generate_dataset.py가 `src/utils/physicsEngine.js`(JS)를 그대로 호출하기 위한 Node 브릿지.
+- **train_rf.py** — RandomForest 학습, 8:2로 나눠 모델(.pkl)과 테스트셋을 저장.
+- **export_onnx.py** — 학습된 모델을 브라우저에서 쓸 수 있게 ONNX로 변환.
+- **evaluate.py** — 테스트셋으로 Accuracy/Precision/Recall/F1과 Confusion Matrix 이미지를 생성.
+- **inference.py** — ONNX 모델로 CSV 한 행을 추론해보는 디버깅용 스크립트.
+
 ## 알려진 한계 (Known Limitations)
 ### 1. Physics Engine 기준값의 한계
 - `physics_reference.csv`는 최근 7일 평균 데이터를 기반으로 생성됩니다.
