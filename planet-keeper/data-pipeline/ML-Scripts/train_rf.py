@@ -3,6 +3,10 @@
 Datasets/의 CSV(FEATURES + LABEL_COLUMN 컬럼 필요)를 읽어 8:2로 나누고
 학습한 뒤 Models/climate_rf.pkl로 저장한다.
 
+같은 실측 위치(SAL/TPW/CLA/SST/t2m/psl)에서 슬라이더만 바꿔 생성된 여러 행이
+train/test에 동시에 섞이지 않도록, row 단위가 아니라 실측 위치 단위(Group)로
+분리한다(GroupShuffleSplit).
+
 피처 목록은 config.py 한 곳에서만 관리한다 - 물리엔진 피처가 추가되면
 config.py의 FEATURES만 수정하면 이 스크립트는 그대로 재사용된다.
 
@@ -19,12 +23,17 @@ from pathlib import Path
 
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import GroupShuffleSplit
 
 import config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+# generate_dataset.py는 하나의 실측 위치(이 6개 컬럼)당 슬라이더만 바꿔 여러 행을
+# 만든다. row 단위로 무작위 분할하면 같은 위치의 행이 train/test에 동시에 들어가
+# 모델이 위치를 암기해버리므로(데이터 누수), 이 컬럼들로 묶은 그룹 단위로 분리한다.
+GROUP_COLUMNS = ["SAL", "TPW", "CLA", "SST", "t2m", "psl"]
 
 
 def load_dataset(csv_path: Path) -> pd.DataFrame:
@@ -51,8 +60,12 @@ def load_dataset(csv_path: Path) -> pd.DataFrame:
     return df
 
 
-def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
-    """FEATURES/LABEL 분리. 결측치가 있는 행은 제거한다."""
+def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
+    """FEATURES/LABEL/그룹id 분리. 결측치가 있는 행은 제거한다.
+
+    그룹id는 실측 위치(GROUP_COLUMNS)를 그대로 이어붙인 문자열이다 - 같은
+    실측 위치에서 나온 시뮬레이션 행은 전부 같은 그룹이 된다.
+    """
     subset = df[config.FEATURES + [config.LABEL_COLUMN]].dropna()
     dropped = len(df) - len(subset)
     if dropped:
@@ -60,7 +73,8 @@ def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
 
     X = subset[config.FEATURES]
     y = subset[config.LABEL_COLUMN]
-    return X, y
+    groups = subset[GROUP_COLUMNS].astype(str).agg("_".join, axis=1)
+    return X, y, groups
 
 
 def train_model(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestClassifier:
@@ -87,9 +101,12 @@ def main(dataset_path: Path) -> None:
     logger.info(f"데이터셋 로드: {dataset_path}")
     df = load_dataset(dataset_path)
 
-    X, y = split_features_labels(df)
+    X, y, groups = split_features_labels(df)
     n_classes = y.nunique()
-    logger.info(f"학습 가능한 행 {len(X)}개, 피처 {len(config.FEATURES)}개, 클래스 {n_classes}개")
+    logger.info(
+        f"학습 가능한 행 {len(X)}개, 피처 {len(config.FEATURES)}개, "
+        f"클래스 {n_classes}개, 실측 위치(그룹) {groups.nunique()}개"
+    )
 
     if n_classes < 2:
         logger.warning(
@@ -98,12 +115,16 @@ def main(dataset_path: Path) -> None:
             "분류 성능은 나오지 않습니다."
         )
 
-    X_train, X_test, y_train, y_test = train_test_split(
-        X, y,
-        test_size=config.TEST_SIZE,
-        random_state=config.RANDOM_STATE,
-        stratify=y if n_classes > 1 else None,
+    splitter = GroupShuffleSplit(
+        n_splits=1, test_size=config.TEST_SIZE, random_state=config.RANDOM_STATE
     )
+    train_idx, test_idx = next(splitter.split(X, y, groups=groups))
+    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
+    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
+
+    overlap = set(groups.iloc[train_idx]) & set(groups.iloc[test_idx])
+    assert not overlap, f"train/test에 겹치는 그룹이 있습니다: {len(overlap)}개"
+
     logger.info(f"train {len(X_train)}행 / test {len(X_test)}행")
 
     model = train_model(X_train, y_train)
