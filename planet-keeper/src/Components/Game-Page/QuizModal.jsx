@@ -1,15 +1,51 @@
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
-function QuizModal() {
-  const navigate = useNavigate();
+// QUIZ/FINAL_QUIZ 단계가 공유하는 문제 UI. quiz 데이터({id, question, choices,
+// answer, reward})만 바뀌고 정답/오답 처리는 부모(GamePage)의 Stage 전환 로직에 맡긴다.
+function QuizModal({ quiz, onCorrect, onWrong }) {
+  const [selected, setSelected] = useState(null);
+  const [wrongMessage, setWrongMessage] = useState(false);
+
+  const handleSubmit = () => {
+    if (selected === null) return;
+
+    if (selected === quiz.answer) {
+      onCorrect(quiz.reward);
+      return;
+    }
+
+    setWrongMessage(true);
+    setSelected(null);
+    onWrong();
+  };
 
   return (
     <div className="game-page__modal">
-      <p>게임 문제 (풀리면 유사 개념 문제 나오게)</p>
-      <p>게임 해설</p>
-      <p>아이템 창 (간단한 설명)</p>
-      {/* 게임 로직 붙기 전까지 임시로 다음 페이지(리포트)로 이동 */}
-      <button className="btn-primary" onClick={() => navigate("/report")}>다음</button>
+      <p>{quiz.question}</p>
+      <ul className="game-page__quiz-choices">
+        {quiz.choices.map((choice, index) => (
+          <li key={index}>
+            <label>
+              <input
+                type="radio"
+                name={quiz.id}
+                checked={selected === index}
+                onChange={() => {
+                  setSelected(index);
+                  setWrongMessage(false);
+                }}
+              />
+              {choice}
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      {wrongMessage && <p>오답입니다. 다시 시도해보세요.</p>}
+
+      <button className="btn-primary" onClick={handleSubmit}>
+        제출
+      </button>
     </div>
   );
 }

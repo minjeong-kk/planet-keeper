@@ -7,10 +7,10 @@ function ReportPage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
   const physicsResult = useClimateStore((state) => state.physicsResult);
-  const resetClimate = useClimateStore((state) => state.resetClimate);
+  const resetGame = useClimateStore((state) => state.resetGame);
 
   const handleRestart = () => {
-    resetClimate();
+    resetGame();
     navigate("/planet-create");
   };
 

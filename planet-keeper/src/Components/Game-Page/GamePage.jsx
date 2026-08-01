@@ -1,28 +1,26 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import QuizModal from "./QuizModal";
+import ClimateAnalysisPanel from "./ClimateAnalysisPanel";
+import ItemStage from "./ItemStage";
 import PlanetUI from "../Planet-ui.jsx";
-import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import useClimateStore, { CLIMATE_VARIABLES, GAME_STAGES } from "../../store/useClimateStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
-import { mapSlidersToClimateInputs, ENERGY_BALANCE_EPSILON, energyStateOf } from "../../utils/physicsEngine.js";
+import { mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
 import { predictClimateState } from "../../utils/climateClassifier.js";
+import { MOCK_QUIZ, MOCK_FINAL_QUIZ } from "../../data/mockQuiz.js";
 import "./GamePage.css";
 
-function energyStateDescription(deltaEnergy) {
-  if (deltaEnergy > ENERGY_BALANCE_EPSILON) {
-    return "흡수 에너지가 방출 에너지보다 큽니다. CO₂를 줄이거나 알베도를 높여 평형에 가깝게 만드세요.";
-  }
-  if (deltaEnergy < -ENERGY_BALANCE_EPSILON) {
-    return "방출 에너지가 더 큽니다. 온실효과를 높이거나 알베도를 낮춰 에너지 균형을 맞춰보세요.";
-  }
-  return "현재 행성은 에너지 평형 상태에 가깝습니다.";
-}
-
 function GamePage() {
-  const [showQuiz, setShowQuiz] = useState(false);
+  const navigate = useNavigate();
   // 제작 페이지에서 만든 행성 상태 + Physics 결과를 그대로 이어받는다.
   // Physics Engine은 PlanetCreatePage에서만 실행하고, 여기서는 재호출하지 않는다.
   const values = useClimateStore((state) => state.values);
   const physicsResult = useClimateStore((state) => state.physicsResult);
+  const gameStage = useClimateStore((state) => state.gameStage);
+  const setGameStage = useClimateStore((state) => state.setGameStage);
+  const hearts = useClimateStore((state) => state.hearts);
+  const loseHeart = useClimateStore((state) => state.loseHeart);
   const visual = slidersToVisual(values);
 
   const [climateState, setClimateState] = useState(null);
@@ -43,6 +41,11 @@ function GamePage() {
     };
   }, [values, physicsResult]);
 
+  const goReport = () => {
+    setGameStage(GAME_STAGES.REPORT);
+    navigate("/report");
+  };
+
   return (
     <div className="game-page">
       <div className="game-page__main">
@@ -56,10 +59,6 @@ function GamePage() {
           <span>ASR: {physicsResult ? physicsResult.absorbedRadiation.toFixed(2) : "-"}</span>
           <span>OLR: {physicsResult ? physicsResult.outgoingRadiation.toFixed(2) : "-"}</span>
           <span>ΔE: {physicsResult ? physicsResult.deltaEnergy.toFixed(2) : "-"}</span>
-          <span>Albedo: {physicsResult ? physicsResult.albedo.toFixed(2) : "-"}</span>
-          <span>Greenhouse: {physicsResult ? physicsResult.greenhouseStrength.toFixed(2) : "-"}</span>
-          <span>ε: {physicsResult ? physicsResult.effectiveEmissivity.toFixed(2) : "-"}</span>
-          <span>ML 상태: {climateState ? climateState.label : "계산 중..."}</span>
         </div>
 
         <div className="game-page__arena">
@@ -67,24 +66,50 @@ function GamePage() {
             <PlanetUI {...visual} />
           </div>
 
-          <button
-            className="game-page__quiz-trigger"
-            onClick={() => setShowQuiz(true)}
-          >
-            문제풀기
-          </button>
+          {gameStage === GAME_STAGES.ANALYZE && (
+            <ClimateAnalysisPanel
+              title="행성 상태 분석"
+              physicsResult={physicsResult}
+              climateState={climateState}
+              nextLabel="문제 풀러 가기"
+              onNext={() => setGameStage(GAME_STAGES.QUIZ)}
+            />
+          )}
 
-          {showQuiz && <QuizModal />}
+          {gameStage === GAME_STAGES.QUIZ && (
+            <QuizModal
+              quiz={MOCK_QUIZ}
+              onCorrect={() => setGameStage(GAME_STAGES.ITEM)}
+              onWrong={loseHeart}
+            />
+          )}
+
+          {gameStage === GAME_STAGES.ITEM && (
+            <ItemStage onSelect={() => setGameStage(GAME_STAGES.STABLE)} />
+          )}
+
+          {gameStage === GAME_STAGES.STABLE && (
+            <ClimateAnalysisPanel
+              title="행성 상태 재확인"
+              physicsResult={physicsResult}
+              climateState={climateState}
+              nextLabel="최종 문제 풀러 가기"
+              onNext={() => setGameStage(GAME_STAGES.FINAL_QUIZ)}
+            />
+          )}
+
+          {gameStage === GAME_STAGES.FINAL_QUIZ && (
+            <QuizModal quiz={MOCK_FINAL_QUIZ} onCorrect={goReport} onWrong={loseHeart} />
+          )}
         </div>
       </div>
 
       <div className="game-page__side">
+        <div className="game-page__side-box">간단한 행성 설명</div>
         <div className="game-page__side-box">
-          <h3>에너지 상태</h3>
-          <h2>{physicsResult ? energyStateOf(physicsResult.deltaEnergy) : "계산 중..."}</h2>
-          <p>{physicsResult ? energyStateDescription(physicsResult.deltaEnergy) : ""}</p>
+          하트: {"❤️".repeat(hearts)}
+          {"🖤".repeat(3 - hearts)}
         </div>
-        <div className="game-page__side-box">틀린 횟수 (하트가 깨지는 느낌)</div>
       </div>
     </div>
   );

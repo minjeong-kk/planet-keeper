@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
-import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import useClimateStore, { CLIMATE_VARIABLES, GAME_STAGES } from "../../store/useClimateStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { computeClimateV2, mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
 import "./PlanetCreatePage.css";
@@ -31,6 +31,7 @@ function PlanetCreatePage() {
   const setValue = useClimateStore((state) => state.setValue);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const setPhysicsResult = useClimateStore((state) => state.setPhysicsResult);
+  const setGameStage = useClimateStore((state) => state.setGameStage);
 
   const visual = slidersToVisual(values);
 
@@ -104,7 +105,13 @@ function PlanetCreatePage() {
 
       <div className="planet-create-page__actions">
         <button onClick={() => navigate("/")}>맨 처음 페이지로 가기</button>
-        <button className="btn-primary" onClick={() => navigate("/game")}>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            setGameStage(GAME_STAGES.ANALYZE);
+            navigate("/game");
+          }}
+        >
           행성 만들기 완료
         </button>
       </div>
