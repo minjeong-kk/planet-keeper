@@ -31,10 +31,11 @@ DATA_PIPELINE_DIR = ML_SCRIPTS_DIR.parent
 DATASETS_DIR = DATA_PIPELINE_DIR / "Datasets"
 MODELS_DIR = DATA_PIPELINE_DIR / "Models"
 
-# 지금은 임시 데이터셋, 물리엔진 결과가 합쳐지면 FINAL_DATASET으로 바꿔서 사용
-CURRENT_DATASET = DATASETS_DIR / "ml_dataset.csv"
 FINAL_DATASET = DATASETS_DIR / "final_ml_dataset.csv"
 TEST_SPLIT_DATASET = DATASETS_DIR / "test_split.csv"
+
+# 물리엔진 결과가 합쳐진 최종 데이터셋을 기본값으로 사용
+CURRENT_DATASET = FINAL_DATASET
 
 MODEL_PKL = MODELS_DIR / "climate_rf.pkl"
 MODEL_ONNX = MODELS_DIR / "climate_rf.onnx"

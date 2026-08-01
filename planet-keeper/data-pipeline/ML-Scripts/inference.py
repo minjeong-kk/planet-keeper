@@ -6,7 +6,7 @@ onnxruntime으로 climate_rf.onnx를 로드하고, 입력 CSV의 한 행(FEATURE
 
 사용법:
     python3 export_onnx.py                      # 먼저 실행해서 climate_rf.onnx를 만들어둘 것
-    python3 inference.py ../Datasets/ml_dataset.csv --row 0
+    python3 inference.py ../Datasets/test_split.csv --row 0
 """
 
 import argparse
