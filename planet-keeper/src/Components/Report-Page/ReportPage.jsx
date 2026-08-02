@@ -4,17 +4,14 @@ import useGameStore from "../../store/useGameStore";
 import { energyStateOf } from "../../utils/physicsEngine.js";
 import "./ReportPage.css";
 
-// gameOverReason별 결과 배너. "stable"/"completed"는 성공, "hearts"는 실패.
+// gameOverReason별 결과 배너. 성공 조건은 오직 "planet_stabilized"(Earth-like
+// Stable 도달) 하나뿐이다 - Warm/Cold Stable, Energy Surplus/Deficit는 클리어가 아니다.
 const RESULT_BANNER_BY_REASON = {
-  stable: {
+  planet_stabilized: {
     title: "🎉 미션 성공 - 행성 평형 안정 도달",
-    detail: "아이템 사용 후 행성이 지구형 안정(Earth-like Stable) 상태에 도달해 게임을 성공적으로 마쳤습니다.",
+    detail: "최종 확인 결과 행성이 지구형 안정(Earth-like Stable) 상태에 도달해 게임을 성공적으로 마쳤습니다.",
   },
-  completed: {
-    title: "🎉 미션 성공 - 모든 문제 해결",
-    detail: "최종 문제까지 전부 맞혀 게임을 마쳤습니다.",
-  },
-  hearts: {
+  life_over: {
     title: "💔 미션 실패 - 목숨 소진",
     detail: "오답이 3회 누적되어 행성을 안정시키지 못한 채 게임이 종료됐습니다.",
   },

@@ -1,29 +1,31 @@
 import { SOLAR_CONSTANT } from "../../utils/physicsEngine.js";
-
-// mlResult.label(climateClassifier.js STATE_LABELS와 동일한 문자열)에 따라
-// 자동으로 바뀌는 행성 한줄 설명.
-const PLANET_SUMMARY_BY_LABEL = {
-  "Earth-like Stable": "현재 행성은 지구와 유사한 안정 상태입니다.",
-  "Warm Stable": "현재 행성은 다소 높은 온도에서 안정적으로 유지되고 있습니다.",
-  "Cold Stable": "현재 행성은 낮은 온도지만 안정적인 기후를 유지하고 있습니다.",
-  "Energy Surplus": "현재 행성은 과도한 에너지로 인해 온도가 계속 상승하고 있습니다.",
-  "Energy Deficit": "현재 행성은 에너지 부족으로 지속적인 냉각이 발생하고 있습니다.",
-};
+import { analyzePlanetState } from "../../utils/planetAnalysis.js";
 
 const fmt = (value, digits = 2) => (value == null ? "-" : value.toFixed(digits));
 
-// 오른쪽 정보 패널. physicsResult/mlResult는 useGameStore가 아이템 사용 후
-// 실제 Physics Engine/ML로 채워준다 - 그 전(문제1 단계)에는 null이라 "-"로 표시.
+// 오른쪽 정보 패널. physicsResult/mlResult는 useGameStore가 매 단계(초기 생성,
+// 아이템 사용) 실제 Physics Engine/AI로 채워준다 - 아직 아무것도 계산 전이면 null.
 function InfoPanel({ physicsResult, mlResult, co2Ppm, atmThickness }) {
-  const summary = mlResult
-    ? PLANET_SUMMARY_BY_LABEL[mlResult.label] ?? "행성 상태를 판단할 수 없습니다."
-    : "아직 행성 상태를 계산하지 않았습니다.";
+  const analysis = analyzePlanetState({ physicsResult, mlResult, co2Ppm, atmThickness });
 
   return (
     <div className="game-page__side-box game-page__info-panel">
       <section>
         <h3>Planet Summary</h3>
-        <p>{summary}</p>
+        {analysis ? (
+          <>
+            {analysis.sections.map((sec, i) => (
+              <div key={i} className="game-page__summary-block">
+                {sec.title && <p className="game-page__summary-title">{sec.title}</p>}
+                {sec.lines.map((line, j) => (
+                  <p key={j}>{line}</p>
+                ))}
+              </div>
+            ))}
+          </>
+        ) : (
+          <p>아직 행성 상태를 계산하지 않았습니다.</p>
+        )}
       </section>
 
       <hr />

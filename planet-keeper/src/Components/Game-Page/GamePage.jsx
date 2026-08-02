@@ -5,7 +5,7 @@ import ItemStage from "./ItemStage";
 import InfoPanel from "./InfoPanel";
 import PlanetUI from "../Planet-ui.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
-import useGameStore, { GAME_STAGES } from "../../store/useGameStore";
+import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
 import "./GamePage.css";
@@ -13,6 +13,23 @@ import "./GamePage.css";
 // 정답/오답 피드백 메시지를 화면에 유지하는 시간(ms). 그 사이에 REPORT로
 // 넘어가더라도 이 시간만큼은 메시지를 보여준 뒤 페이지를 이동한다.
 const FEEDBACK_DISPLAY_MS = 2000;
+
+const STAGE_LABELS = {
+  [GAME_STAGES.PROBLEM1]: "1단계 문제",
+  [GAME_STAGES.ITEM]: "1단계 - 아이템 선택",
+  [GAME_STAGES.FINAL]: "2단계 문제",
+};
+
+// 아이템 사용/2단계 확인 후 AI가 판정한 상태 - 일반 안내 문구보다 눈에 띄도록
+// 아이콘/색상을 구분해서 강조 표시한다. Energy Surplus/Deficit은 아이템을 잘못
+// 골라 오히려 에너지 불균형이 커진 경우다.
+const STABLE_BADGES = {
+  "Earth-like Stable": { icon: "🌍", text: "Earth-like Stable", className: "game-page__stable-badge--earth" },
+  "Warm Stable": { icon: "🔥", text: "Warm Stable", className: "game-page__stable-badge--warm" },
+  "Cold Stable": { icon: "❄️", text: "Cold Stable", className: "game-page__stable-badge--cold" },
+  "Energy Surplus": { icon: "🔥", text: "Energy Surplus", className: "game-page__stable-badge--warm" },
+  "Energy Deficit": { icon: "❄️", text: "Energy Deficit", className: "game-page__stable-badge--cold" },
+};
 
 function GamePage() {
   const navigate = useNavigate();
@@ -25,9 +42,11 @@ function GamePage() {
   const currentProblem = useGameStore((state) => state.currentProblem);
   const inventory = useGameStore((state) => state.inventory);
   const wrongCount = useGameStore((state) => state.wrongCount);
+  const finalAttempts = useGameStore((state) => state.finalAttempts);
   const physicsResult = useGameStore((state) => state.physicsResult);
   const mlResult = useGameStore((state) => state.mlResult);
   const isComputing = useGameStore((state) => state.isComputing);
+  const notice = useGameStore((state) => state.notice);
   const solveProblem = useGameStore((state) => state.solveProblem);
   const useItem = useGameStore((state) => state.useItem);
 
@@ -69,15 +88,32 @@ function GamePage() {
             <PlanetUI {...visual} />
           </div>
 
+          {STAGE_LABELS[currentStage] && <h2 className="game-page__stage-label">{STAGE_LABELS[currentStage]}</h2>}
+
           {currentStage === GAME_STAGES.ITEM && !isComputing && <ItemStage onSelect={useItem} />}
 
-          {isComputing && <p>행성 상태 재계산 중...</p>}
+          {isComputing && <p>AI가 행성 상태를 판정하는 중...</p>}
 
-          {feedback === "correct" && (
-            <p className="game-page__feedback game-page__feedback--correct">
-              ✅ 정답입니다! 아이템을 획득했습니다.
-            </p>
+          {notice && STABLE_BADGES[mlResult?.label] && (
+            <div className={`game-page__stable-badge ${STABLE_BADGES[mlResult.label].className}`}>
+              <span className="game-page__stable-badge-icon">{STABLE_BADGES[mlResult.label].icon}</span>
+              <span>{STABLE_BADGES[mlResult.label].text}</span>
+            </div>
           )}
+
+          {notice && (
+            <div
+              className={`game-page__feedback ${
+                notice.ok ? "game-page__feedback--correct" : "game-page__feedback--wrong"
+              }`}
+            >
+              {notice.lines.map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
+          )}
+
+          {feedback === "correct" && <p className="game-page__feedback game-page__feedback--correct">✅ 정답입니다!</p>}
           {feedback === "wrong" && (
             <p className="game-page__feedback game-page__feedback--wrong">❌ 오답입니다. 다시 시도하세요.</p>
           )}
@@ -96,10 +132,23 @@ function GamePage() {
         />
         <div className="game-page__side-box">
           <p>
-            목숨: {"❤️".repeat(Math.max(0, 3 - wrongCount))}
-            {"🖤".repeat(Math.min(3, wrongCount))}
+            목숨: {"❤️".repeat(Math.max(0, MAX_WRONG_COUNT - wrongCount))}
+            {"🖤".repeat(Math.min(MAX_WRONG_COUNT, wrongCount))}
           </p>
-          <p>보유 아이템: {inventory.length ? inventory.join(", ") : "없음"}</p>
+          {currentStage === GAME_STAGES.FINAL && (
+            <p className="game-page__final-progress">
+              안정화 진행:{" "}
+              {Array.from({ length: MAX_FINAL_ATTEMPTS }, (_, i) => (
+                <span
+                  key={i}
+                  className={i < finalAttempts ? "game-page__final-check game-page__final-check--filled" : "game-page__final-check"}
+                >
+                  ✔
+                </span>
+              ))}
+            </p>
+          )}
+          <p> 사용 아이템: {inventory.length ? inventory.join(", ") : "없음"}</p>
         </div>
       </div>
     </div>
