@@ -1,50 +1,57 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import QuizModal from "./QuizModal";
-import ClimateAnalysisPanel from "./ClimateAnalysisPanel";
 import ItemStage from "./ItemStage";
+import InfoPanel from "./InfoPanel";
 import PlanetUI from "../Planet-ui.jsx";
-import useClimateStore, { CLIMATE_VARIABLES, GAME_STAGES } from "../../store/useClimateStore";
+import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import useGameStore, { GAME_STAGES } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
-import { predictClimateState } from "../../utils/climateClassifier.js";
-import { MOCK_QUIZ, MOCK_FINAL_QUIZ } from "../../data/mockQuiz.js";
 import "./GamePage.css";
+
+// 정답/오답 피드백 메시지를 화면에 유지하는 시간(ms). 그 사이에 REPORT로
+// 넘어가더라도 이 시간만큼은 메시지를 보여준 뒤 페이지를 이동한다.
+const FEEDBACK_DISPLAY_MS = 2000;
 
 function GamePage() {
   const navigate = useNavigate();
-  // 제작 페이지에서 만든 행성 상태 + Physics 결과를 그대로 이어받는다.
-  // Physics Engine은 PlanetCreatePage에서만 실행하고, 여기서는 재호출하지 않는다.
+  // 행성 슬라이더 값(제작 페이지에서 만든 값)은 그대로 이어받아 보여주기만 한다.
   const values = useClimateStore((state) => state.values);
-  const physicsResult = useClimateStore((state) => state.physicsResult);
-  const gameStage = useClimateStore((state) => state.gameStage);
-  const setGameStage = useClimateStore((state) => state.setGameStage);
-  const hearts = useClimateStore((state) => state.hearts);
-  const loseHeart = useClimateStore((state) => state.loseHeart);
   const visual = slidersToVisual(values);
+  const climateInputs = mapSlidersToClimateInputs(values);
 
-  const [climateState, setClimateState] = useState(null);
+  const currentStage = useGameStore((state) => state.currentStage);
+  const currentProblem = useGameStore((state) => state.currentProblem);
+  const inventory = useGameStore((state) => state.inventory);
+  const wrongCount = useGameStore((state) => state.wrongCount);
+  const physicsResult = useGameStore((state) => state.physicsResult);
+  const mlResult = useGameStore((state) => state.mlResult);
+  const isComputing = useGameStore((state) => state.isComputing);
+  const solveProblem = useGameStore((state) => state.solveProblem);
+  const useItem = useGameStore((state) => state.useItem);
 
-  useEffect(() => {
-    if (!physicsResult) return;
-    let cancelled = false;
-    const climateInputs = mapSlidersToClimateInputs(values);
+  const [feedback, setFeedback] = useState(null); // "correct" | "wrong" | null
 
-    predictClimateState(climateInputs, physicsResult)
-      .then((result) => {
-        if (!cancelled) setClimateState(result);
-      })
-      .catch((err) => console.error("[GamePage] 기후 상태 예측 실패:", err));
-
-    return () => {
-      cancelled = true;
-    };
-  }, [values, physicsResult]);
-
-  const goReport = () => {
-    setGameStage(GAME_STAGES.REPORT);
-    navigate("/report");
+  const handleAnswer = (answer) => {
+    const correct = solveProblem(answer);
+    setFeedback(correct ? "correct" : "wrong");
   };
+
+  // 피드백 메시지는 일정 시간 뒤 자동으로 사라진다.
+  useEffect(() => {
+    if (!feedback) return undefined;
+    const timer = setTimeout(() => setFeedback(null), FEEDBACK_DISPLAY_MS);
+    return () => clearTimeout(timer);
+  }, [feedback]);
+
+  // 오답 3회 누적 또는 최종 문제 정답으로 REPORT 단계가 되면 리포트 페이지로 이동한다.
+  // 마지막 피드백 메시지를 잠깐 보여줄 시간을 준 뒤 이동한다.
+  useEffect(() => {
+    if (currentStage !== GAME_STAGES.REPORT) return undefined;
+    const timer = setTimeout(() => navigate("/report"), FEEDBACK_DISPLAY_MS);
+    return () => clearTimeout(timer);
+  }, [currentStage, navigate]);
 
   return (
     <div className="game-page">
@@ -55,10 +62,6 @@ function GamePage() {
               {label}: {key === "co2" ? `${co2Ppm(values.co2)} ppm` : `${values[key]}%`}
             </span>
           ))}
-          <span>현재 온도: {physicsResult ? physicsResult.currentTemperature.toFixed(1) : "-"} K</span>
-          <span>ASR: {physicsResult ? physicsResult.absorbedRadiation.toFixed(2) : "-"}</span>
-          <span>OLR: {physicsResult ? physicsResult.outgoingRadiation.toFixed(2) : "-"}</span>
-          <span>ΔE: {physicsResult ? physicsResult.deltaEnergy.toFixed(2) : "-"}</span>
         </div>
 
         <div className="game-page__arena">
@@ -66,49 +69,37 @@ function GamePage() {
             <PlanetUI {...visual} />
           </div>
 
-          {gameStage === GAME_STAGES.ANALYZE && (
-            <ClimateAnalysisPanel
-              title="행성 상태 분석"
-              physicsResult={physicsResult}
-              climateState={climateState}
-              nextLabel="문제 풀러 가기"
-              onNext={() => setGameStage(GAME_STAGES.QUIZ)}
-            />
+          {currentStage === GAME_STAGES.ITEM && !isComputing && <ItemStage onSelect={useItem} />}
+
+          {isComputing && <p>행성 상태 재계산 중...</p>}
+
+          {feedback === "correct" && (
+            <p className="game-page__feedback game-page__feedback--correct">
+              ✅ 정답입니다! 아이템을 획득했습니다.
+            </p>
+          )}
+          {feedback === "wrong" && (
+            <p className="game-page__feedback game-page__feedback--wrong">❌ 오답입니다. 다시 시도하세요.</p>
           )}
 
-          {gameStage === GAME_STAGES.QUIZ && (
-            <QuizModal
-              quiz={MOCK_QUIZ}
-              onCorrect={() => setGameStage(GAME_STAGES.ITEM)}
-              onWrong={loseHeart}
-            />
-          )}
-
-          {gameStage === GAME_STAGES.ITEM && (
-            <ItemStage onSelect={() => setGameStage(GAME_STAGES.STABLE)} />
-          )}
-
-          {gameStage === GAME_STAGES.STABLE && (
-            <ClimateAnalysisPanel
-              title="행성 상태 재확인"
-              physicsResult={physicsResult}
-              climateState={climateState}
-              nextLabel="최종 문제 풀러 가기"
-              onNext={() => setGameStage(GAME_STAGES.FINAL_QUIZ)}
-            />
-          )}
-
-          {gameStage === GAME_STAGES.FINAL_QUIZ && (
-            <QuizModal quiz={MOCK_FINAL_QUIZ} onCorrect={goReport} onWrong={loseHeart} />
-          )}
+          {(currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) &&
+            currentProblem && <QuizModal problem={currentProblem} onSubmit={handleAnswer} />}
         </div>
       </div>
 
       <div className="game-page__side">
-        <div className="game-page__side-box">간단한 행성 설명</div>
+        <InfoPanel
+          physicsResult={physicsResult}
+          mlResult={mlResult}
+          co2Ppm={climateInputs.co2Ppm}
+          atmThickness={climateInputs.atmThickness}
+        />
         <div className="game-page__side-box">
-          하트: {"❤️".repeat(hearts)}
-          {"🖤".repeat(3 - hearts)}
+          <p>
+            목숨: {"❤️".repeat(Math.max(0, 3 - wrongCount))}
+            {"🖤".repeat(Math.min(3, wrongCount))}
+          </p>
+          <p>보유 아이템: {inventory.length ? inventory.join(", ") : "없음"}</p>
         </div>
       </div>
     </div>

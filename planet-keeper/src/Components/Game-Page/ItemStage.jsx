@@ -1,7 +1,7 @@
 import { MOCK_ITEMS } from "../../data/mockItems.js";
 
-// 아이템 효과(슬라이더/physics 값 변경)는 다음 작업에서 구현한다.
-// 지금은 아이템을 고르면 바로 STABLE 단계로 넘어간다.
+// 정답 후 아이템 선택 단계. 고른 아이템이 실제로 에너지 평형에 도움이 되는지는
+// 여기서 판정하지 않는다 - 재계산된 물리엔진/ML 결과로 자연스럽게 드러난다.
 function ItemStage({ onSelect }) {
   return (
     <div className="game-page__modal">
@@ -10,7 +10,7 @@ function ItemStage({ onSelect }) {
         {MOCK_ITEMS.map((item) => (
           <li key={item.id}>
             <button className="btn-primary" onClick={() => onSelect(item)}>
-              {item.name}
+              {item.emoji} {item.name}
             </button>
             <span> — {item.description}</span>
           </li>

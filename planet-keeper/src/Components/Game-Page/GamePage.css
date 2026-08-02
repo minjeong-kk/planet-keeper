@@ -68,6 +68,19 @@
   gap: 4px;
 }
 
+.game-page__feedback {
+  width: 100%;
+  font-weight: 600;
+}
+
+.game-page__feedback--correct {
+  color: #2e7d32;
+}
+
+.game-page__feedback--wrong {
+  color: #c62828;
+}
+
 /* 오른쪽: 긴 네모(바깥) 안에 작은 네모 2개(안쪽) */
 .game-page__side {
   flex: 1;
@@ -86,6 +99,29 @@
   padding: 16px;
   text-align: left;
   flex: 1;
+}
+
+.game-page__info-panel {
+  flex: 3;
+  overflow-y: auto;
+}
+
+.game-page__info-panel h3 {
+  margin: 0 0 8px;
+}
+
+.game-page__info-panel section {
+  margin-bottom: 12px;
+}
+
+.game-page__info-panel p {
+  margin: 2px 0;
+}
+
+.game-page__info-panel hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
 }
 
 @media (max-width: 900px) {

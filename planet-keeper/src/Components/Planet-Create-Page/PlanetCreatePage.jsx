@@ -2,7 +2,8 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
-import useClimateStore, { CLIMATE_VARIABLES, GAME_STAGES } from "../../store/useClimateStore";
+import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import useGameStore from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { computeClimateV2, mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
 import "./PlanetCreatePage.css";
@@ -31,7 +32,7 @@ function PlanetCreatePage() {
   const setValue = useClimateStore((state) => state.setValue);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const setPhysicsResult = useClimateStore((state) => state.setPhysicsResult);
-  const setGameStage = useClimateStore((state) => state.setGameStage);
+  const nextProblem = useGameStore((state) => state.nextProblem);
 
   const visual = slidersToVisual(values);
 
@@ -108,7 +109,7 @@ function PlanetCreatePage() {
         <button
           className="btn-primary"
           onClick={() => {
-            setGameStage(GAME_STAGES.ANALYZE);
+            nextProblem();
             navigate("/game");
           }}
         >

@@ -1,7 +1,62 @@
-// Item 단계 목데이터. 실제 아이템 효과(슬라이더/physics 값 변경)는 다음 작업에서 구현한다.
+// Item 단계 목데이터. 슬라이더(key, iceThickness/ocean/cloud/atmThickness/co2 - 전부
+// 0~100 스케일)에 delta만큼 더해서 기후를 바꾼다.
+//
+// 원래 기획안의 effects(예: albedo: 0.05, albedoOffset: 0.08)는 실제로는 게임이
+// 저장하는 입력값이 아니라 physicsEngine.js가 슬라이더로부터 매번 새로 계산해내는
+// 출력값이라 직접 대입할 수 없다 - 그래서 같은 의도(빙하/구름 늘려 알베도 올리기,
+// CO2 늘리고 줄이기, 대기 두께 조절)가 나오도록 실제 슬라이더에 대응시켰다.
+//
 
 export const MOCK_ITEMS = [
-  { id: "item-cloud-seed", name: "구름 씨앗", description: "구름 양을 늘려 알베도를 높인다." },
-  { id: "item-carbon-filter", name: "탄소 필터", description: "CO₂ 농도를 낮춘다." },
-  { id: "item-glacier-seed", name: "빙하 씨앗", description: "빙하 면적을 늘린다." },
+  {
+    id: "ice_restorer",
+    name: "빙하 복구제",
+    emoji: "🧊",
+    description: "빙하 비율을 높여 지표면 알베도를 인위적으로 증가시키고 태양 에너지 반사량을 늘립니다.",
+    key: "iceThickness",
+    delta: 15,
+  },
+  {
+    id: "cloud_seeder",
+    name: "인공 구름 생성기",
+    emoji: "☁️",
+    description: "대기 상층부에 구름을 형성하여 태양광 반사율(알베도)을 즉각적으로 끌어올립니다.",
+    key: "cloud",
+    delta: 25,
+  },
+  {
+    id: "carbon_capture",
+    name: "탄소 포집 장치",
+    emoji: "🏭",
+    description: "대기 중 온실가스(CO2)를 흡수하여 대기 재복사 에너지를 줄이고 온도를 낮춥니다.",
+    key: "co2",
+    delta: -25,
+  },
+  {
+    id: "greenhouse_emitter",
+    name: "온실가스 방출기",
+    emoji: "🌋",
+    description: "지열을 자극해 CO2를 강제 방출하고 대기 재복사량을 늘려 극도의 저온 상태를 탈출합니다.",
+    key: "co2",
+    delta: 25,
+  },
+  {
+    // ponytail: 원본 설명(태양 유입 에너지 총량 조정)은 지금 코드에 없는 값이다
+    // (SOLAR_CONSTANT는 고정 상수, 슬라이더가 아님) - 반사판 효과를 구름 슬라이더로 근사함.
+    // 실제로 "태양 유입 총량"을 조절하는 기능이 생기면 그때 제대로 연결할 것.
+    id: "space_mirror",
+    name: "반사판 설치/제거",
+    emoji: "☀️",
+    description: "행성 외곽의 궤도 반사경을 조절해 태양 유입 에너지 총량과 알베도를 미세하게 조정합니다.",
+    key: "cloud",
+    delta: 15,
+  },
+  {
+    id: "density_regulator",
+    name: "대기 밀도 조절기",
+    emoji: "🌫️",
+    description: "대기의 전반적인 두께를 압축 및 팽창시켜 대기 흡수율과 복사 보유 능력을 동시 조정합니다.",
+    key: "atmThickness",
+    delta: 30,
+  },
 ];
