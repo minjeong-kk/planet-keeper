@@ -53,6 +53,10 @@ function evaluate(sim) {
     // 지표면 반사도: 천리안 SAL과 같은 정의를 맞추려고 구름을 뺀 값으로 계산한다.
     surface_albedo: albedoOf({ glacierRatio, oceanRatio, cloudRatio: 0 }),
     atm_thickness: atmThickness,
+    // 구름은 알베도와 온실효과에 동시에 기여하므로 별도 피처로 넘긴다.
+    // surface_albedo가 구름을 제외한 값이라, 이게 없으면 모델이 평형온도를
+    // 제대로 추정할 수 없다(config.py FEATURES 주석 참고).
+    cloud: cloudRatio,
 
     // ── 라벨 ──
     state: planetStateOf(physics.deltaEnergy, temperature),

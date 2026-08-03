@@ -88,9 +88,16 @@ def main() -> None:
         f"python={config.FEATURES} / js={js_features}",
     )
 
-    # 2. 라벨 누수 없음
+    # 2. 명백한 정답 컬럼이 입력에 섞이지 않았는지
+    #    ⚠️ 이 검사는 "한 컬럼만으로 라벨을 알려주는" 경우만 막는다. FEATURES 조합으로
+    #    라벨이 결정되는지는 검사하지 않는다(현재 구성은 실제로 결정된다 - 물리 규칙을
+    #    근사하는 구조이며 README '알려진 한계 7번'에 사유가 기록되어 있다).
     leaked = [c for c in config.LEAKY_COLUMNS if c in config.FEATURES]
-    check("FEATURES에 라벨 결정 컬럼 없음", not leaked, f"발견: {leaked}" if leaked else "")
+    check(
+        "FEATURES에 정답 직결 컬럼 없음 (조합 결정성은 검사 대상 아님)",
+        not leaked,
+        f"발견: {leaked}" if leaked else "",
+    )
 
     # 3. 임계값 일치
     pairs = [

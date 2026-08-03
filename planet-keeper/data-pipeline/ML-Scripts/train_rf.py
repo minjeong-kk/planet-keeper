@@ -1,7 +1,36 @@
-"""RandomForestClassifier 학습 스크립트.
+"""기후 분류 모델 학습 스크립트.
 
 Datasets/의 CSV(FEATURES + LABEL_COLUMN 컬럼 필요)를 읽어 8:2로 나누고
 학습한 뒤 Models/climate_rf.pkl로 저장한다.
+
+파일명·산출물명이 `_rf`인 이유
+------------------------------
+개발계획서는 RandomForest를 명시했고 초기 구현도 그랬지만, 측정 결과 이 문제에는
+RandomForest가 맞지 않아 작은 신경망(MLP)으로 교체했다(아래 '모델 선택' 참고).
+파일명(train_rf.py / climate_rf.pkl / climate_rf.onnx)은 README·계획서·프론트
+경로에서 이미 참조하고 있어 그대로 두었다. 이름만 과거형이고 내용은 MLP다.
+
+모델 선택
+---------
+라벨을 정하는 식은 ΔE = S(1−albedo) − (1−greenhouse)·σ·T⁴ 이고, 이건 매끄러운
+곡면이다. RandomForest는 축에 평행한 계단으로만 자르므로 이 곡면을 근사하려면
+노드가 수만 개 필요하고, 그래도 잘 안 맞는다. 신경망은 연속 함수라 가중치 수백
+개로 같은 경계를 표현한다.
+
+실측 비교 (final_ml_dataset.csv, 피처 5개):
+
+    모델                      정확도   ONNX 크기   불평형 오판율
+    RandomForest(10, 깊이8)   0.7513    272.6 KB     54.6%
+    RandomForest(30, 깊이12)  0.8236   6,079.8 KB    39.9%
+    GradientBoosting(100)     0.7966    276.7 KB     47.0%
+    MLP(32, 32)               0.9694      7.0 KB      5.0%   ← 현재 설정
+    MLP(128, 128)             0.9765     71.5 KB      2.2%
+
+정확도가 오르면서 파일이 39배 작아진다. 7 KB는 계획서가 명시한 "수십 KB" 기준도
+충족한다(RandomForest로는 맞출 수 없었다).
+
+입력 스케일이 서로 크게 다르므로(온도 ~10², CO2 ~10³, 알베도 ~10⁰) StandardScaler를
+파이프라인 앞에 붙인다. 스케일링도 ONNX에 함께 들어가므로 프론트에서 따로 할 일은 없다.
 
 분할 방식
 ---------
@@ -10,27 +39,6 @@ Datasets/의 CSV(FEATURES + LABEL_COLUMN 컬럼 필요)를 읽어 8:2로 나누�
 여러 행을 만들었기 때문에 같은 위치의 행이 train/test에 섞이는 누수가 있었다.
 지금은 generate_dataset.py가 (조성 × 온도)를 매 행 독립적으로 샘플링하므로
 '같은 위치'라는 개념 자체가 없고, 그룹 분할을 쓸 근거가 사라졌다.
-
-모델 크기
----------
-계획서 (2)②는 "단일 .onnx 포맷(수십 KB)"이라고 적고 있는데, 이 수치는 라벨 누수가
-있던 시절의 것이다. 그때는 라벨이 deltaEnergy 하나의 임계값과 거의 같아서 트리가
-몇 노드만으로 순수해졌다. deltaEnergy를 입력에서 빼면 결정 경계가 실제로 복잡한
-곡면이 되므로(축에 평행한 분기로 근사해야 함) 트리가 훨씬 커진다.
-
-실측한 트레이드오프 (final_ml_dataset.csv 53,060행 기준):
-
-    트리/깊이   ONNX      정확도
-    40 / 12    7,140 KB   0.7973   ← 제한 없이 키운 경우
-    10 /  9      478 KB   0.7704
-    10 /  8      274 KB   0.7635   ← 현재 설정
-     6 /  8      165 KB   0.7601
-    10 /  7      146 KB   0.7363
-    10 /  6       73 KB   0.7218   ← 계획서의 '수십 KB'를 맞춘 경우
-
-브라우저가 받는 총량은 onnxruntime-web의 wasm 12.86 MB가 지배하므로, 274 KB는
-전체의 2% 수준이다. 73 KB로 줄여 얻는 이득(0.2 MB)보다 잃는 정확도(4.2%p)가 크다고
-판단해 10/8을 택했다. 크기를 더 줄여야 하면 아래 두 상수만 바꾸면 된다.
 
 피처 목록은 config.py 한 곳에서만 관리한다.
 
@@ -46,18 +54,19 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 import config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-# ONNX 크기 제한(위 docstring의 트레이드오프 표 참고). ONNX 용량은 총 노드 수에
-# 거의 비례하므로, 크기를 줄이려면 이 두 값을 낮추면 된다.
-N_ESTIMATORS = 10
-MAX_DEPTH = 8
+# 은닉층 크기. 키우면 정확도가 아주 조금 오르고 ONNX가 커진다(위 표 참고).
+HIDDEN_LAYERS = (32, 32)
+MAX_ITER = 800
 
 
 def load_dataset(csv_path: Path) -> pd.DataFrame:
@@ -93,21 +102,32 @@ def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
     return subset[config.FEATURES], subset[config.LABEL_COLUMN]
 
 
-def train_model(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestClassifier:
-    model = RandomForestClassifier(
-        n_estimators=N_ESTIMATORS,
-        max_depth=MAX_DEPTH,
-        random_state=config.RANDOM_STATE,
+def train_model(X_train: pd.DataFrame, y_train: pd.Series):
+    """StandardScaler + MLP 파이프라인. 스케일링도 ONNX에 함께 들어간다."""
+    model = make_pipeline(
+        StandardScaler(),
+        MLPClassifier(
+            hidden_layer_sizes=HIDDEN_LAYERS,
+            max_iter=MAX_ITER,
+            random_state=config.RANDOM_STATE,
+        ),
     )
     model.fit(X_train, y_train)
-    total_nodes = sum(t.tree_.node_count for t in model.estimators_)
+
+    mlp = model[-1]
+    n_params = sum(w.size for w in mlp.coefs_) + sum(b.size for b in mlp.intercepts_)
     logger.info(
-        f"트리 {N_ESTIMATORS}그루, 최대 깊이 {MAX_DEPTH}, 총 노드 {total_nodes:,}개"
+        f"MLP 은닉층 {HIDDEN_LAYERS}, 학습 반복 {mlp.n_iter_}회, 파라미터 {n_params:,}개"
     )
+    if mlp.n_iter_ >= MAX_ITER:
+        logger.warning(
+            f"최대 반복({MAX_ITER})에 도달했습니다 - 수렴하지 않았을 수 있습니다. "
+            f"MAX_ITER를 늘려보세요."
+        )
     return model
 
 
-def save_model(model: RandomForestClassifier, path: Path) -> None:
+def save_model(model, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as f:
         pickle.dump(model, f)
@@ -162,7 +182,7 @@ def main(dataset_path: Path) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="RandomForestClassifier 학습")
+    parser = argparse.ArgumentParser(description="기후 분류 모델 학습 (StandardScaler + MLP)")
     parser.add_argument(
         "--dataset", type=Path, default=config.CURRENT_DATASET,
         help="학습에 쓸 CSV 경로 (기본: config.CURRENT_DATASET)",

@@ -1,5 +1,5 @@
 /**
- * climateClassifier.js — 학습된 RandomForest(ONNX)로 행성 상태(state)를 예측한다.
+ * climateClassifier.js — 학습된 분류 모델(ONNX)로 행성 상태(state)를 예측한다.
  *
  * 피처 이름·순서는 data-pipeline/ML-Scripts/config.py 의 FEATURES 가 원본이고
  * 여기는 그걸 그대로 따라간다. 어긋나면 에러 없이 조용히 틀린 예측이 나가므로,
@@ -7,8 +7,8 @@
  */
 
 // 'onnxruntime-web'(기본 진입점)은 webgpu(jsep) 백엔드까지 다 포함해 26MB wasm이
-// 번들된다. RandomForest는 GPU 가속 대상이 아니므로 CPU 전용 서브패스로 import해
-// webgpu 코드 자체를 번들에서 빼고, wasm(13MB)만 받게 한다.
+// 번들된다. 모델이 가중치 1,413개짜리라 GPU 가속이 무의미하므로 CPU 전용 서브패스로
+// import해 webgpu 코드 자체를 번들에서 빼고, wasm(13MB)만 받게 한다.
 import * as ort from 'onnxruntime-web/wasm'
 import { albedoOf, PLANET_STATES } from './physicsEngine.js'
 
@@ -18,9 +18,15 @@ ort.env.wasm.numThreads = 1
 
 const MODEL_URL = '/models/climate_rf.onnx'
 
-// config.py FEATURES와 이름·순서가 같아야 한다.
-// 개발계획서 3쪽 데이터 표의 "Input Feature" 4개다.
-export const FEATURE_ORDER = ['temperature', 'co2', 'surface_albedo', 'atm_thickness']
+// config.py FEATURES와 이름·순서가 같아야 한다(verify_sync.py가 검사).
+// 계획서 3쪽 데이터 표의 "Input Feature" 4개 + 구름량.
+export const FEATURE_ORDER = [
+  'temperature',
+  'co2',
+  'surface_albedo',
+  'atm_thickness',
+  'cloud',
+]
 
 // physicsEngine의 PLANET_STATES가 원본(label_rules.py와 클래스 번호가 같다).
 export const STATE_LABELS = Object.fromEntries(
@@ -60,6 +66,7 @@ function toFeatureValues(climateInputs, physics) {
     co2: climateInputs.co2Ppm,
     surface_albedo: albedoOf({ ...climateInputs, cloudRatio: 0 }),
     atm_thickness: climateInputs.atmThickness,
+    cloud: climateInputs.cloudRatio,
   }
 
   return FEATURE_ORDER.map((key) => {
