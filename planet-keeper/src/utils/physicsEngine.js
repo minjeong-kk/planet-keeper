@@ -5,7 +5,7 @@
  * 동일한 함수를 브라우저(게임)와 머신러닝 데이터 생성 스크립트에서 그대로
  * import하여 재사용한다.
  *
- *   import { computeClimate, mapSlidersToClimateInputs } from ".../utils/physicsEngine"
+ *   import { computeClimateV2, mapSlidersToClimateInputs } from ".../utils/physicsEngine"
  *
  * ------------------------------------------------------------------
  * 모델
@@ -44,6 +44,15 @@
  * - CO₂ 기준 농도 = 432 ppm
  * - 기준 온도 = 288 K
  */
+
+// 라벨 임계값은 실측 데이터에서 도출된 생성 파일에서 읽는다.
+// (data-pipeline/ML-Scripts/derive_thresholds.py → src/data/climateThresholds.js)
+// label_rules.py도 같은 도출 결과를 읽으므로 Python/JS가 어긋날 수 없다.
+import {
+  EPSILON_ENERGY_BALANCE,
+  COLD_STABLE_MAX_K,
+  EARTH_LIKE_MAX_K,
+} from "../data/climateThresholds.js"
 
 // ── 과학적 기준 상수 (PLAN.md) ──────────────────────────────────
 export const SOLAR_CONSTANT = 100 // TOA 하향단파복사속 기준
@@ -148,7 +157,7 @@ export function computeClimateV2(inputs = {}) {
 }
 
 /**
- * 제작 페이지 슬라이더(각 0~100)를 computeClimate 입력값으로 변환한다.
+ * 제작 페이지 슬라이더(각 0~100)를 computeClimateV2 입력값으로 변환한다.
  * UI 슬라이더 스케일과 물리 단위 사이의 매핑을 한곳에 모아 둔다.
  *
  * @param {{iceThickness:number, ocean:number, cloud:number, atmThickness:number, co2:number}} sliders
@@ -170,12 +179,88 @@ export function mapSlidersToClimateInputs(sliders = {}) {
   }
 }
 
-// GamePage/ReportPage가 공유하는 에너지 상태 판정 기준.
-// label_rules.py의 EPSILON_ENERGY_BALANCE와 같은 값(게임 UI 판정용).
-export const ENERGY_BALANCE_EPSILON = 5
+// 에너지 평형 판정 허용오차. label_rules.py와 같은 값을 쓰는 것이 구조적으로
+// 보장된다 - 둘 다 derive_thresholds.py가 생성한 파일에서 읽기 때문이다.
+export const ENERGY_BALANCE_EPSILON = EPSILON_ENERGY_BALANCE
 
 export function energyStateOf(deltaEnergy) {
   if (deltaEnergy > ENERGY_BALANCE_EPSILON) return "Energy Surplus"
   if (deltaEnergy < -ENERGY_BALANCE_EPSILON) return "Energy Deficit"
   return "Stable"
+}
+
+// ── 온도 동역학 ────────────────────────────────────────────────────
+// computeClimateV2는 주어진 온도에서 수지만 평가하고 온도를 바꾸지 않는다.
+// 온도를 실제로 움직이는 규칙은 게임 로직의 것이지만, ML 데이터 생성 스크립트도
+// 같은 규칙을 써야 하므로 순수 함수로 여기 모아 둔다.
+
+// 온도가 물리적으로 의미 있는 범위를 벗어나 발산하지 않도록 하는 상하한.
+export const TEMPERATURE_FLOOR_K = 150
+export const TEMPERATURE_CEILING_K = 400
+
+/**
+ * 지금 조성 그대로 충분히 시간이 지나면 도달하는 평형온도(K).
+ *
+ * OLR = ε·σ·T⁴ 이므로 ASR = OLR 을 T에 대해 풀면
+ *   T_eq = (ASR / (ε·σ))^(1/4) = T_current · (ASR / OLR)^(1/4)
+ * 로 닫힌 형태로 구해진다(온도를 바꿔가며 반복 계산할 필요가 없다).
+ *
+ * 개발계획서의 T = 15 + ((Total_Energy − 142) × 0.5) 선형식은 계획서 고유의
+ * 에너지 분배 모델(대기층 직접 흡수량 등)을 전제한 식이라 σT⁴ 기반인 이 엔진에
+ * 그대로 옮기면 단위가 맞지 않는다. 그래서 같은 목적(평형온도 산출)을 이 엔진의
+ * 자기 방정식을 역산하는 방식으로 구현한다.
+ */
+export function equilibriumTemperatureOf(physics) {
+  if (!(physics.outgoingRadiation > 0)) return TEMPERATURE_CEILING_K
+  return clamp(
+    physics.currentTemperature *
+      Math.pow(physics.absorbedRadiation / physics.outgoingRadiation, 0.25),
+    TEMPERATURE_FLOOR_K,
+    TEMPERATURE_CEILING_K,
+  )
+}
+
+// 피드백 타이머 한 틱에 온도가 ΔE 방향으로 움직이는 정도.
+// ΔE > 0(흡수 과다)이면 온도가 오르고, 오르면 OLR(∝T⁴)이 커져 ΔE가 줄어든다.
+// 즉 평형온도로 단조 수렴하며 평형 근처에서는 ΔE가 작아져 자동으로 멈춘다.
+// 한 틱 이동량에 상한을 둬서 극단적인 ΔE에서도 평형을 지나치지 않게 한다.
+export const TEMPERATURE_STEP_PER_ENERGY = 0.05
+export const MAX_TEMPERATURE_STEP_K = 3
+
+/** 현재 온도에서 한 틱만큼 ΔE 방향으로 이동한 다음 온도(K). */
+export function stepTemperature(currentTemperature, deltaEnergy) {
+  const step = clamp(
+    TEMPERATURE_STEP_PER_ENERGY * deltaEnergy,
+    -MAX_TEMPERATURE_STEP_K,
+    MAX_TEMPERATURE_STEP_K,
+  )
+  return clamp(
+    currentTemperature + step,
+    TEMPERATURE_FLOOR_K,
+    TEMPERATURE_CEILING_K,
+  )
+}
+
+// ── 행성 상태 5분류 (label_rules.py와 같은 규칙) ─────────────────────
+// ΔE로 평형/불평형을 먼저 가르고, 평형이면 온도로 저온/지구형/고온을 가른다.
+// 클래스 번호는 저온 → 고온 순서다.
+// 온도 구간은 실측 데이터에서 도출된 값이며(derive_thresholds.py),
+// label_rules.py와 같은 생성 파일을 읽으므로 한쪽만 바뀌어 어긋날 수 없다.
+export { COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K }
+
+export const PLANET_STATES = [
+  { state: 0, label: "Energy Deficit", korean: "저온 불평형" },
+  { state: 1, label: "Cold Stable", korean: "저온 안정" },
+  { state: 2, label: "Earth-like Stable", korean: "지구형 안정" },
+  { state: 3, label: "Warm Stable", korean: "고온 안정" },
+  { state: 4, label: "Energy Surplus", korean: "고온 불평형" },
+]
+
+/** ΔE와 현재 온도로부터 행성 상태(0~4)를 판정한다. label_rules.assign_label과 동일. */
+export function planetStateOf(deltaEnergy, temperatureK) {
+  if (deltaEnergy < -ENERGY_BALANCE_EPSILON) return 0
+  if (deltaEnergy > ENERGY_BALANCE_EPSILON) return 4
+  if (temperatureK < COLD_STABLE_MAX_K) return 1
+  if (temperatureK <= EARTH_LIKE_MAX_K) return 2
+  return 3
 }

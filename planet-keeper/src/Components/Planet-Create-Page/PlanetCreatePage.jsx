@@ -1,10 +1,8 @@
-import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
-import { computeClimateV2, mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
 import "./PlanetCreatePage.css";
 
 // label은 CLIMATE_VARIABLES(store)가 원본 - GamePage/ReportPage와 항상 같은 문구를 쓴다.
@@ -29,18 +27,12 @@ function PlanetCreatePage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
   const setValue = useClimateStore((state) => state.setValue);
-  const currentTemperature = useClimateStore((state) => state.currentTemperature);
-  const setPhysicsResult = useClimateStore((state) => state.setPhysicsResult);
 
   const visual = slidersToVisual(values);
 
-  // 슬라이더가 바뀔 때마다 Physics Engine을 여기서만 실행하고, 결과는
-  // Store(physicsResult)에 저장해서 GamePage/ReportPage/ML 추론이 재계산 없이 공유한다.
-  useEffect(() => {
-    const climateInputs = mapSlidersToClimateInputs(values);
-    const physics = computeClimateV2({ ...climateInputs, currentTemperature });
-    setPhysicsResult(physics);
-  }, [values, currentTemperature, setPhysicsResult]);
+  // Physics 결과는 store에 저장하지 않는다 - 슬라이더와 현재 온도만 있으면
+  // 어디서든 다시 계산되는 순수 함수이므로, 쓰는 쪽(GamePage/ReportPage)에서
+  // useMemo로 파생시킨다.
 
   // 대시보드 수치 표시(단위 포함). CO₂ 는 실제 ppm 으로 환산해 보여준다.
   const displayValue = (v) =>

@@ -1,25 +1,35 @@
-"""ml_dataset.csv(실측)에 물리엔진(computeClimateV2)을 반복 실행해서
-최종 학습 데이터셋(final_ml_dataset.csv)을 만든다.
+"""물리엔진으로 학습 데이터셋(final_ml_dataset.csv)을 생성한다.
 
-실측 위치(SAL/TPW/CLA/SST/t2m/psl)마다 슬라이더 변수(빙하/바다/구름/대기두께/CO2)를
-무작위로 여러 번 바꿔가며 물리엔진을 돌려서, "이 실측 위치의 실제 관측 온도가
-이 가상의 행성 조건에서 에너지수지가 맞는 상태인지"를 평가한다.
+개발계획서 (2)의 구조를 그대로 따른다:
+    "기상청·천리안 실측 데이터로 '현대 지구형 안정 평형' 표준 범위를 정의하고,
+     물리 엔진 수식과 연동해 극단적 이상 기후 합성 데이터를 추가 생성한다."
 
-물리엔진은 평형온도를 계산하지 않고, 주어진 현재 온도(currentTemperature =
-그 행의 실측 t2m)에서의 ASR/OLR/deltaEnergy만 평가한다 - 그래서 deltaEnergy가
-항상 0이 아니라 실제로 에너지 잉여/부족을 나타낼 수 있다.
+즉 실측 데이터와 합성 데이터의 역할이 다르다.
+    - 실측(ml_dataset.csv) → derive_thresholds.py가 라벨 임계값을 도출하는 데 쓴다.
+    - 합성(이 스크립트)     → 게임에서 나올 수 있는 조성 × 온도를 넓게 훑어 학습 표본을 만든다.
 
-물리 계산은 Python으로 재구현하지 않는다. src/utils/physicsEngine.js의
-computeClimateV2()를 Node 브릿지(run_physics_engine.mjs)로 그대로 호출해서
-쓴다 - 게임과 데이터 생성이 서로 다른 공식을 쓰게 되는 걸 막기 위함.
+이전 방식과의 차이
+------------------
+예전에는 실측 행(SAL/TPW/CLA/SST/t2m/psl)을 그대로 피처로 넣고, 물리엔진에는 그와
+아무 관계없는 무작위 슬라이더를 넣었다. 그래서 한 행 안에 서로 다른 행성이 섞여
+있었고(학습 데이터에서 SAL↔albedo 상관이 +0.048, 게임에서는 +0.834),
+모델은 실측 피처를 노이즈로 학습했다. 지금은 한 행이 하나의 행성만 나타낸다.
 
-라벨(state)은 label_rules.py의 deltaEnergy/currentTemperature 기준 5클래스
-규칙으로 함께 생성한다. 슬라이더를 넓은 범위에서 균일 샘플링하면 대부분
-에너지 부족/잉여 쪽에 쏠리므로(평형 밴드가 좁아서), 실측 행당 시뮬레이션을
-넉넉히 뽑은 뒤 클래스별로 최소 개수만큼 언더샘플링해서 최종 분포를 맞춘다
-(중복 행 생성 없이 균등화).
+온도 샘플링
+-----------
+현재 온도를 독립적으로 샘플링해야 5개 클래스가 모두 나온다.
+    - 평형온도 근처  → 에너지가 균형이므로 온도에 따라 저온/지구형/고온 안정 (1/2/3)
+    - 평형온도에서 멀면 → 에너지 불평형 (0/4)
+절대 온도를 여기서 만들지 않고 "평형온도로부터의 offset"만 넘긴다. 평형온도는 조성에
+의존하므로 물리엔진이 계산해야 하고, 그래야 게임에서 실제로 나타나는 궤적(평형으로
+수렴하는 중의 온도)과 같은 분포가 된다.
+
+라벨도 물리엔진 쪽(run_physics_engine.mjs의 planetStateOf)에서 계산한다 - 물리 계산과
+라벨이 같은 소스를 쓰게 하기 위함이다. label_rules.py는 같은 규칙의 Python 구현이며,
+두 결과가 일치하는지는 verify_sync.py가 검사한다.
 
 사용법:
+    python3 derive_thresholds.py   # 임계값 먼저 도출
     python3 generate_dataset.py
 """
 
@@ -33,174 +43,135 @@ import numpy as np
 import pandas as pd
 
 import config
-from label_rules import assign_labels
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-# ml_dataset.csv에서 그대로 들고 갈 실측 컬럼 (위치별로 고정, 시뮬레이션마다 안 변함)
-ML_INPUT_COLUMNS = ["SAL", "TPW", "CLA", "SST", "t2m", "psl"]
-
-# 실측 행 하나당 만들 무작위 시뮬레이션 개수.
-# ponytail: 균일 랜덤 샘플링이라 평형 밴드(클래스 1~3, 특히 클래스 1)에
-# 자연스럽게 걸리는 비율이 낮다. 언더샘플링만으로 균형을 맞추려면 가장 희소한
-# 클래스도 넉넉한 절대 개수가 나와야 하므로 10 -> 100으로 늘렸다. 그래도 특정
-# 클래스가 너무 적으면 이 값을 더 올리거나, 슬라이더 샘플링 자체를 평형 근처로
-# 편향시키는 방법(중요도 샘플링)을 고려한다.
-N_SIMULATIONS_PER_ROW = 100
-
-# computeClimateV2() 슬라이더 입력 범위. physicsEngine.js의
-# mapSlidersToClimateInputs()가 실제 슬라이더(0~100)로 만들어내는 범위와
-# 맞춰서, 게임에서 실제로 나올 수 있는 입력만 학습하게 한다.
-CO2_BASELINE_PPM = 432
-PARAM_RANGES = {
-    "glacierRatio": (0.0, 1.0),
-    "oceanRatio": (0.0, 1.0),
-    "cloudRatio": (0.0, 1.0),
-    "atmThickness": (0.4, 2.0),
-    "co2Ppm": (CO2_BASELINE_PPM * 0.3, CO2_BASELINE_PPM * 3.0),
-}
-
 NODE_SCRIPT = Path(__file__).resolve().parent / "run_physics_engine.mjs"
-INPUT_DATASET = config.DATASETS_DIR / "ml_dataset.csv"
 OUTPUT_DATASET = config.FINAL_DATASET
 
-# 최종 CSV 컬럼 순서
-OUTPUT_COLUMNS = [
-    "SAL", "TPW", "CLA", "SST", "t2m", "psl", "co2",
-    "absorbedRadiation", "outgoingRadiation", "deltaEnergy",
-    "greenhouseStrength", "albedo",
-    "state",
-]
+# 생성할 원본 표본 수. 클래스 균등화(언더샘플링) 후에는 이보다 줄어든다.
+N_SAMPLES = 240_000
+# Node에 한 번에 넘기는 개수. 전체를 한 덩어리 JSON으로 주고받으면 메모리가 커진다.
+CHUNK_SIZE = 30_000
+
+# 슬라이더는 게임과 동일하게 0~100 정수만 나온다(input type=range, step=1).
+SLIDER_KEYS = ["iceThickness", "ocean", "cloud", "atmThickness", "co2"]
+
+# 평형온도로부터의 offset 샘플링. 평형 밴드가 좁아서 넓은 범위만 뽑으면 안정 3종이
+# 희소해지므로, 절반은 평형 근처에서 촘촘히 뽑는다(최종 분포는 언더샘플링으로 맞춘다).
+NEAR_EQUILIBRIUM_FRACTION = 0.5
+NEAR_EQUILIBRIUM_OFFSET_K = 10.0
+WIDE_OFFSET_K = 60.0
 
 
-def load_ml_dataset(csv_path: Path) -> pd.DataFrame:
-    """실측 데이터셋을 읽고 필요한 컬럼이 다 있는지 검증한다."""
-    if not csv_path.exists():
-        raise FileNotFoundError(f"실측 데이터셋을 찾을 수 없습니다: {csv_path}")
+def sample_simulations(rng: np.random.Generator, n: int) -> pd.DataFrame:
+    """게임에서 나올 수 있는 (슬라이더 조합 × 현재 온도) 표본을 만든다."""
+    sliders = pd.DataFrame(
+        {key: rng.integers(0, 101, size=n) for key in SLIDER_KEYS}
+    )
 
-    df = pd.read_csv(csv_path)
-
-    missing = [c for c in ML_INPUT_COLUMNS if c not in df.columns]
-    if missing:
-        raise ValueError(f"ml_dataset.csv에 없는 컬럼: {missing}")
-
-    before = len(df)
-    df = df.dropna(subset=ML_INPUT_COLUMNS)
-    dropped = before - len(df)
-    if dropped:
-        logger.info(f"결측치로 제외된 행: {dropped}개")
-
-    return df
+    near = rng.random(n) < NEAR_EQUILIBRIUM_FRACTION
+    offset = np.where(
+        near,
+        rng.uniform(-NEAR_EQUILIBRIUM_OFFSET_K, NEAR_EQUILIBRIUM_OFFSET_K, size=n),
+        rng.uniform(-WIDE_OFFSET_K, WIDE_OFFSET_K, size=n),
+    )
+    sliders["temperatureOffsetK"] = offset
+    return sliders
 
 
-def sample_slider_params(rng: np.random.Generator) -> dict:
-    """computeClimateV2() 슬라이더 입력 하나를 무작위로 뽑는다."""
-    return {key: float(rng.uniform(lo, hi)) for key, (lo, hi) in PARAM_RANGES.items()}
+def to_engine_inputs(sliders: pd.DataFrame) -> list[dict]:
+    """슬라이더(0~100)를 물리엔진 입력 단위로 변환한다.
 
-
-def build_simulation_plan(df: pd.DataFrame, rng: np.random.Generator) -> list[dict]:
-    """실측 행마다 N_SIMULATIONS_PER_ROW개의 (실측값 + 무작위 슬라이더) 조합을 만든다.
-
-    currentTemperature는 무작위가 아니라 그 행의 실측 t2m을 그대로 쓴다 -
-    "이 실측 위치의 실제 관측 온도가 이 가상 조건에서 에너지수지가 맞는지"를
-    평가하기 위함이다.
+    mapSlidersToClimateInputs()와 같은 매핑이다. 이 변환만 Python에 있는 이유는
+    브릿지에 넘길 JSON을 만들어야 하기 때문이고, 물리 계산 자체는 전부 엔진이 한다.
     """
-    plan = []
-    for _, row in df.iterrows():
-        ml_inputs = {col: row[col] for col in ML_INPUT_COLUMNS}
-        for _ in range(N_SIMULATIONS_PER_ROW):
-            plan.append({
-                **ml_inputs,
-                **sample_slider_params(rng),
-                "currentTemperature": row["t2m"],
-            })
-    return plan
+    s = sliders / 100.0
+    return [
+        {
+            "glacierRatio": row.iceThickness,
+            "oceanRatio": row.ocean,
+            "cloudRatio": row.cloud,
+            "atmThickness": 0.4 + row.atmThickness * 1.6,
+            "co2Ppm": 432.0 * (0.3 + row.co2 * 2.7),
+            "temperatureOffsetK": offset,
+        }
+        for row, offset in zip(s.itertuples(index=False), sliders["temperatureOffsetK"])
+    ]
 
 
-def run_physics_engine(plan: list[dict]) -> list[dict]:
-    """Node로 physicsEngine.js의 computeClimateV2()를 그대로 호출한다 (한 번의 프로세스로 전부 처리)."""
+def run_physics_engine(engine_inputs: list[dict]) -> list[dict]:
+    """Node로 physicsEngine.js를 그대로 호출한다(청크 단위)."""
     if not NODE_SCRIPT.exists():
         raise FileNotFoundError(f"Node 브릿지 스크립트가 없습니다: {NODE_SCRIPT}")
 
-    climate_input_keys = list(PARAM_RANGES) + ["currentTemperature"]
-    climate_inputs = [{k: sim[k] for k in climate_input_keys} for sim in plan]
+    results: list[dict] = []
+    for start in range(0, len(engine_inputs), CHUNK_SIZE):
+        chunk = engine_inputs[start : start + CHUNK_SIZE]
+        proc = subprocess.run(
+            ["node", str(NODE_SCRIPT)],
+            input=json.dumps(chunk),
+            capture_output=True,
+            text=True,
+        )
+        if proc.returncode != 0:
+            raise RuntimeError(f"physicsEngine.js 실행 실패:\n{proc.stderr}")
+        results.extend(json.loads(proc.stdout))
+        logger.info(f"  물리엔진 {len(results):,} / {len(engine_inputs):,}")
 
-    proc = subprocess.run(
-        ["node", str(NODE_SCRIPT)],
-        input=json.dumps(climate_inputs),
-        capture_output=True,
-        text=True,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(f"physicsEngine.js 실행 실패:\n{proc.stderr}")
-
-    return json.loads(proc.stdout)
-
-
-def build_output_rows(plan: list[dict], physics_results: list[dict]) -> list[dict]:
-    rows = []
-    for sim_inputs, physics in zip(plan, physics_results):
-        rows.append({
-            **{col: sim_inputs[col] for col in ML_INPUT_COLUMNS},
-            "co2": sim_inputs["co2Ppm"],
-            "absorbedRadiation": physics["absorbedRadiation"],
-            "outgoingRadiation": physics["outgoingRadiation"],
-            "deltaEnergy": physics["deltaEnergy"],
-            "greenhouseStrength": physics["greenhouseStrength"],
-            "albedo": physics["albedo"],
-        })
-    return rows
+    return results
 
 
-def balance_classes(df: pd.DataFrame, label_col: str, rng: np.random.Generator) -> pd.DataFrame:
-    """클래스별로 가장 적은 클래스의 개수만큼 언더샘플링해서 균등하게 맞춘다.
+def balance_classes(df: pd.DataFrame, rng: np.random.Generator) -> pd.DataFrame:
+    """가장 적은 클래스 개수만큼 언더샘플링해 균등하게 맞춘다.
 
-    슬라이더를 넓은 범위에서 균일 샘플링하면 대부분 에너지 부족/잉여로 쏠려서
-    평형 밴드(1~3)가 희소해진다. 중복 행을 만드는 오버샘플링 대신, 넉넉히
-    생성한 뒤 각 클래스를 최소 클래스 개수로 잘라내는 방식으로 균형을 맞춘다 -
-    train/test로 나눴을 때 같은 행이 양쪽에 섞이는 문제가 없다.
+    중복 행을 만드는 오버샘플링을 쓰지 않는 이유: 같은 행이 train/test 양쪽에
+    들어가면 성능이 부풀려진다.
     """
-    min_count = df[label_col].value_counts().min()
+    counts = df[config.LABEL_COLUMN].value_counts()
+    min_count = int(counts.min())
     parts = [
-        group.sample(n=min_count, random_state=rng.integers(2**32 - 1))
-        for _, group in df.groupby(label_col)
+        group.sample(n=min_count, random_state=int(rng.integers(2**32 - 1)))
+        for _, group in df.groupby(config.LABEL_COLUMN)
     ]
     balanced = pd.concat(parts)
-    return balanced.sample(frac=1, random_state=rng.integers(2**32 - 1)).reset_index(drop=True)
+    return balanced.sample(
+        frac=1, random_state=int(rng.integers(2**32 - 1))
+    ).reset_index(drop=True)
 
 
 def main() -> None:
     rng = np.random.default_rng(config.RANDOM_STATE)
 
-    logger.info(f"실측 데이터셋 로드: {INPUT_DATASET}")
-    df = load_ml_dataset(INPUT_DATASET)
+    logger.info(f"표본 {N_SAMPLES:,}개 샘플링")
+    sliders = sample_simulations(rng, N_SAMPLES)
 
-    n_planned = len(df) * N_SIMULATIONS_PER_ROW
-    logger.info(f"실측 {len(df)}행 x 시뮬레이션 {N_SIMULATIONS_PER_ROW}개 = {n_planned}개 생성 예정")
+    logger.info("physicsEngine.js 실행 중 (Node)...")
+    results = run_physics_engine(to_engine_inputs(sliders))
 
-    plan = build_simulation_plan(df, rng)
+    out_df = pd.DataFrame(results)
 
-    logger.info("physicsEngine.js(computeClimateV2) 실행 중 (Node)...")
-    physics_results = run_physics_engine(plan)
+    missing = [c for c in config.FEATURES if c not in out_df.columns]
+    if missing:
+        raise ValueError(
+            f"물리엔진 출력에 없는 피처: {missing}\n"
+            f"config.FEATURES와 run_physics_engine.mjs의 출력 키를 맞추세요."
+        )
 
-    rows = build_output_rows(plan, physics_results)
-    out_df = pd.DataFrame(rows)
-
-    out_df["state"] = assign_labels(
-        out_df, delta_energy_col="deltaEnergy", temperature_col="t2m"
+    logger.info(
+        f"균형화 전 클래스 분포:\n{out_df[config.LABEL_COLUMN].value_counts().sort_index()}"
     )
-
-    logger.info(f"균형화 전 클래스 분포:\n{out_df['state'].value_counts().sort_index()}")
-
-    out_df = balance_classes(out_df, label_col="state", rng=rng)
-    out_df = out_df[OUTPUT_COLUMNS]
+    out_df = balance_classes(out_df, rng)
+    out_df = out_df[config.FEATURES + [config.LABEL_COLUMN] + config.LEAKY_COLUMNS]
 
     config.DATASETS_DIR.mkdir(parents=True, exist_ok=True)
     out_df.to_csv(OUTPUT_DATASET, index=False)
 
-    logger.info(f"CSV 저장 완료: {OUTPUT_DATASET} ({len(out_df)}행)")
-    logger.info(f"균형화 후 클래스 분포:\n{out_df['state'].value_counts().sort_index()}")
+    logger.info(f"CSV 저장 완료: {OUTPUT_DATASET} ({len(out_df):,}행)")
+    logger.info(
+        f"균형화 후 클래스 분포:\n{out_df[config.LABEL_COLUMN].value_counts().sort_index()}"
+    )
 
 
 if __name__ == "__main__":
