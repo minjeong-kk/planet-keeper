@@ -8,8 +8,13 @@
 // label_rules.py의 assign_label은 같은 규칙의 Python 구현이며, 두 결과가 일치하는지는
 // verify_sync.py가 검사한다.
 //
-// 입력: stdin으로 JSON 배열
-//   [{glacierRatio, oceanRatio, cloudRatio, atmThickness, co2Ppm, temperatureOffsetK}, ...]
+// 입력: stdin으로 JSON 배열 — 게임 슬라이더 값(각 0~100) + 온도 offset
+//   [{iceThickness, ocean, cloud, atmThickness, co2, temperatureOffsetK}, ...]
+//
+//   ⚠️ 슬라이더 → 물리 단위 변환도 여기서 한다(mapSlidersToClimateInputs).
+//   예전에는 이 변환식(대기두께 0.4+x*1.6, CO2 432*(0.3+x*2.7))이 Python에도
+//   복제돼 있었다. JS 쪽 매핑을 고치면 학습 데이터가 조용히 게임과 달라지는 구조라
+//   제거했다 - Python은 이제 슬라이더 원값만 넘긴다.
 //
 //   temperatureOffsetK 는 "평형온도에서 얼마나 떨어져 있는가"다. 절대 온도를 Python이
 //   직접 만들지 않는 이유: 평형온도는 조성에 의존하므로 엔진이 계산해야 하고, 그래야
@@ -20,6 +25,7 @@
 
 import {
   computeClimateV2,
+  mapSlidersToClimateInputs,
   albedoOf,
   equilibriumTemperatureOf,
   planetStateOf,
@@ -31,8 +37,9 @@ import {
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x));
 
 function evaluate(sim) {
-  const { glacierRatio, oceanRatio, cloudRatio, atmThickness, co2Ppm } = sim;
-  const composition = { glacierRatio, oceanRatio, cloudRatio, atmThickness, co2Ppm };
+  // 게임(PlanetCreatePage → GamePage)이 쓰는 것과 완전히 같은 변환을 거친다.
+  const composition = mapSlidersToClimateInputs(sim);
+  const { glacierRatio, oceanRatio, cloudRatio, atmThickness, co2Ppm } = composition;
 
   // 1) 이 조성의 평형온도 (어떤 온도를 넣어 계산해도 같은 값이 나온다)
   const probe = computeClimateV2({ ...composition, currentTemperature: REFERENCE_TEMP_K });

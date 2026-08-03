@@ -82,23 +82,13 @@ def sample_simulations(rng: np.random.Generator, n: int) -> pd.DataFrame:
 
 
 def to_engine_inputs(sliders: pd.DataFrame) -> list[dict]:
-    """슬라이더(0~100)를 물리엔진 입력 단위로 변환한다.
+    """브릿지에 넘길 JSON으로 변환한다.
 
-    mapSlidersToClimateInputs()와 같은 매핑이다. 이 변환만 Python에 있는 이유는
-    브릿지에 넘길 JSON을 만들어야 하기 때문이고, 물리 계산 자체는 전부 엔진이 한다.
+    슬라이더 원값(0~100)을 그대로 넘긴다 - 물리 단위 변환(대기두께 배율, CO2 ppm)은
+    브릿지가 mapSlidersToClimateInputs()로 처리한다. 예전에는 그 변환식이 여기에도
+    복제돼 있었는데, JS 쪽을 고치면 학습 데이터가 조용히 게임과 달라지는 구조였다.
     """
-    s = sliders / 100.0
-    return [
-        {
-            "glacierRatio": row.iceThickness,
-            "oceanRatio": row.ocean,
-            "cloudRatio": row.cloud,
-            "atmThickness": 0.4 + row.atmThickness * 1.6,
-            "co2Ppm": 432.0 * (0.3 + row.co2 * 2.7),
-            "temperatureOffsetK": offset,
-        }
-        for row, offset in zip(s.itertuples(index=False), sliders["temperatureOffsetK"])
-    ]
+    return sliders.to_dict(orient="records")
 
 
 def run_physics_engine(engine_inputs: list[dict]) -> list[dict]:
