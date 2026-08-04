@@ -54,11 +54,6 @@ const useClimateStore = create((set) => ({
       return { currentTemperature: next };
     }),
 
-  decayClimate: () =>
-    set((state) => ({
-      currentTemperature: Math.min(TEMPERATURE_CEILING_K, state.currentTemperature + CLIMATE_DECAY_STEP_K),
-    })),
-
   resetClimate: () =>
     set({
       values: { ...DEFAULT_VALUES },
