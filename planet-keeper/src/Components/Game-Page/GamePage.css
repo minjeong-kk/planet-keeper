@@ -1,8 +1,13 @@
 .game-page {
   display: flex;
-  gap: 24px;
-  padding: 24px;
+  gap: 20px;
+  padding: 20px;
   flex: 1;
+  /* 페이지 높이를 뷰포트에 고정해두고, 넘치는 내용은 페이지 전체가 아니라
+     아래 arena/side가 각자(overflow-y:auto) 스크롤하게 한다. */
+  height: 100svh;
+  min-height: 0;
+  box-sizing: border-box;
 }
 
 .game-page__main {
@@ -10,6 +15,7 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  min-height: 0;
 }
 
 .game-page__stats-bar {
@@ -18,13 +24,31 @@
   padding: 16px;
   text-align: left;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow);
+}
+
+.game-page__stats-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  box-shadow: var(--shadow);
+}
+
+.game-page__stats-row--physics {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.game-page__stats-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
 }
 
 .game-page__arena {
   flex: 1;
+  min-height: 0;
   border-radius: 12px;
   border: 1px solid var(--border);
   display: flex;
@@ -37,14 +61,10 @@
 }
 
 .game-page__planet-placeholder {
-  width: 500px;
-  height: 500px;
+  width: 320px;
+  height: 320px;
   border-radius: 50%;
   overflow: hidden;
-  flex-shrink: 0;
-}
-
-.game-page__quiz-trigger {
   flex-shrink: 0;
 }
 
@@ -64,9 +84,92 @@
   align-self: flex-end;
 }
 
+.game-page__recovery {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
+}
+
+.game-page__quiz-choices {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.game-page__stage-label {
+  width: 100%;
+  margin: 0;
+  font-size: 1rem;
+  color: var(--text);
+}
+
+.game-page__feedback {
+  width: 100%;
+  font-weight: 600;
+}
+
+.game-page__feedback--correct {
+  color: #2e7d32;
+}
+
+.game-page__feedback--wrong {
+  color: #c62828;
+}
+
+/* 아이템 사용 후 평형 도달 결과(Earth-like/Warm/Cold Stable) 강조 배지 */
+.game-page__stable-badge {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  box-shadow: var(--shadow);
+}
+
+.game-page__stable-badge-icon {
+  font-size: 1.6rem;
+}
+
+.game-page__stable-badge--earth {
+  background: linear-gradient(135deg, #d6f5e3, #a8e6cf);
+  color: #1b5e3a;
+  border: 2px solid #4caf7d;
+}
+
+.game-page__stable-badge--warm {
+  background: linear-gradient(135deg, #ffe0d6, #ffb199);
+  color: #8a2c0d;
+  border: 2px solid #ff7043;
+}
+
+.game-page__stable-badge--cold {
+  background: linear-gradient(135deg, #dbeeff, #a9d6ff);
+  color: #0d3f6e;
+  border: 2px solid #4fa3e3;
+}
+
+/* 2단계 안정화 진행 체크(빨간 체크) - 채워질수록 붉게, 아직이면 회색 */
+.game-page__final-check {
+  font-size: 1.2rem;
+  color: var(--border);
+  margin-right: 4px;
+}
+
+.game-page__final-check--filled {
+  color: #d32f2f;
+}
+
 /* 오른쪽: 긴 네모(바깥) 안에 작은 네모 2개(안쪽) */
 .game-page__side {
   flex: 1;
+  min-height: 0;
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
@@ -82,6 +185,37 @@
   padding: 16px;
   text-align: left;
   flex: 1;
+}
+
+.game-page__info-panel {
+  flex: 3;
+  overflow-y: auto;
+}
+
+.game-page__info-panel h3 {
+  margin: 0 0 8px;
+}
+
+.game-page__info-panel section {
+  margin-bottom: 12px;
+}
+
+.game-page__info-panel p {
+  margin: 2px 0;
+}
+
+.game-page__summary-block {
+  margin-bottom: 10px;
+}
+
+.game-page__summary-title {
+  font-weight: 600;
+}
+
+.game-page__info-panel hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
 }
 
 @media (max-width: 900px) {

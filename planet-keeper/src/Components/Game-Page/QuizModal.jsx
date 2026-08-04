@@ -1,15 +1,39 @@
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 
-function QuizModal() {
-  const navigate = useNavigate();
+// PROBLEM1/FINAL 단계가 공유하는 문제 UI. 정답 판정은 하지 않고 선택값을
+// 그대로 onSubmit으로 올려보낸다 - 판정은 store의 solveProblem(answer)이 한다.
+// 정답/오답 피드백은 GamePage가 (Stage 전환과 무관하게) 따로 표시한다.
+function QuizModal({ problem, onSubmit }) {
+  const [selected, setSelected] = useState(null);
+
+  const handleSubmit = () => {
+    if (selected === null) return;
+    onSubmit(selected);
+    setSelected(null);
+  };
 
   return (
     <div className="game-page__modal">
-      <p>게임 문제 (풀리면 유사 개념 문제 나오게)</p>
-      <p>게임 해설</p>
-      <p>아이템 창 (간단한 설명)</p>
-      {/* 게임 로직 붙기 전까지 임시로 다음 페이지(리포트)로 이동 */}
-      <button className="btn-primary" onClick={() => navigate("/report")}>다음</button>
+      <p>{problem.title}</p>
+      <ul className="game-page__quiz-choices">
+        {problem.choices.map((choice) => (
+          <li key={choice}>
+            <label>
+              <input
+                type="radio"
+                name={problem.id}
+                checked={selected === choice}
+                onChange={() => setSelected(choice)}
+              />
+              {choice}
+            </label>
+          </li>
+        ))}
+      </ul>
+
+      <button className="btn-primary" onClick={handleSubmit}>
+        제출
+      </button>
     </div>
   );
 }

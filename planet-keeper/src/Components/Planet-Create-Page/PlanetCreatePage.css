@@ -2,8 +2,8 @@
   display: flex;
   align-items: center; /* 패널을 내용 높이로 수직 중앙 정렬 → 탭바 제거로 생긴 하단 공백 제거 */
   justify-content: space-between;
-  gap: 40px;
-  padding: 40px;
+  gap: 20px;
+  padding: 20px;
   flex: 1;
 }
 
@@ -15,8 +15,8 @@
 }
 
 .planet-create-page__planet-placeholder {
-  width: 500px;
-  height: 500px;
+  width: 320px;
+  height: 320px;
   border-radius: 50%;
   overflow: hidden;
 }

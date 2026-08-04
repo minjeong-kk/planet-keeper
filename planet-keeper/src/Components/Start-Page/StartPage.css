@@ -1,8 +1,8 @@
 .start-page {
   display: flex;
   justify-content: space-between;
-  gap: 40px;
-  padding: 40px;
+  gap: 28px;
+  padding: 28px;
   flex: 1;
 }
 
@@ -16,7 +16,7 @@
 
 .start-page__box {
   border: 1px solid var(--border);
-  border-radius: 12px;
+  border-radius: 20px;
   padding: 20px;
   box-shadow: var(--shadow);
 }
@@ -63,9 +63,13 @@
 .start-page__modal {
   background: var(--bg);
   color: var(--text-h);
-  padding: 32px;
+  padding: 36px;
   border-radius: 12px;
-  max-width: 400px;
+  max-width: 640px;
+  max-height: 80svh;
+  overflow-y: auto;
+  font-size: 1.05rem;
+  line-height: 1.6;
   border: 1px solid var(--border);
   box-shadow: var(--shadow);
 }

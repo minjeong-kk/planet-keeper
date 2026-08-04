@@ -64,7 +64,12 @@ body,
   border-inline: 1px solid var(--border);
   min-height: 100svh;
   padding: 0;
-  overflow: hidden; /* 하단/우측 불필요한 스크롤바 제거 */
+  /* GamePage는 height:100svh + 내부(arena/side) overflow-y:auto로 스스로 스크롤을
+     처리하므로 세로 스크롤이 여기서 생기지 않는다. Start/PlanetCreate/Report처럼
+     내부 스크롤이 없는 페이지가 뷰포트보다 커지는 경우를 위한 안전장치로 세로만
+     열어둔다(가로는 계속 막아 불필요한 스크롤바를 막는다). */
+  overflow-x: hidden;
+  overflow-y: auto;
   border: none;
   outline: none;
   box-shadow: none;

@@ -16,14 +16,20 @@ export const CLIMATE_VARIABLES = [
   { key: "co2", label: "CO2" },
 ];
 
-const DEFAULT_VALUES = Object.fromEntries(
-  CLIMATE_VARIABLES.map((v) => [v.key, 50])
-);
+// 전부 50(중립값)이면 우연히 이미 평형(Earth-like Stable)에 가까운 조성이 되어
+// 1단계/아이템 단계를 건너뛰는 경우가 잦았다 - 뚜렷한 Energy Surplus(ΔE≈+14.5)로
+// 시작해 실제로 고칠 게 있는 상태에서 게임이 시작되도록 값을 조정했다. 이 값이
+// 유일한 기준점이라 PlanetCreatePage(첫 진입)와 resetClimate(재도전) 둘 다 항상
+// 같은 조성으로 시작한다.
+const DEFAULT_VALUES = { ocean: 50, iceThickness: 20, cloud: 30, atmThickness: 50, co2: 40 };
 
 // store는 "입력"만 들고 있는다 — 슬라이더 값(values)과 현재 온도.
-// Physics 결과는 이 둘의 순수 함수이므로 store에 저장하지 않고 각 페이지에서
-// useMemo로 파생시킨다(예전에는 physicsResult를 저장해 두어서, 제작 페이지를
-// 거치지 않고 /game에 바로 들어오면 값이 null로 남는 문제가 있었다).
+// Physics 결과는 이 둘의 순수 함수이므로 store에 저장하지 않고 필요한 곳(예:
+// useGameStore.computeSnapshotResult/computeSettledResult)에서 그때그때
+// computeClimateV2로 파생시킨다. 게임 진행(문제/아이템/오답 횟수)은 useGameStore가
+// 별도로 관리한다. currentTemperature는 useGameStore가 setCurrentTemperature로
+// 직접 갱신하거나, useGameStore.applyClimateEvent가 advanceTemperature로 매 타이머
+// 틱마다 지금 조성의 평형 방향으로 조금씩 옮긴다.
 const useClimateStore = create((set) => ({
   values: { ...DEFAULT_VALUES },
   currentTemperature: REFERENCE_TEMP_K,

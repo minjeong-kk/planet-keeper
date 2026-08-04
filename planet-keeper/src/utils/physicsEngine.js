@@ -189,6 +189,40 @@ export function mapSlidersToClimateInputs(sliders = {}) {
   }
 }
 
+// 알베도/대기두께 "기준(중립)" 값 - Planet Summary 원인 분석(현재 값 vs 기준값 비교)에 쓴다.
+// BASELINE_STATE(288K에서 deltaEnergy≈0이 되도록 보정한 조성)의 알베도를 그대로 쓴다.
+export const BASELINE_ALBEDO = albedoOf(BASELINE_STATE)
+export const BASELINE_ATM_THICKNESS = BASELINE_STATE.atmThickness // 1 (지구 기준)
+
+// equilibriumTemperatureOf는 이 파일 아래(온도 동역학 섹션)에 정의돼 있다 -
+// 병합 전 이쪽 브랜치가 만든 버전은 clamp/가드가 없어서, 그걸 포함하는
+// 최신(ML 파이프라인) 버전으로 통합했다. 이름/시그니처는 그대로라 아래
+// co2PpmForTargetTemperature나 useGameStore.js 쪽 호출부는 안 바뀐다.
+
+/**
+ * 2단계 문제를 맞혔지만 아직 지구형 범위 밖(Warm/Cold Stable)일 때, "부족한 부분"을
+ * 목표 평형온도(targetTempK)까지 자동으로 계산해서 채워준다. CO₂만 조정하는 이유:
+ * greenhouseStrengthOf의 co2Term(로그항)이 대기두께/구름과 달리 단독으로 역산 가능한
+ * 유일한 항이라 닫힌 형태 해를 구할 수 있다(다른 항은 여러 슬라이더가 얽혀 있어
+ * "얼마나 조정해야 하는지"가 하나로 정해지지 않는다).
+ * ASR(absorbedRadiation)은 CO2와 무관하므로 그대로 두고, targetTempK에서
+ * OLR=ASR이 되도록 필요한 온실효과 강도를 구한 뒤 co2Term을 역산한다.
+ */
+export function co2PpmForTargetTemperature({ atmThickness, cloudRatio }, absorbedRadiation, targetTempK) {
+  const desiredEmissivity = absorbedRadiation / (EFFECTIVE_SIGMA * Math.pow(targetTempK, 4))
+  const desiredGreenhouse = clamp(1 - desiredEmissivity, 0, 0.8)
+  const atmTerm = 0.35 * (atmThickness - 1)
+  const cloudTerm = 0.1 * cloudRatio
+  const co2Term = desiredGreenhouse - 0.3 - atmTerm - cloudTerm
+  const co2Ppm = CO2_BASELINE_PPM * Math.pow(2, co2Term / 0.25)
+  return clamp(co2Ppm, CO2_BASELINE_PPM * 0.3, CO2_BASELINE_PPM * 3.0)
+}
+
+// sliderToCO2Ppm의 역함수 - 자동 조정된 ppm을 다시 슬라이더 값(0~100)으로 되돌린다.
+export function co2PpmToSlider(co2Ppm) {
+  return clamp(((co2Ppm / CO2_BASELINE_PPM - 0.3) / 2.7) * 100, 0, 100)
+}
+
 // 에너지 평형 판정 허용오차. label_rules.py와 같은 값을 쓰는 것이 구조적으로
 // 보장된다 - 둘 다 derive_thresholds.py가 생성한 파일에서 읽기 때문이다.
 export const ENERGY_BALANCE_EPSILON = EPSILON_ENERGY_BALANCE

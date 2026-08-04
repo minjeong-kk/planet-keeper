@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import useGameStore from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import "./PlanetCreatePage.css";
 
@@ -17,16 +18,11 @@ const VARIABLE_ICONS = [
 const LABEL_BY_KEY = Object.fromEntries(CLIMATE_VARIABLES.map((v) => [v.key, v.label]));
 const VARIABLES = VARIABLE_ICONS.map((v) => ({ ...v, label: LABEL_BY_KEY[v.key] }));
 
-// 첫 로드 시 '아름다운 지구' 기본값으로 초기화. (공유 store 기본은 all-50 이지만,
-// store 파일은 팀원과 바이트 동일하게 유지하고 초기값은 여기서만 override → store 충돌 방지)
-useClimateStore.setState({
-  values: { ocean: 50, iceThickness: 20, cloud: 30, atmThickness: 50, co2: 20 },
-});
-
 function PlanetCreatePage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
   const setValue = useClimateStore((state) => state.setValue);
+  const nextProblem = useGameStore((state) => state.nextProblem);
 
   const visual = slidersToVisual(values);
 
@@ -96,7 +92,13 @@ function PlanetCreatePage() {
 
       <div className="planet-create-page__actions">
         <button onClick={() => navigate("/")}>맨 처음 페이지로 가기</button>
-        <button className="btn-primary" onClick={() => navigate("/game")}>
+        <button
+          className="btn-primary"
+          onClick={() => {
+            nextProblem();
+            navigate("/game");
+          }}
+        >
           행성 만들기 완료
         </button>
       </div>
