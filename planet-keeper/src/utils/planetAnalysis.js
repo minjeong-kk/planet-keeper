@@ -236,12 +236,13 @@ function describeImbalanceChange(before, after, label) {
 }
 
 /**
- * 아이템 적용 전/후 Physics 결과를 비교해서 무엇이 바뀌었는지, 그리고 그 조성이
- * 평형에 도달하면 실제로 몇 도가 되는지를 순서대로 설명하는 문장 배열을 만든다
- * (before->after 인과 사슬). label은 평형온도로 재분류한 결과다(useGameStore.
- * computeSettledResult) - 방향이 맞는 아이템은 Earth-like Stable에 가깝게,
- * 틀린 아이템은 Cold/Warm Stable처럼 지구형 범위 밖으로 보낸다. clamp 한계 때문에
- * 평형 자체가 존재하지 않는 극단적인 조성만 여전히 Energy Surplus/Deficit로 남는다.
+ * 아이템 적용 전/후 Physics 결과를 비교해서 무엇이 바뀌었는지, 그리고 그 결과
+ * ΔE가 나아졌는지 나빠졌는지를 순서대로 설명하는 문장 배열을 만든다(before->after
+ * 인과 사슬). label은 완전히 settle하지 않고 딱 한 걸음만 진행한 결과다
+ * (useGameStore.computeItemStepResult) - 맞는 방향 아이템은 |ΔE|를 줄이고,
+ * 틀린 방향이면 |ΔE|를 키운다(describeImbalanceChange가 이 둘을 구분한다).
+ * 여러 걸음에 걸쳐 누적되다가 지구형 범위(Cold/Earth-like/Warm Stable)에
+ * 들어오면 그때 describeStableLabel로 넘어간다.
  */
 export function describeItemJudgment(item, before, after, label) {
   const lines = [];

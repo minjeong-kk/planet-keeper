@@ -44,6 +44,7 @@ function GamePage() {
 
   const currentStage = useGameStore((state) => state.currentStage);
   const currentProblem = useGameStore((state) => state.currentProblem);
+  const visibleItems = useGameStore((state) => state.visibleItems);
   const inventory = useGameStore((state) => state.inventory);
   const wrongCount = useGameStore((state) => state.wrongCount);
   const finalAttempts = useGameStore((state) => state.finalAttempts);
@@ -148,7 +149,7 @@ function GamePage() {
             </div>
           )}
 
-          {currentStage === GAME_STAGES.ITEM && !isComputing && <ItemStage onSelect={useItem} />}
+          {currentStage === GAME_STAGES.ITEM && !isComputing && <ItemStage items={visibleItems} onSelect={useItem} />}
 
           {isComputing && <p>AI가 행성 상태를 판정하는 중...</p>}
 
