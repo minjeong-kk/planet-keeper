@@ -1,13 +1,28 @@
+import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
-import { energyStateOf } from "../../utils/physicsEngine.js";
+import {
+  computeClimateV2,
+  mapSlidersToClimateInputs,
+  energyStateOf,
+} from "../../utils/physicsEngine.js";
 import "./ReportPage.css";
 
 function ReportPage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
-  const physicsResult = useClimateStore((state) => state.physicsResult);
+  const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const resetClimate = useClimateStore((state) => state.resetClimate);
+
+  // GamePage와 동일하게 (슬라이더 + 현재 온도)에서 직접 파생시킨다.
+  const physicsResult = useMemo(
+    () =>
+      computeClimateV2({
+        ...mapSlidersToClimateInputs(values),
+        currentTemperature,
+      }),
+    [values, currentTemperature],
+  );
 
   const handleRestart = () => {
     resetClimate();
