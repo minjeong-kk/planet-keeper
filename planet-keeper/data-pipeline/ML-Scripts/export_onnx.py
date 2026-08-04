@@ -4,6 +4,10 @@
 포맷으로 변환한다. 입력 피처 개수는 config.FEATURES 길이를 그대로 쓰므로,
 FEATURES가 늘어나도 이 스크립트는 수정할 필요 없다.
 
+Models/ 와 public/models/ 두 곳에 동시에 쓴다. 예전에는 README의 수동 cp에만
+의존해서, 복사를 잊으면 배포본만 옛 모델로 남고(에러도 안 남) 프론트가 새 피처
+순서로 값을 넣어 조용히 틀린 예측이 나가는 위험이 있었다.
+
 사용법:
     python3 train_rf.py   # 먼저 실행해서 climate_rf.pkl을 만들어둘 것
     python3 export_onnx.py
@@ -37,15 +41,19 @@ def convert_to_onnx(model, n_features: int):
 
 def save_onnx(onnx_model, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
+    payload = onnx_model.SerializeToString()
     with open(path, "wb") as f:
-        f.write(onnx_model.SerializeToString())
-    logger.info(f"ONNX 변환 완료: {path}")
+        f.write(payload)
+    logger.info(f"ONNX 저장: {path} ({len(payload) / 1024:.1f} KB)")
 
 
 def main() -> None:
     model = load_model(config.MODEL_PKL)
     onnx_model = convert_to_onnx(model, len(config.FEATURES))
+
+    # 학습 산출물 보관용 + 게임이 실제로 받는 배포본. 두 곳을 동시에 쓴다.
     save_onnx(onnx_model, config.MODEL_ONNX)
+    save_onnx(onnx_model, config.PUBLIC_MODEL_ONNX)
 
 
 if __name__ == "__main__":

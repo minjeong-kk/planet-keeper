@@ -21,8 +21,10 @@ function ReportPage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
   const resetClimate = useClimateStore((state) => state.resetClimate);
-  // 게임 중 아이템 사용으로 재계산된 최신 Physics 결과(useGameStore)를 보여준다 -
-  // useClimateStore.physicsResult는 제작 페이지 시점의 값이라 최종 결과와 다를 수 있다.
+  // 게임 중 아이템 사용/최종 확인으로 재계산된 최신 Physics 결과(useGameStore)를
+  // 보여준다 - 슬라이더+현재 온도에서 다시 파생시키면 useGameStore가 settle해 둔
+  // currentTemperature를 useClimateStore에서 그대로 다시 읽어야 해서 같은 값이긴
+  // 하지만, 스냅샷을 한 곳(useGameStore)에서만 관리하는 게 더 단순하다.
   const physicsResult = useGameStore((state) => state.physicsResult);
   const gameOverReason = useGameStore((state) => state.gameOverReason);
   const resetGame = useGameStore((state) => state.resetGame);

@@ -7,8 +7,14 @@ pyproj
 python-dotenv
 
 # ML 파이프라인 (ML-Scripts/)
-pandas
-scikit-learn
-skl2onnx
-onnxruntime
-matplotlib
+#
+# 버전을 고정하는 이유:
+#  - scikit-learn 버전이 다르면 저장된 climate_rf.pkl을 로드할 때 경고가 나고
+#    결과가 달라질 수 있다(InconsistentVersionWarning).
+#  - skl2onnx는 scikit-learn 버전에 민감해서 조합이 어긋나면 ONNX 변환 자체가 깨진다.
+# 커밋된 모델은 아래 조합으로 학습·변환한 것이다.
+pandas==2.3.3
+scikit-learn==1.7.2
+skl2onnx==1.20.0
+onnxruntime==1.28.0
+matplotlib==3.10.7

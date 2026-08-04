@@ -16,16 +16,19 @@ import { describeItemJudgment, describeFinalizeJudgment } from "../utils/planetA
 // 들고 있고, 여기서는 아이템 사용 시 그 값을 바꾸고 물리엔진/ML을 재계산한다.
 //
 // 전체 흐름: 행성 생성 -> Physics+ML(초기 판정 - 조성이 우연히 이미 Earth-like
-// Stable이면 1단계/아이템 없이 2단계로 직행) -> 1단계 문제 -> 아이템 사용(온도는
-// 그대로 두고 재평가 - 맞는 아이템이어야 에너지가 평형(Cold/Earth-like/Warm
-// Stable)이 되고, 틀리면 Energy Surplus/Deficit이 더 커진다) -> 맞으면 2단계로,
-// 틀리면 새 1단계 문제로 돌아가 아이템을 다시 고른다(그 1단계 문제 자체를 틀리면
-// solveProblem이 목숨을 깎는다 - 아이템을 잘못 고른 것만으로는 목숨이 깎이지 않음).
-// 2단계 승리 조건은 항상 "정답 3번"(finalizeGame의 finalAttempts) - 정답을 맞힐
-// 때마다 체크가 하나 채워지고(목숨은 깎이지 않음), 아직 지구형 범위 밖이면 CO2를
-// 부족한 방향으로 조정한다(3번째 정답에서는 무한 루프를 막기 위해 강제로 정확히
-// 평형). 2단계에서 오답이면 목숨이 깎이고 체크가 전부 0으로 초기화되며, 목숨이
-// 다 떨어지면 게임오버로 리포트.
+// Stable이면 1단계/아이템 없이 2단계로 직행) -> 1단계 문제 -> 아이템 사용(조성이
+// 평형에 도달하면 실제로 몇 도가 되는지 계산 - equilibriumTemperatureOf는 시작
+// 온도와 무관하게 조성만으로 정해지므로, 방향이 맞는 아이템은 Earth-like Stable에
+// 가깝게, 틀린 아이템은 Cold/Warm Stable처럼 지구형 범위 밖으로 보낸다. clamp
+// 한계 때문에 평형 자체가 존재하지 않는 극단적인 조성만 여전히 Energy Surplus/
+// Deficit로 남는다) -> 에너지가 균형(Cold/Earth-like/Warm Stable 중 하나)이면
+// 2단계로, 극단적으로 안 되면 새 1단계 문제로 돌아가 아이템을 다시 고른다(그
+// 1단계 문제 자체를 틀리면 solveProblem이 목숨을 깎는다 - 아이템을 잘못 고른
+// 것만으로는 목숨이 깎이지 않음). 2단계 승리 조건은 항상 "정답 3번"(finalizeGame의
+// finalAttempts) - 정답을 맞힐 때마다 체크가 하나 채워지고(목숨은 깎이지 않음),
+// 아직 지구형 범위 밖이면 CO2를 부족한 방향으로 조정한다(3번째 정답에서는 무한
+// 루프를 막기 위해 강제로 정확히 평형). 2단계에서 오답이면 목숨이 깎이고 체크가
+// 전부 0으로 초기화되며, 목숨이 다 떨어지면 게임오버로 리포트.
 export const GAME_STAGES = {
   CREATOR: "creator",
   PROBLEM1: "problem1",
@@ -47,6 +50,10 @@ const FINAL_CO2_STEP = 25;
 // 위해 co2PpmForTargetTemperature로 정확히 지구형 평형이 되도록 강제 조정한다.
 // GamePage가 2단계 진행 체크(finalAttempts/MAX_FINAL_ATTEMPTS)를 표시하는 데도 쓴다.
 export const MAX_FINAL_ATTEMPTS = 3;
+
+// 타이머 한 틱마다 co2 슬라이더(0~100)에 더하는 양 - GamePage의 CLIMATE_TICK_MS(3초)
+// 간격과 맞물려 방치 시 체감할 수 있을 정도로만 CO2가 오르게 조절한 값이다.
+const CLIMATE_TICK_CO2_STEP = 1;
 
 const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
 
@@ -100,6 +107,21 @@ const useGameStore = create((set, get) => ({
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
 
+  // 게임이 진행되는 내내(CREATOR/REPORT 제외) 호출되는 타이머 한 틱 - CO2가
+  // 계속 배출되는 것을 흉내내 co2 슬라이더를 조금씩 올린다. CO2가 오르면
+  // 온실효과가 커져 평형온도(equilibriumTemperatureOf) 자체가 올라가고,
+  // advanceTemperature가 그 새 평형 방향으로 currentTemperature를 조금씩
+  // 옮긴다 - "가만히 두면 계속 나빠진다"는 압박이 실제 조성 변화로 나타난다.
+  // ML 재판정은 아이템 사용/최종 확인 같은 실제 행동 시점에만 하므로 여기서는 안 한다.
+  tickClimate: () => {
+    const { values, setValue, advanceTemperature } = useClimateStore.getState();
+    setValue("co2", Math.min(100, values.co2 + CLIMATE_TICK_CO2_STEP));
+    advanceTemperature();
+    const { values: nextValues, currentTemperature } = useClimateStore.getState();
+    const physics = computeClimateV2({ ...mapSlidersToClimateInputs(nextValues), currentTemperature });
+    set({ physicsResult: physics });
+  },
+
   // CREATOR -> PROBLEM1. 지금 조성의 있는 그대로의 에너지 상태를 Physics+AI로
   // 보여준 뒤 1단계 문제로 진행한다. 만든 조성이 우연히 이미 Earth-like Stable이면
   // 고칠 게 없으니 1단계/아이템 없이 2단계 확인 문제로 바로 간다(그래도 성공은
@@ -126,28 +148,29 @@ const useGameStore = create((set, get) => ({
     }
   },
 
-  // 아이템 효과는 정답/오답 판정 없이 항상 실제로 슬라이더에 적용하지만, 온도를
-  // 평형으로 강제 정착시키지 않는다 - 지금 온도(currentTemperature)를 그대로 두고
-  // Physics/AI로 다시 평가한다. 그래서 맞는 방향의 아이템을 골라야만 에너지가
-  // 실제로 균형(Cold/Earth-like/Warm Stable)을 이루고, 틀린 아이템은 오히려
-  // Energy Surplus/Deficit을 키운다. 맞으면 2단계로, 틀리면 1단계 문제부터 다시
-  // 시도한다(그 1단계 문제를 틀리면 solveProblem이 목숨을 깎는다 - 아이템을 잘못
-  // 고른 것 자체는 목숨을 깎지 않는다).
+  // 아이템 효과는 정답/오답 판정 없이 항상 실제로 슬라이더에 적용한 뒤, 그 조성이
+  // 실제로 평형에 도달하면 몇 도가 되는지(computeSettledResult/equilibriumTemperatureOf)
+  // 계산한다. 평형온도는 시작 온도와 무관하게 조성만으로 정해지므로(수학적으로
+  // T_current가 상쇄됨), 대부분의 "방향이 틀린" 아이템도 에너지 자체는 결국
+  // 균형에 도달하지만 그 온도가 Cold/Warm Stable(지구형 범위 밖)로 나온다 - 이게
+  // 실제 "틀렸다"는 신호다. 알베도/온실효과가 clamp 한계에 걸려 물리적으로 그
+  // 조성의 평형 자체가 존재하지 않는 극단적인 경우에만 여전히 Energy Surplus/
+  // Deficit으로 남고, 그때만 1단계 문제부터 다시 시도한다(그 1단계 문제를 틀리면
+  // solveProblem이 목숨을 깎는다 - 아이템을 잘못 고른 것 자체는 목숨을 깎지 않음).
+  // 에너지가 균형에 도달했다면(Cold/Earth-like/Warm Stable 중 하나) 2단계로 넘어가고,
+  // 지구형 범위 밖이면 2단계(finalizeGame)의 CO2 자동 조정이 마무리를 담당한다.
   useItem: async (item) => {
     const { physicsResult } = get();
-    const { values, currentTemperature, setValue } = useClimateStore.getState();
+    const { values, setValue } = useClimateStore.getState();
 
     if (!physicsResult) return;
 
     get().addItem(`${item.emoji} ${item.name}`);
-    const nextValues = nextSliderValues(values, item);
-    setValue(item.key, nextValues[item.key]);
+    setValue(item.key, nextSliderValues(values, item)[item.key]);
 
     set({ isComputing: true });
     try {
-      const climateInputs = mapSlidersToClimateInputs(nextValues);
-      const physics = computeClimateV2({ ...climateInputs, currentTemperature });
-      const ml = await predictClimateState(climateInputs, physics);
+      const { physics, ml } = await computeSettledResult();
       const balanced = STABLE_LABELS.has(ml.label);
       const lines = describeItemJudgment(item, physicsResult, physics, ml.label);
       set({

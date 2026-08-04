@@ -1,14 +1,46 @@
-"""RandomForestClassifier 학습 스크립트.
+"""기후 분류 모델 학습 스크립트.
 
 Datasets/의 CSV(FEATURES + LABEL_COLUMN 컬럼 필요)를 읽어 8:2로 나누고
 학습한 뒤 Models/climate_rf.pkl로 저장한다.
 
-같은 실측 위치(SAL/TPW/CLA/SST/t2m/psl)에서 슬라이더만 바꿔 생성된 여러 행이
-train/test에 동시에 섞이지 않도록, row 단위가 아니라 실측 위치 단위(Group)로
-분리한다(GroupShuffleSplit).
+파일명·산출물명이 `_rf`인 이유
+------------------------------
+개발계획서는 RandomForest를 명시했고 초기 구현도 그랬지만, 측정 결과 이 문제에는
+RandomForest가 맞지 않아 작은 신경망(MLP)으로 교체했다(아래 '모델 선택' 참고).
+파일명(train_rf.py / climate_rf.pkl / climate_rf.onnx)은 README·계획서·프론트
+경로에서 이미 참조하고 있어 그대로 두었다. 이름만 과거형이고 내용은 MLP다.
 
-피처 목록은 config.py 한 곳에서만 관리한다 - 물리엔진 피처가 추가되면
-config.py의 FEATURES만 수정하면 이 스크립트는 그대로 재사용된다.
+모델 선택
+---------
+라벨을 정하는 식은 ΔE = S(1−albedo) − (1−greenhouse)·σ·T⁴ 이고, 이건 매끄러운
+곡면이다. RandomForest는 축에 평행한 계단으로만 자르므로 이 곡면을 근사하려면
+노드가 수만 개 필요하고, 그래도 잘 안 맞는다. 신경망은 연속 함수라 가중치 수백
+개로 같은 경계를 표현한다.
+
+실측 비교 (final_ml_dataset.csv, 피처 5개):
+
+    모델                      정확도   ONNX 크기   불평형 오판율
+    RandomForest(10, 깊이8)   0.7513    272.6 KB     54.6%
+    RandomForest(30, 깊이12)  0.8236   6,079.8 KB    39.9%
+    GradientBoosting(100)     0.7966    276.7 KB     47.0%
+    MLP(32, 32)               0.9694      7.0 KB      5.0%   ← 현재 설정
+    MLP(128, 128)             0.9765     71.5 KB      2.2%
+
+정확도가 오르면서 파일이 39배 작아진다. 7 KB는 계획서가 명시한 "수십 KB" 기준도
+충족한다(RandomForest로는 맞출 수 없었다).
+
+입력 스케일이 서로 크게 다르므로(온도 ~10², CO2 ~10³, 알베도 ~10⁰) StandardScaler를
+파이프라인 앞에 붙인다. 스케일링도 ONNX에 함께 들어가므로 프론트에서 따로 할 일은 없다.
+
+분할 방식
+---------
+클래스 비율을 유지하는 층화 분할(stratified)을 쓴다. 예전에는 실측 위치 단위
+그룹 분할(GroupShuffleSplit)을 썼는데, 그때는 한 실측 위치에서 슬라이더만 바꿔
+여러 행을 만들었기 때문에 같은 위치의 행이 train/test에 섞이는 누수가 있었다.
+지금은 generate_dataset.py가 (조성 × 온도)를 매 행 독립적으로 샘플링하므로
+'같은 위치'라는 개념 자체가 없고, 그룹 분할을 쓸 근거가 사라졌다.
+
+피처 목록은 config.py 한 곳에서만 관리한다.
 
 사용법:
     python3 train_rf.py                       # config.CURRENT_DATASET 사용
@@ -22,18 +54,19 @@ import sys
 from pathlib import Path
 
 import pandas as pd
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GroupShuffleSplit
+from sklearn.model_selection import train_test_split
+from sklearn.neural_network import MLPClassifier
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 import config
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-# generate_dataset.py는 하나의 실측 위치(이 6개 컬럼)당 슬라이더만 바꿔 여러 행을
-# 만든다. row 단위로 무작위 분할하면 같은 위치의 행이 train/test에 동시에 들어가
-# 모델이 위치를 암기해버리므로(데이터 누수), 이 컬럼들로 묶은 그룹 단위로 분리한다.
-GROUP_COLUMNS = ["SAL", "TPW", "CLA", "SST", "t2m", "psl"]
+# 은닉층 크기. 키우면 정확도가 아주 조금 오르고 ONNX가 커진다(위 표 참고).
+HIDDEN_LAYERS = (32, 32)
+MAX_ITER = 800
 
 
 def load_dataset(csv_path: Path) -> pd.DataFrame:
@@ -53,37 +86,48 @@ def load_dataset(csv_path: Path) -> pd.DataFrame:
     if config.LABEL_COLUMN not in df.columns:
         raise ValueError(
             f"라벨 컬럼 '{config.LABEL_COLUMN}'이 데이터셋에 없습니다. "
-            f"물리엔진 결과가 합쳐진 최종 데이터셋(final_ml_dataset.csv)이 준비되면 "
-            f"--dataset 옵션으로 그 파일을 넘겨서 다시 실행하세요."
+            f"generate_dataset.py를 먼저 실행하세요."
         )
 
     return df
 
 
-def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series, pd.Series]:
-    """FEATURES/LABEL/그룹id 분리. 결측치가 있는 행은 제거한다.
-
-    그룹id는 실측 위치(GROUP_COLUMNS)를 그대로 이어붙인 문자열이다 - 같은
-    실측 위치에서 나온 시뮬레이션 행은 전부 같은 그룹이 된다.
-    """
+def split_features_labels(df: pd.DataFrame) -> tuple[pd.DataFrame, pd.Series]:
+    """FEATURES/LABEL 분리. 결측치가 있는 행은 제거한다."""
     subset = df[config.FEATURES + [config.LABEL_COLUMN]].dropna()
     dropped = len(df) - len(subset)
     if dropped:
         logger.info(f"결측치로 제외된 행: {dropped}개")
 
-    X = subset[config.FEATURES]
-    y = subset[config.LABEL_COLUMN]
-    groups = subset[GROUP_COLUMNS].astype(str).agg("_".join, axis=1)
-    return X, y, groups
+    return subset[config.FEATURES], subset[config.LABEL_COLUMN]
 
 
-def train_model(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestClassifier:
-    model = RandomForestClassifier(random_state=config.RANDOM_STATE)
+def train_model(X_train: pd.DataFrame, y_train: pd.Series):
+    """StandardScaler + MLP 파이프라인. 스케일링도 ONNX에 함께 들어간다."""
+    model = make_pipeline(
+        StandardScaler(),
+        MLPClassifier(
+            hidden_layer_sizes=HIDDEN_LAYERS,
+            max_iter=MAX_ITER,
+            random_state=config.RANDOM_STATE,
+        ),
+    )
     model.fit(X_train, y_train)
+
+    mlp = model[-1]
+    n_params = sum(w.size for w in mlp.coefs_) + sum(b.size for b in mlp.intercepts_)
+    logger.info(
+        f"MLP 은닉층 {HIDDEN_LAYERS}, 학습 반복 {mlp.n_iter_}회, 파라미터 {n_params:,}개"
+    )
+    if mlp.n_iter_ >= MAX_ITER:
+        logger.warning(
+            f"최대 반복({MAX_ITER})에 도달했습니다 - 수렴하지 않았을 수 있습니다. "
+            f"MAX_ITER를 늘려보세요."
+        )
     return model
 
 
-def save_model(model: RandomForestClassifier, path: Path) -> None:
+def save_model(model, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "wb") as f:
         pickle.dump(model, f)
@@ -101,31 +145,35 @@ def main(dataset_path: Path) -> None:
     logger.info(f"데이터셋 로드: {dataset_path}")
     df = load_dataset(dataset_path)
 
-    X, y, groups = split_features_labels(df)
+    leaked = [c for c in config.LEAKY_COLUMNS if c in config.FEATURES]
+    if leaked:
+        raise ValueError(
+            f"라벨을 직접 결정하는 컬럼이 FEATURES에 들어 있습니다: {leaked}\n"
+            f"이 컬럼이 입력에 있으면 모델이 학습 대신 정답을 계산합니다. "
+            f"config.py의 FEATURES에서 제거하세요."
+        )
+
+    X, y = split_features_labels(df)
     n_classes = y.nunique()
     logger.info(
-        f"학습 가능한 행 {len(X)}개, 피처 {len(config.FEATURES)}개, "
-        f"클래스 {n_classes}개, 실측 위치(그룹) {groups.nunique()}개"
+        f"학습 가능한 행 {len(X):,}개, 피처 {len(config.FEATURES)}개 "
+        f"{config.FEATURES}, 클래스 {n_classes}개"
     )
 
     if n_classes < 2:
-        logger.warning(
-            "라벨 클래스가 1개뿐입니다. 물리엔진 이상값(클래스 1~3)이 아직 "
-            "합쳐지지 않은 임시 데이터셋으로 보입니다 - 학습은 되지만 의미있는 "
-            "분류 성능은 나오지 않습니다."
+        raise ValueError(
+            f"라벨 클래스가 {n_classes}개뿐입니다. generate_dataset.py를 다시 실행해 "
+            f"5개 클래스가 모두 포함된 데이터셋을 만드세요."
         )
 
-    splitter = GroupShuffleSplit(
-        n_splits=1, test_size=config.TEST_SIZE, random_state=config.RANDOM_STATE
+    X_train, X_test, y_train, y_test = train_test_split(
+        X,
+        y,
+        test_size=config.TEST_SIZE,
+        random_state=config.RANDOM_STATE,
+        stratify=y,
     )
-    train_idx, test_idx = next(splitter.split(X, y, groups=groups))
-    X_train, X_test = X.iloc[train_idx], X.iloc[test_idx]
-    y_train, y_test = y.iloc[train_idx], y.iloc[test_idx]
-
-    overlap = set(groups.iloc[train_idx]) & set(groups.iloc[test_idx])
-    assert not overlap, f"train/test에 겹치는 그룹이 있습니다: {len(overlap)}개"
-
-    logger.info(f"train {len(X_train)}행 / test {len(X_test)}행")
+    logger.info(f"train {len(X_train):,}행 / test {len(X_test):,}행 (층화 분할)")
 
     model = train_model(X_train, y_train)
 
@@ -134,7 +182,7 @@ def main(dataset_path: Path) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="RandomForestClassifier 학습")
+    parser = argparse.ArgumentParser(description="기후 분류 모델 학습 (StandardScaler + MLP)")
     parser.add_argument(
         "--dataset", type=Path, default=config.CURRENT_DATASET,
         help="학습에 쓸 CSV 경로 (기본: config.CURRENT_DATASET)",

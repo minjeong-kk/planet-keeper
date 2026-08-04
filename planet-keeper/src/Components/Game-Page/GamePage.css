@@ -5,7 +5,7 @@
   flex: 1;
   /* 페이지 높이를 뷰포트에 고정해두고, 넘치는 내용은 페이지 전체가 아니라
      아래 arena/side가 각자(overflow-y:auto) 스크롤하게 한다. */
-  height: 200svh;
+  height: 100svh;
   min-height: 0;
   box-sizing: border-box;
 }
@@ -24,9 +24,26 @@
   padding: 16px;
   text-align: left;
   display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow);
+}
+
+.game-page__stats-row {
+  display: flex;
   flex-wrap: wrap;
   gap: 16px;
-  box-shadow: var(--shadow);
+}
+
+.game-page__stats-row--physics {
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.game-page__stats-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text);
 }
 
 .game-page__arena {
@@ -65,6 +82,14 @@
 
 .game-page__modal button {
   align-self: flex-end;
+}
+
+.game-page__recovery {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 20px;
 }
 
 .game-page__quiz-choices {

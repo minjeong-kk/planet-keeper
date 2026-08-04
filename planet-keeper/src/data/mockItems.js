@@ -17,12 +17,30 @@ export const MOCK_ITEMS = [
     delta: 15,
   },
   {
+    // ice_restorer의 반대 방향 - 빙하/구름/대기는 원래 증가만 가능해서, CO2를
+    // 이미 최대로 낮춘 뒤에도 알베도가 계속 높으면 회복 경로가 없었다(소프트락).
+    id: "ice_melter",
+    name: "빙하 해빙제",
+    emoji: "🔥",
+    description: "빙하를 인위적으로 녹여 지표면 알베도를 낮추고 태양 에너지 흡수량을 늘립니다.",
+    key: "iceThickness",
+    delta: -15,
+  },
+  {
     id: "cloud_seeder",
     name: "인공 구름 생성기",
     emoji: "☁️",
     description: "대기 상층부에 구름을 형성하여 태양광 반사율(알베도)을 즉각적으로 끌어올립니다.",
     key: "cloud",
     delta: 25,
+  },
+  {
+    id: "cloud_clearer",
+    name: "구름 제거제",
+    emoji: "🌤️",
+    description: "대기 상층부의 구름을 흩어 태양광 반사율(알베도)을 낮추고 흡수량을 늘립니다.",
+    key: "cloud",
+    delta: -25,
   },
   {
     id: "carbon_capture",
@@ -58,5 +76,13 @@ export const MOCK_ITEMS = [
     description: "대기의 전반적인 두께를 압축 및 팽창시켜 대기 흡수율과 복사 보유 능력을 동시 조정합니다.",
     key: "atmThickness",
     delta: 30,
+  },
+  {
+    id: "atm_thinner",
+    name: "대기 감압 장치",
+    emoji: "🌬️",
+    description: "대기를 강제로 얇게 압축해 온실효과를 줄이고 지표 복사가 우주로 더 잘 빠져나가게 합니다.",
+    key: "atmThickness",
+    delta: -30,
   },
 ];
