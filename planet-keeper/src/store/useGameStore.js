@@ -8,6 +8,7 @@ import {
   co2PpmForTargetTemperature,
   co2PpmToSlider,
   REFERENCE_TEMP_K,
+  ENERGY_BALANCE_EPSILON,
 } from "../utils/physicsEngine.js";
 import { predictClimateState } from "../utils/climateClassifier.js";
 import { describeItemJudgment, describeFinalizeJudgment } from "../utils/planetAnalysis.js";
@@ -51,9 +52,24 @@ const FINAL_CO2_STEP = 25;
 // GamePage가 2단계 진행 체크(finalAttempts/MAX_FINAL_ATTEMPTS)를 표시하는 데도 쓴다.
 export const MAX_FINAL_ATTEMPTS = 3;
 
-// 타이머 한 틱마다 co2 슬라이더(0~100)에 더하는 양 - GamePage의 CLIMATE_TICK_MS(3초)
-// 간격과 맞물려 방치 시 체감할 수 있을 정도로만 CO2가 오르게 조절한 값이다.
-const CLIMATE_TICK_CO2_STEP = 1;
+// 매 틱 지금 물리 상태(ΔE 부호)를 보고 어느 방향으로 악화시킬지 먼저 정한 뒤,
+// 그 방향에 맞는 후보 중 하나를 무작위로 고른다 - "지금 에너지가 과다/부족하니까
+// 이 현상이 일어난다"가 항상 실제 ΔE와 맞아떨어지게 하려는 것이다(ML은 최종
+// 상태 판정만 하고, 방치 중 악화 방향은 물리 상태가 정한다). 스텝 크기는
+// CLIMATE_TICK_INTERVAL_SECONDS 주기와 맞물려 방치 시 체감될 정도로 잡았다.
+const WARMING_EVENTS = [
+  { key: "co2", delta: 1, message: "🌡️ CO₂가 배출되고 있습니다." },
+  { key: "iceThickness", delta: -1, message: "🧊 빙하가 녹고 있습니다." },
+  { key: "cloud", delta: -1, message: "☁️ 구름이 옅어지고 있습니다." },
+];
+const COOLING_EVENTS = [
+  { key: "iceThickness", delta: 1, message: "🧊 빙하가 늘어나고 있습니다." },
+  { key: "co2", delta: -1, message: "🌡️ CO₂가 줄어들고 있습니다." },
+];
+
+// 몇 초마다 고정된 이상기후 이벤트를 한 번씩 적용할지. elapsedSeconds(1초마다
+// 증가하는 총 경과 시간)가 이 배수가 될 때마다 GamePage가 applyClimateEvent를 부른다.
+export const CLIMATE_TICK_INTERVAL_SECONDS = 3;
 
 const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
 
@@ -102,24 +118,48 @@ const useGameStore = create((set, get) => ({
   isComputing: false,
   // 아이템 사용 결과 / 최종 확인 결과 메시지. { ok: boolean, lines: string[] } | null
   notice: null,
+  // 방치 타이머가 마지막으로 일으킨 이상기후 이벤트 문구 - notice(아이템/최종 확인
+  // 판정)와는 별개다. 판정 문구를 덮어쓰지 않도록 GamePage가 다른 자리에 표시한다.
+  climateEvent: null,
+  // 타이머가 돈 총 경과 시간(초) - GamePage가 1초마다 +1 하고, REPORT로 넘어가면
+  // 더 이상 증가하지 않아 그 값 그대로 ReportPage에서 "총 걸린 시간"으로 보여준다.
+  elapsedSeconds: 0,
   // REPORT 단계로 넘어간 이유: "planet_stabilized"(성공) | "life_over"(실패) | null(진행 중)
   gameOverReason: null,
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
 
-  // 게임이 진행되는 내내(CREATOR/REPORT 제외) 호출되는 타이머 한 틱 - CO2가
-  // 계속 배출되는 것을 흉내내 co2 슬라이더를 조금씩 올린다. CO2가 오르면
-  // 온실효과가 커져 평형온도(equilibriumTemperatureOf) 자체가 올라가고,
-  // advanceTemperature가 그 새 평형 방향으로 currentTemperature를 조금씩
-  // 옮긴다 - "가만히 두면 계속 나빠진다"는 압박이 실제 조성 변화로 나타난다.
-  // ML 재판정은 아이템 사용/최종 확인 같은 실제 행동 시점에만 하므로 여기서는 안 한다.
-  tickClimate: () => {
+  // 지금 ΔE 부호를 보고 악화 방향(온난화/냉각)을 정한 뒤, 그 방향 후보 중 하나를
+  // 무작위로 골라 적용한다. 이미 평형(|ΔE|≤ENERGY_BALANCE_EPSILON)이면 악화시킬
+  // 방향이 없으므로 아무것도 하지 않는다. 조성이 바뀌면 평형온도(equilibriumTemperatureOf)
+  // 자체가 움직이고, advanceTemperature가 그 새 평형 방향으로 currentTemperature를
+  // 조금씩 옮긴다. ML 재판정은 아이템 사용/최종 확인 같은 실제 행동 시점에만
+  // 하므로 여기서는 안 한다.
+  applyClimateEvent: () => {
+    const { physicsResult } = get();
+    if (!physicsResult) return;
+    const { deltaEnergy } = physicsResult;
+    const pool =
+      deltaEnergy > ENERGY_BALANCE_EPSILON ? WARMING_EVENTS : deltaEnergy < -ENERGY_BALANCE_EPSILON ? COOLING_EVENTS : null;
+    if (!pool) return;
+
+    const event = pickRandom(pool);
     const { values, setValue, advanceTemperature } = useClimateStore.getState();
-    setValue("co2", Math.min(100, values.co2 + CLIMATE_TICK_CO2_STEP));
+    setValue(event.key, nextSliderValues(values, event)[event.key]);
     advanceTemperature();
     const { values: nextValues, currentTemperature } = useClimateStore.getState();
     const physics = computeClimateV2({ ...mapSlidersToClimateInputs(nextValues), currentTemperature });
-    set({ physicsResult: physics });
+    set({ physicsResult: physics, climateEvent: event.message });
+  },
+
+  // GamePage가 1초마다 부르는 심장박동 - 경과 시간을 늘리고, CLIMATE_TICK_INTERVAL_SECONDS
+  // 배수가 될 때마다 고정 이상기후를 한 번 적용한다.
+  tickSecond: () => {
+    const elapsedSeconds = get().elapsedSeconds + 1;
+    set({ elapsedSeconds });
+    if (elapsedSeconds % CLIMATE_TICK_INTERVAL_SECONDS === 0) {
+      get().applyClimateEvent();
+    }
   },
 
   // CREATOR -> PROBLEM1. 지금 조성의 있는 그대로의 에너지 상태를 Physics+AI로
@@ -289,6 +329,8 @@ const useGameStore = create((set, get) => ({
       mlResult: null,
       isComputing: false,
       notice: null,
+      climateEvent: null,
+      elapsedSeconds: 0,
       gameOverReason: null,
     }),
 }));

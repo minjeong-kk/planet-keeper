@@ -14,8 +14,8 @@ import "./GamePage.css";
 // 넘어가더라도 이 시간만큼은 메시지를 보여준 뒤 페이지를 이동한다.
 const FEEDBACK_DISPLAY_MS = 2000;
 
-// 기후 악화 타이머 간격(ms) - CREATOR/REPORT를 제외한 모든 단계에서 계속 돈다.
-const CLIMATE_TICK_MS = 3000;
+// 코드는 그대로 두고 실행만 끈다 - 다시 끌 땐 이 플래그만 false로.
+const CLIMATE_TICK_ENABLED = true;
 
 const STAGE_LABELS = {
   [GAME_STAGES.PROBLEM1]: "1단계 문제",
@@ -51,9 +51,11 @@ function GamePage() {
   const mlResult = useGameStore((state) => state.mlResult);
   const isComputing = useGameStore((state) => state.isComputing);
   const notice = useGameStore((state) => state.notice);
+  const climateEvent = useGameStore((state) => state.climateEvent);
   const solveProblem = useGameStore((state) => state.solveProblem);
   const useItem = useGameStore((state) => state.useItem);
-  const tickClimate = useGameStore((state) => state.tickClimate);
+  const tickSecond = useGameStore((state) => state.tickSecond);
+  const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
   const resetGame = useGameStore((state) => state.resetGame);
 
   const handleBackToCreator = () => {
@@ -72,12 +74,15 @@ function GamePage() {
   // 시간이 지날수록 기후가 악화되는 압박 장치 - CREATOR/REPORT를 제외한 모든
   // 단계에서 계속 돈다. CREATOR는 보통 곧 PROBLEM1/FINAL로 넘어가지만, /game을
   // 새로고침해서 store가 초기화된 채 멈춰 있는 경우(진행할 physicsResult가 없음)도
-  // CREATOR라 여기서도 제외한다.
+  // CREATOR라 여기서도 제외한다. 1초마다 store의 elapsedSeconds를 늘리기만 하고,
+  // 실제로 이상기후를 적용할지(3초 배수마다)는 useGameStore.tickSecond가 판단한다 -
+  // REPORT에 도달하면 여기서 멈추므로 그 값이 "총 걸린 시간"으로 그대로 남는다.
   useEffect(() => {
+    if (!CLIMATE_TICK_ENABLED) return undefined;
     if (currentStage === GAME_STAGES.REPORT || currentStage === GAME_STAGES.CREATOR) return undefined;
-    const timer = setInterval(tickClimate, CLIMATE_TICK_MS);
+    const timer = setInterval(tickSecond, 1000);
     return () => clearInterval(timer);
-  }, [currentStage, tickClimate]);
+  }, [currentStage, tickSecond]);
 
   const handleAnswer = (answer) => {
     const correct = solveProblem(answer);
@@ -120,7 +125,9 @@ function GamePage() {
                 <span>방출(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
                 <span>알베도: {physicsResult.albedo.toFixed(2)}</span>
                 <span>온실효과: {physicsResult.greenhouseStrength.toFixed(2)}</span>
+                {CLIMATE_TICK_ENABLED && <span>⏱️ 경과 시간: {elapsedSeconds}초</span>}
               </div>
+              {climateEvent && <p className="game-page__stats-note">{climateEvent}</p>}
             </>
           )}
         </div>

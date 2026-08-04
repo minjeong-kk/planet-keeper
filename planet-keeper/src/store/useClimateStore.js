@@ -28,7 +28,7 @@ const DEFAULT_VALUES = { ocean: 50, iceThickness: 20, cloud: 30, atmThickness: 5
 // useGameStore.computeSnapshotResult/computeSettledResult)에서 그때그때
 // computeClimateV2로 파생시킨다. 게임 진행(문제/아이템/오답 횟수)은 useGameStore가
 // 별도로 관리한다. currentTemperature는 useGameStore가 setCurrentTemperature로
-// 직접 갱신하거나, useGameStore.tickClimate가 advanceTemperature로 매 타이머
+// 직접 갱신하거나, useGameStore.applyClimateEvent가 advanceTemperature로 매 타이머
 // 틱마다 지금 조성의 평형 방향으로 조금씩 옮긴다.
 const useClimateStore = create((set) => ({
   values: { ...DEFAULT_VALUES },

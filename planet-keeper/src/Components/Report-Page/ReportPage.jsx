@@ -27,6 +27,9 @@ function ReportPage() {
   // 하지만, 스냅샷을 한 곳(useGameStore)에서만 관리하는 게 더 단순하다.
   const physicsResult = useGameStore((state) => state.physicsResult);
   const gameOverReason = useGameStore((state) => state.gameOverReason);
+  // GamePage가 REPORT로 넘어가는 순간부터 더 이상 늘리지 않으므로 그 값 그대로
+  // "총 걸린 시간"이 된다.
+  const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
   const resetGame = useGameStore((state) => state.resetGame);
 
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
@@ -47,6 +50,7 @@ function ReportPage() {
       <div className="report-page__section">
         <h2>{resultBanner.title}</h2>
         {resultBanner.detail && <p>{resultBanner.detail}</p>}
+        <p>⏱️ 총 걸린 시간: {elapsedSeconds}초</p>
 
         {/* 행성 변수값 리스트 */}
         <div className="report-page__values-box">
