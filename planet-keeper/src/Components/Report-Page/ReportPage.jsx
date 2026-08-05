@@ -98,6 +98,44 @@ function ReportPage() {
 
       <hr className="report-page__divider" />
 
+      {/* 초기 / 최종 물리값 비교 */}
+      <div className="report-page__section">
+        <h3>최종 물리값 비교</h3>
+        {initial && final ? (
+          <table className="report-page__compare-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>초기</th>
+                <th>최종</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>평균 온도</td>
+                <td>{fmt(final.physics.currentTemperature, 1)} K</td>
+              </tr>
+              <tr>
+                <td>ΔEnergy</td>
+                <td>{fmt(final.physics.deltaEnergy)} W/m²</td>
+              </tr>
+              <tr>
+                <td>알베도</td>
+                <td>{fmt(final.physics.albedo)}</td>
+              </tr>
+              <tr>
+                <td>온실효과</td>
+                <td>{fmt(final.physics.greenhouseStrength)}</td>
+              </tr>
+            </tbody>
+          </table>
+        ) : (
+          <p>비교할 데이터가 없습니다.</p>
+        )}
+      </div>
+
+      <hr className="report-page__divider" />
+
       {/* 행성 변화 타임라인: 초기 → 아이템 → 최종 */}
       <div className="report-page__section">
         <h3>행성 변화 타임라인</h3>
@@ -129,48 +167,6 @@ function ReportPage() {
           </ol>
         ) : (
           <p>기록된 변화가 없습니다.</p>
-        )}
-      </div>
-
-      <hr className="report-page__divider" />
-
-      {/* 초기 / 최종 물리값 비교 */}
-      <div className="report-page__section">
-        <h3>초기 / 최종 물리값 비교</h3>
-        {initial && final ? (
-          <table className="report-page__compare-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>초기</th>
-                <th>최종</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>평균 온도</td>
-                <td>{fmt(initial.physics.currentTemperature, 1)} K</td>
-                <td>{fmt(final.physics.currentTemperature, 1)} K</td>
-              </tr>
-              <tr>
-                <td>ΔEnergy</td>
-                <td>{fmt(initial.physics.deltaEnergy)} W/m²</td>
-                <td>{fmt(final.physics.deltaEnergy)} W/m²</td>
-              </tr>
-              <tr>
-                <td>알베도</td>
-                <td>{fmt(initial.physics.albedo)}</td>
-                <td>{fmt(final.physics.albedo)}</td>
-              </tr>
-              <tr>
-                <td>온실효과</td>
-                <td>{fmt(initial.physics.greenhouseStrength)}</td>
-                <td>{fmt(final.physics.greenhouseStrength)}</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <p>비교할 데이터가 없습니다.</p>
         )}
       </div>
 

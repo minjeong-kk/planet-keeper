@@ -73,8 +73,10 @@ function GamePage() {
   // 파생값들은 그때마다 다시 계산되고, physicsResult가 없으면 그냥 표시를 건너뛴다.
   const equilibriumTemperature = physicsResult ? equilibriumTemperatureOf(physicsResult) : null;
 
+  // "🧊 빙하 해빙제" 같은 이름이 여러 번 쓰이면 나열하지 않고 x횟수로 묶어 보여준다.
+  const inventoryCounts = [...inventory.reduce((counts, name) => counts.set(name, (counts.get(name) ?? 0) + 1), new Map())];
+
   const [feedback, setFeedback] = useState(null); // "correct" | "wrong" | null
-  const [showDetails, setShowDetails] = useState(false);
 
   // 시간이 지날수록 기후가 악화되는 압박 장치 - CREATOR/REPORT를 제외한 모든
   // 단계에서 계속 돈다. CREATOR는 보통 곧 PROBLEM1/FINAL로 넘어가지만, /game을
@@ -111,6 +113,18 @@ function GamePage() {
 
   return (
     <div className="game-page">
+      {/* 스크롤 시 화면 우측 상단에 고정 표시될 플로팅 타이머 & 알림 창 */}
+      {CLIMATE_TICK_ENABLED && (
+        <div className="game-page__floating-timer">
+          <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>
+          {climateEvent && (
+            <div className="game-page__event-toast">
+              {climateEvent}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="game-page__main">
         <div className="game-page__stats-bar">
           {physicsResult && (
@@ -140,34 +154,14 @@ function GamePage() {
                 </div>
               </div>
 
-              <div className="game-page__stats-row">
-            {CLIMATE_VARIABLES.map(({ key, label }) => (
-              <span key={key}>
-                {label}: {key === "co2" ? `${co2Ppm(values.co2)} ppm` : `${values[key]}%`}
-              </span>
-            ))}
-          </div>
+                <div className="game-page__stats-row">
+                {CLIMATE_VARIABLES.map(({ key, label }) => (
+                  <span key={key}>
+                    {label}: {key === "co2" ? `${co2Ppm(values.co2)} ppm` : `${values[key]}%`}
+                  </span>
+                ))}
+                </div>
 
-              {/* 숫자보다 의미가 먼저 보이도록 - ΔE 방향과 현재↔안정 온도 관계를 문장으로 설명한다. */}
-              <p className="game-page__stats-note">{deltaEnergyLines(physicsResult.deltaEnergy)[1]}</p>
-              <p className="game-page__stats-note">
-                현재 평균 온도는 시간이 지나면서 예상 안정 온도에 가까워집니다.{" "}
-                {Math.abs(physicsResult.currentTemperature - equilibriumTemperature) < 0.5
-                  ? "지금은 이미 안정 상태에 도달했습니다."
-                  : "지금은 아직 안정 상태에 도달하지 않았습니다."}
-              </p>
-              {CLIMATE_TICK_ENABLED && <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>}
-              {climateEvent && <p className="game-page__stats-note">{climateEvent}</p>}
-
-              <button
-                type="button"
-                className="game-page__details-toggle"
-                onClick={() => setShowDetails((v) => !v)}
-              >
-                {showDetails ? "▲ 상세 물리 정보 접기" : "▼ 상세 물리 정보 보기"}
-              </button>
-
-              {showDetails && (
                 <div className="game-page__stats-row game-page__stats-row--physics">
                   <span>흡수 에너지(ASR): {physicsResult.absorbedRadiation.toFixed(2)}</span>
                   <span>방출 에너지(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
@@ -178,8 +172,7 @@ function GamePage() {
                     <Term concept={CLIMATE_CONCEPTS.greenhouseEffect}>온실효과</Term>:{" "}
                     {physicsResult.greenhouseStrength.toFixed(2)}
                   </span>
-                </div>
-              )}
+              </div>
             </>
           )}
         </div>
@@ -258,7 +251,20 @@ function GamePage() {
               ))}
             </p>
           )}
-          <p> 사용 아이템: {inventory.length ? inventory.join(", ") : "없음"}</p>
+          <div className="game-page__used-items-container">
+            <p className="game-page__used-items-label">사용 아이템:</p>
+            {inventoryCounts.length > 0 ? (
+              <ul className="game-page__used-items-list">
+                {inventoryCounts.map(([name, count]) => (
+                  <li key={name} className="game-page__used-item-row" title={`${name} x${count}`}>
+                    {name} x{count}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="game-page__used-items-empty">없음</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

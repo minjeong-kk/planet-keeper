@@ -210,19 +210,6 @@ export function shortSliderChangeLabel(key, delta) {
   return `${label} ${delta > 0 ? "증가" : "감소"}`;
 }
 
-// 각 슬라이더가 알베도 계열(빙하/바다/구름)인지 온실효과 계열(CO2/대기두께)인지와,
-// 슬라이더가 늘어날 때 그 계열 수치가 커지는지(sign=1) 작아지는지(sign=-1).
-// physicsEngine.js의 albedoOf(+빙하, +구름, -바다)/greenhouseStrengthOf(+CO2, +대기두께)
-// 계수 부호를 그대로 옮긴 것 - 새 물리 규칙이 아니라 기존 공식 부호의 문장화다.
-const SLIDER_PHYSICS = {
-  iceThickness: { channel: "albedo", sign: 1 },
-  cloud: { channel: "albedo", sign: 1 },
-  ocean: { channel: "albedo", sign: -1 },
-  co2: { channel: "greenhouse", sign: 1 },
-  atmThickness: { channel: "greenhouse", sign: 1 },
-};
-
-
 const CHANGE_EPSILON = 0.005;
 
 function changeLine(before, after, riseText, fallText) {
@@ -420,7 +407,7 @@ export function previewItemEffect(item) {
       return {
         concept: [
           "📖 어떤 물리량을 바꾸나요?",
-          "• 빙하 비율 증가",
+          "• 빙하 면적 증가",
           "• 알베도 증가",
           "• 태양 에너지 반사량 증가",
         ],
@@ -528,6 +515,7 @@ export function previewItemEffect(item) {
           "📖 어떤 물리량을 바꾸나요?",
           "• CO₂ 농도 감소",
           "• 온실효과 감소",
+          "• 우주 방출 에너지(OLR) 증가",
         ],
         chain: [
           "CO₂ 감소",
@@ -545,7 +533,7 @@ export function previewItemEffect(item) {
         science: [
           "💡 지구과학 개념",
           "이산화탄소는 대표적인 온실기체입니다.",
-          "농도가 감소하면 지표의 열이 우주로 더 쉽게 방출됩니다.",
+          "CO₂가 줄어들면 대기가 가두는 열이 감소하여 우주로 방출되는 열이 늘어납니다.",
         ],
       };
 

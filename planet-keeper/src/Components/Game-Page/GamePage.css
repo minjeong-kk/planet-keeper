@@ -29,15 +29,34 @@
   box-shadow: var(--shadow);
 }
 
+/* 주요 스탯 카드 아래의 서브 정보 줄 */
 .game-page__stats-row {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
   gap: 16px;
+  
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border); /* 상세 정보는 점선으로 세련되게 구분 */
+  
+  font-size: 0.88rem;
+  color: var(--text-p);
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  padding: 8px 12px;
+  line-height: 1.5;
 }
 
+/* 상세 물리 정보 접기/펼치기 영역 */
 .game-page__stats-row--physics {
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border); /* 상세 정보는 점선으로 세련되게 구분 */
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  padding: 8px 12px;
 }
 
 .game-page__stats-note {
@@ -76,8 +95,14 @@
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   box-shadow: var(--shadow);
+  box-sizing: border-box;
+}
+
+.game-page__modal h3 {
+  margin: 0;
+  text-align: left; /* "아이템 선택" 제목은 좌상단 유지 */
 }
 
 .game-page__quiz-retry-badge {
@@ -213,13 +238,85 @@
 .game-page__info-panel p {
   margin: 2px 0;
 }
+.info-panel__section {
+  margin-bottom: 14px;
+}
 
+.info-panel__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 8px;
+}
+
+/* Planet Summary 내 서브 리스트 정돈 */
 .game-page__summary-block {
-  margin-bottom: 10px;
+  background: var(--bg-card, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
 }
 
 .game-page__summary-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--primary, #65a30d);
+  margin-bottom: 4px;
+}
+
+.game-page__summary-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 0.83rem;
+  color: var(--text-p);
+  line-height: 1.45;
+}
+
+/* ML Prediction 카드 형태 디자인 */
+.info-panel__ml-card {
+  background: var(--bg-card, rgba(101, 163, 13, 0.05));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.info-panel__ml-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.info-panel__badge {
+  background: var(--primary-light, #ecfccb);
+  color: var(--primary-dark, #3f6212);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
   font-weight: 600;
+}
+
+.info-panel__divider {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 14px 0;
+}
+
+/* 하단 해석 가이드 상자 */
+.info-panel__guide-box {
+  background: rgba(101, 163, 13, 0.05);
+  border: 1px solid rgba(101, 163, 13, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .game-page__info-panel hr {
@@ -232,11 +329,14 @@
 .item-card-grid {
   width: 100%;
   list-style: none;
-  margin: 0;
+  margin: 0 auto;
   padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
+  
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* 핵심: 카드가 몇 개든 가로 중앙 정렬 */
+  align-items: center;
+  gap: 16px;
 }
 
 .item-card {
@@ -244,12 +344,20 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 16px 12px 12px;
+  font-size: 0.95rem;
+
+  
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between; /* 내부 요소들을 위/아래 균등 배치 */
+  
+  width: 180px;
+  height: 175px; /* 모든 아이템 카드의 높이를 일정하게 고정 */
+  flex-shrink: 0;
   text-align: center;
   box-shadow: var(--shadow);
+  box-sizing: border-box;
 }
 
 .item-card__info-btn {
@@ -328,6 +436,47 @@
 .item-info-modal button {
   align-self: flex-end;
 }
+/* 사용 아이템 전체 컨테이너 */
+.game-page__used-items-container {
+  margin-top: 10px;
+  border-top: 1px dashed var(--border);
+  padding-top: 8px;
+}
+
+.game-page__used-items-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+  color: var(--text-h);
+}
+
+/* 한 줄에 하나의 아이템만 나오도록 설정한 리스트 */
+.game-page__used-items-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px; /* 아이템 간격 */
+}
+
+.game-page__used-item-row {
+  font-size: 0.83rem;
+  color: var(--text-p);
+  white-space: nowrap;      /* 줄바꿈 금지 (한 줄 유지) */
+  overflow: hidden;         /* 영역 벗어나면 숨김 */
+  text-overflow: ellipsis; /* 너무 길 경우 ... 처리 */
+  background: var(--bg-card, rgba(0, 0, 0, 0.02));
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.game-page__used-items-empty {
+  font-size: 0.83rem;
+  color: #888;
+  margin: 0;
+}
 
 /* 상단 핵심 지표 카드 3개 */
 .game-page__key-cards {
@@ -359,6 +508,76 @@
   align-self: flex-start;
   padding: 6px 12px;
   font-size: 0.85rem;
+}
+.game-page__stats-bar--sticky {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background-color: var(--bg); /* 스크롤 시 뒤 내용이 비치지 않게 배경색 지정 */
+}
+
+/* 화면 구석에 스크롤을 따라다니는 고정 타이머 위젯 */
+.game-page__floating-timer {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 999; /* 다른 요소보다 항상 위에 뜨도록 설정 */
+  
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  
+  padding: 10px 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px); /* 배후가 살짝 비치는 고급스러운 Glassmorphic 효과 */
+  
+  transition: all 0.2s ease;
+}
+
+.game-page__floating-timer .game-page__stats-note {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-h);
+  font-size: 0.95rem;
+}
+
+/* 경고 문구 토스트 팝업 */
+.game-page__event-toast {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+  animation: toastPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  white-space: nowrap;
+}
+
+/* 다크 모드에서의 토스트 팝업 색상 */
+@media (prefers-color-scheme: dark) {
+  .game-page__event-toast {
+    background: #450a0a;
+    color: #fca5a5;
+    border-color: #991b1b;
+  }
+}
+
+/* 살짝 확대되며 올라오는 통통 튀는 애니메이션 */
+@keyframes toastPop {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (max-width: 900px) {

@@ -1,15 +1,16 @@
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
+  --text: #5e665b;
+  --text-h: #0f1a0e;
   --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #3b82f6;
-  --accent-bg: rgba(59, 130, 246, 0.1);
-  --accent-border: rgba(59, 130, 246, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
+  --border: #e2e8e0;
+  --code-bg: #f3f6f2;
+  /* 라이트 모드: 화사한 연두 (Lime Green) */
+  --accent: #65a30d;
+  --accent-bg: rgba(101, 163, 13, 0.1);
+  --accent-border: rgba(101, 163, 13, 0.4);
+  --social-bg: rgba(243, 246, 242, 0.5);
   --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+    rgba(0, 0, 0, 0.08) 0 10px 15px -3px, rgba(0, 0, 0, 0.04) 0 4px 6px -2px;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -32,15 +33,16 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #818cf8;
-    --accent-bg: rgba(129, 140, 248, 0.15);
-    --accent-border: rgba(129, 140, 248, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
+    --text: #a3b3a1;
+    --text-h: #f0fdf4;
+    --bg: #121913; /* 답답하지 않은 깊은 딥 그린 톤 배경 */
+    --border: #233325;
+    --code-bg: #1a261c;
+    /* 다크 모드: 시원하고 선명한 에메랄드/브라이트 초록 */
+    --accent: #4ade80;
+    --accent-bg: rgba(74, 222, 128, 0.15);
+    --accent-border: rgba(74, 222, 128, 0.4);
+    --social-bg: rgba(35, 51, 37, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
   }
@@ -53,9 +55,6 @@
 html,
 body,
 #root {
-  /*width: 100%;
-  height: 100%;
-  margin: 0;*/
   background: linear-gradient(180deg, var(--accent-bg), transparent 240px), var(--bg);
   width: 1440px;
   max-width: 100%;
@@ -64,10 +63,6 @@ body,
   border-inline: 1px solid var(--border);
   min-height: 100svh;
   padding: 0;
-  /* GamePage는 height:100svh + 내부(arena/side) overflow-y:auto로 스스로 스크롤을
-     처리하므로 세로 스크롤이 여기서 생기지 않는다. Start/PlanetCreate/Report처럼
-     내부 스크롤이 없는 페이지가 뷰포트보다 커지는 경우를 위한 안전장치로 세로만
-     열어둔다(가로는 계속 막아 불필요한 스크롤바를 막는다). */
   overflow-x: hidden;
   overflow-y: auto;
   border: none;
@@ -97,8 +92,18 @@ button:hover {
 .btn-primary {
   border: none;
   background: var(--accent);
-  color: #fff;
+  color: #052e16; /* 가독성을 위해 버튼 글자색을 어두운 그린으로 지정 (다크모드 시 가독성 보장) */
   font-weight: 600;
+}
+
+:root .btn-primary {
+  color: #ffffff; /* 라이트 모드에서는 흰색 글자 유지 */
+}
+
+@media (prefers-color-scheme: dark) {
+  .btn-primary {
+    color: #052e16; /* 다크 모드에서는 밝은 초록 배경 위에 어두운 글자색 적용 */
+  }
 }
 
 .btn-primary:hover {
@@ -106,10 +111,10 @@ button:hover {
   filter: brightness(1.08);
 }
 
-/* 교과 개념 용어(Term 컴포넌트) - 마우스 오버 시 브라우저 기본 title 툴팁이 뜬다는 걸
-   점선 밑줄로 미리 알려준다. */
+/* 교과 개념 용어(Term 컴포넌트) */
 .concept-term {
-  text-decoration: underline dotted;
+  text-decoration: underline dotted var(--accent); /* 밑줄에 포인트 색상 부여 */
   text-underline-offset: 3px;
   cursor: help;
+  color: var(--text-h);
 }
