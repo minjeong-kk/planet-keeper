@@ -1,75 +1,1082 @@
+/* Start Page — 좌: 타이틀 + 메뉴 2개 + CTA / 우: 기상이 + 말풍선.
+   톤: 디지털 SF 미니멀. 팝업도 같은 매트 다크 네이비 + 사이언 홀로그램 엣지.
+   페이지 배경 자체는 칠하지 않고(배경 작업 예정), 장식 레이어만 은은하게 깐다. */
 .start-page {
-  display: flex;
-  justify-content: space-between;
-  gap: 28px;
-  padding: 28px;
-  flex: 1;
-}
+  --neon: #58e0ff;
+  --glass: linear-gradient(160deg, rgba(28, 36, 58, 0.72), rgba(14, 18, 30, 0.72));
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --ink: #eef2fa;
+  --ink-dim: #a9b6cd;
+  /* 배경이 밝든 어둡든 타이틀/부제목이 묻히지 않게 하는 어두운 외곽 그림자
+     (형광 블러 없이 대비만 확보한다) */
+  --text-contrast: 0 2px 10px rgba(4, 9, 20, 0.85);
 
-.start-page__info {
+  position: relative;
+  isolation: isolate;
   display: flex;
-  flex-direction: column;
-  gap: 24px;
+  align-items: center;
+  gap: 40px;
+  padding: 36px 52px;
   flex: 1;
   text-align: left;
 }
 
-.start-page__box {
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 20px;
-  box-shadow: var(--shadow);
+/* ══ 장식 레이어 ═══════════════════════════════════════════════ */
+.start-page__backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
 }
 
-.start-page__box button {
-  margin-top: 8px;
+/* 장식 레이어(z-index:-1) 위로 올리기만 하면 되므로 z-index 는 주지 않는다.
+   여기에 z-index 를 주면 스택 컨텍스트가 생겨서 팝업이 그 안에 갇힌다. */
+.start-page__side,
+.start-page__stage {
+  position: relative;
 }
 
-.start-page__visual {
+/* 홀로그램 그리드 — 가장자리로 갈수록 사라진다 */
+.start-page__grid {
+  position: absolute;
+  inset: -10%;
+  background-image:
+    linear-gradient(to right, rgba(111, 220, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(111, 220, 255, 0.07) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(ellipse 68% 62% at 62% 48%, #000 20%, transparent 78%);
+  -webkit-mask-image: radial-gradient(ellipse 68% 62% at 62% 48%, #000 20%, transparent 78%);
+}
+
+/* 우주 입자 — 크기/속도가 다른 두 겹으로 미세한 시차를 만든다 */
+.start-page__dust {
+  position: absolute;
+  inset: -20%;
+  background-repeat: repeat;
+}
+
+.start-page__dust--far {
+  background-image: radial-gradient(circle, rgba(214, 236, 255, 0.5) 0.8px, transparent 0.8px);
+  background-size: 132px 118px;
+  opacity: 0.5;
+  animation: start-page-drift-far 96s linear infinite;
+}
+
+.start-page__dust--near {
+  background-image: radial-gradient(circle, rgba(160, 226, 255, 0.55) 1.3px, transparent 1.3px);
+  background-size: 258px 226px;
+  opacity: 0.6;
+  animation: start-page-drift-near 62s linear infinite;
+}
+
+/* 행성 궤도 라인 — 우측 마스코트 쪽을 중심으로 아주 천천히 돈다 */
+.start-page__orbit {
+  position: absolute;
+  top: 50%;
+  left: 68%;
+  border: 1px solid rgba(111, 220, 255, 0.13);
+  border-radius: 50%;
+  transform: translate(-50%, -50%) rotate(-16deg);
+}
+
+.start-page__orbit--outer {
+  width: 1180px;
+  height: 720px;
+  animation: start-page-orbit 150s linear infinite;
+}
+
+.start-page__orbit--mid {
+  width: 880px;
+  height: 540px;
+  border-color: rgba(111, 220, 255, 0.16);
+  animation: start-page-orbit 108s linear infinite reverse;
+}
+
+.start-page__orbit--inner {
+  width: 600px;
+  height: 372px;
+  border-style: dashed;
+  border-color: rgba(111, 220, 255, 0.12);
+  animation: start-page-orbit 78s linear infinite;
+}
+
+/* ══ 좌측 ══════════════════════════════════════════════════════ */
+.start-page__side {
+  flex: 0 0 470px;
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+.start-page__intro {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.start-page__eyebrow {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  letter-spacing: 0.24em;
+  color: var(--neon);
+}
+
+/* 타이틀: 형광 블러 없이 그라디언트 + 어두운 외곽 그림자로만 대비를 잡는다.
+   (background-clip 미지원 환경에서는 아래 단색 color 가 그대로 쓰인다) */
+.start-page__title {
+  margin: 0;
+  font-size: 4rem;
+  font-weight: 800;
+  line-height: 0.96;
+  letter-spacing: 0.03em;
+  color: #ffffff;
+  text-shadow: 0 0 1px rgba(5, 10, 22, 0.9), 0 2px 12px rgba(4, 9, 20, 0.85);
+}
+
+@supports (-webkit-background-clip: text) or (background-clip: text) {
+  .start-page__title {
+    background: linear-gradient(180deg, #ffffff 0%, #dff4ff 52%, #8fdcf7 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+.start-page__tagline {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+  text-shadow: var(--text-contrast);
+  word-break: keep-all;
+}
+
+.start-page__tagline strong {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* ── 메뉴 버튼 2개 ──────────────────────────────────────────── */
+.start-page__menu {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* 전역 button 스타일(밝은 배경)을 덮어쓴다 */
+.start-page__menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 100%;
+  padding: 22px 24px;
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.32);
+  color: var(--ink);
+  text-align: left;
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.start-page__menu-btn:hover {
+  transform: translateX(5px);
+  border-color: rgba(88, 224, 255, 0.45);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.32), 0 0 22px rgba(88, 224, 255, 0.14);
+}
+
+.start-page__menu-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  flex-shrink: 0;
+  border: 1px solid rgba(88, 224, 255, 0.32);
+  border-radius: 14px;
+  background: rgba(88, 224, 255, 0.1);
+  color: var(--neon);
+}
+
+.start-page__menu-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.start-page__menu-label {
+  font-size: 1.12rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.start-page__menu-sub {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  color: var(--ink-dim);
+}
+
+.start-page__menu-arrow {
+  margin-left: auto;
+  flex-shrink: 0;
+  color: var(--ink-dim);
+  transition: transform 0.18s ease, color 0.18s ease;
+}
+
+.start-page__menu-btn:hover .start-page__menu-arrow {
+  transform: translateX(3px);
+  color: var(--neon);
+}
+
+/* ══ 메인 CTA — 일렉트릭 사이언/블루 그라데이션 ═══════════════ */
+.start-page__cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 23px 32px;
+  border: none;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #35e6f0 0%, #35a7f5 52%, #4b6cf7 100%);
+  color: #04121f;
+  font-size: 1.22rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  /* 입체감: 위쪽 하이라이트 + 아래쪽 음영 + 바깥 글로우 */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.55),
+    inset 0 -2px 0 rgba(4, 18, 31, 0.22),
+    0 10px 26px rgba(6, 14, 28, 0.42),
+    0 0 30px rgba(53, 200, 244, 0.42);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, filter 0.18s ease;
+  animation: start-page-cta-pulse 3s ease-in-out infinite;
+}
+
+.start-page__cta:hover {
+  transform: translateY(-3px);
+  filter: saturate(1.08) brightness(1.04);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    inset 0 -2px 0 rgba(4, 18, 31, 0.24),
+    0 14px 32px rgba(6, 14, 28, 0.48),
+    0 0 44px rgba(53, 200, 244, 0.6);
+  animation: none;
+}
+
+.start-page__cta:active {
+  transform: translateY(-1px);
+}
+
+.start-page__cta-arrow {
+  color: #04121f;
+  transition: transform 0.18s ease;
+}
+
+.start-page__cta:hover .start-page__cta-arrow {
+  transform: translateX(5px);
+}
+
+/* ══ 우측: 기상이 + 말풍선 ═════════════════════════════════════ */
+.start-page__stage {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
-  flex: 1;
+  justify-content: center;
+  gap: 4px;
 }
 
-.start-page__planet {
-  width: 220px;
-  height: 220px;
-  border-radius: 50%;
-  background: var(--accent);
-  color: #fff;
+/* ── 말풍선(호흡하듯 미세하게 움직인다) ────────────────────── */
+.start-page__bubble {
+  position: relative;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 24px;
+  border: 1px solid rgba(88, 224, 255, 0.3);
+  border-radius: 22px 22px 22px 6px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+  animation: start-page-breathe 4.4s ease-in-out infinite;
+}
+
+/* 말풍선 꼬리(마스코트 쪽으로 향한다) */
+.start-page__bubble::after {
+  content: "";
+  position: absolute;
+  bottom: -9px;
+  left: 28px;
+  width: 16px;
+  height: 16px;
+  transform: rotate(45deg);
+  border-right: 1px solid rgba(88, 224, 255, 0.3);
+  border-bottom: 1px solid rgba(88, 224, 255, 0.3);
+  background: rgba(18, 24, 40, 0.92);
+}
+
+.start-page__bubble-text {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.65;
+  color: var(--ink);
+  word-break: keep-all;
+}
+
+.start-page__bubble-text strong {
+  font-weight: 700;
+  color: var(--neon);
+}
+
+/* ── 마스코트(둥둥 떠다닌다) ───────────────────────────────── */
+.start-page__mascot {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
-  box-shadow: var(--shadow);
+  animation: start-page-float 5.2s ease-in-out infinite;
 }
 
-.start-page__cta {
-  padding: 12px 24px;
-  font-size: 1.05em;
+/* 형광 번짐이 아니라 궤도 안쪽의 옅은 광원 정도로만 남긴다 */
+.start-page__mascot-glow {
+  position: absolute;
+  width: 420px;
+  height: 420px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(88, 224, 255, 0.1), transparent 70%);
+  pointer-events: none;
 }
 
-.start-page__modal-overlay {
+/* 원본 PNG 이 이미 알파 투명 배경이라 블렌드 모드 없이 그대로 얹는다. */
+.start-page__mascot-img,
+.start-page__mascot-fallback {
+  position: relative;
+  width: 460px;
+  height: 460px;
+}
+
+.start-page__mascot-img {
+  object-fit: contain;
+  filter: drop-shadow(0 22px 32px rgba(0, 0, 0, 0.38));
+}
+
+/* 이미지가 없을 때만(onError → .is-missing) SVG 실루엣으로 대체한다. */
+.start-page__mascot-fallback {
+  display: none;
+}
+
+.start-page__mascot-img.is-missing {
+  display: none;
+}
+
+.start-page__mascot-img.is-missing ~ .start-page__mascot-fallback {
+  display: block;
+}
+
+/* ══ 팝업 백드롭 ═══════════════════════════════════════════════
+   뒤 화면을 어둡게 덮지 않고, 옅은 딤 + 블러로 초점만 옮긴다.
+   팝업은 createPortal 로 document.body 에 붙기 때문에 .start-page 의 변수를
+   물려받지 못한다 → 팝업 팔레트는 여기서 직접 정의한다. */
+.start-page__overlay {
+  --holo: #6fdcff;
+  --pad: linear-gradient(160deg, #17213a 0%, #0e1524 100%);
+  --pad-border: rgba(111, 220, 255, 0.22);
+  --pad-ink: #e9f0fb;
+  --pad-ink-dim: #9fb2cf;
+  --pad-line: rgba(111, 220, 255, 0.16);
+  --pad-inset: rgba(6, 11, 20, 0.55);
+
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 32px;
+  background: rgba(10, 16, 28, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: start-page-fade 0.2s ease both;
 }
 
-.start-page__modal {
-  background: var(--bg);
-  color: var(--text-h);
-  padding: 36px;
-  border-radius: 12px;
-  max-width: 640px;
-  max-height: 80svh;
+/* 스타 패드는 우측 탭이 펼쳐질 공간을 비워둔다 */
+.start-page__overlay--book {
+  padding: 32px 220px 32px 32px;
+}
+
+/* ══ 브리핑 패널(학습 목표 & 게임 흐름) ═══════════════════════ */
+.start-page__panel {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  max-height: 82svh;
   overflow-y: auto;
-  font-size: 1.05rem;
+  padding: 32px 34px 34px;
+  border: 1px solid var(--pad-border);
+  border-radius: 18px;
+  background: var(--pad);
+  box-shadow: 0 26px 60px rgba(3, 7, 16, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  color: var(--pad-ink);
+  animation: start-page-pop 0.24s ease both;
+}
+
+/* 패널 상단 홀로그램 엣지 */
+.start-page__panel::before,
+.start-page__pad::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--holo), transparent);
+  opacity: 0.7;
+}
+
+.start-page__panel-head {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding-right: 46px;
+  padding-bottom: 16px;
+  margin-bottom: 22px;
+  border-bottom: 1px solid var(--pad-line);
+}
+
+.start-page__panel-eyebrow {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.2em;
+  line-height: 1.2;
+  color: var(--holo);
+}
+
+.start-page__panel-title {
+  margin: 0;
+  font-size: 1.45rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.start-page__panel-close {
+  position: absolute;
+  top: -2px;
+  right: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--pad-ink-dim);
+}
+
+.start-page__panel-close:hover {
+  transform: none;
+  border-color: var(--pad-border);
+  color: var(--holo);
+  box-shadow: 0 0 16px rgba(111, 220, 255, 0.22);
+}
+
+.start-page__panel-intro {
+  margin: 0 0 20px;
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: var(--pad-ink);
+  word-break: keep-all;
+}
+
+/* ── 게임 흐름 스텝 ─────────────────────────────────────────── */
+.start-page__flow {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.start-page__flow-step {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  padding: 16px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-left: 2px solid rgba(111, 220, 255, 0.55);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.035);
+  animation: start-page-rise 0.32s ease both;
+  animation-delay: calc(var(--i) * 70ms);
+}
+
+.start-page__flow-no {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
   line-height: 1.6;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  color: var(--holo);
+}
+
+.start-page__flow-body {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.start-page__flow-title {
+  font-size: 0.96rem;
+  line-height: 1.5;
+  color: #ffffff;
+}
+
+.start-page__flow-text {
+  font-size: 0.88rem;
+  line-height: 1.72;
+  color: var(--pad-ink-dim);
+  word-break: keep-all;
+}
+
+/* ══ 기후 개념 도감 — 스타 패드 ════════════════════════════════ */
+.start-page__pad {
+  position: relative;
+  width: 100%;
+  max-width: 900px;
+  padding: 26px 30px 20px;
+  border: 1px solid var(--pad-border);
+  border-radius: 20px;
+  background: var(--pad);
+  box-shadow:
+    0 30px 70px rgba(3, 7, 16, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 0 40px rgba(111, 220, 255, 0.08);
+  color: var(--pad-ink);
+  animation: start-page-pop 0.26s ease both;
+}
+
+/* 패널 네 귀퉁이 브래킷(SF 계기판 디테일) */
+.start-page__pad::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  border-radius: 14px;
+  background:
+    linear-gradient(var(--holo), var(--holo)) left 0 top 0 / 18px 1px no-repeat,
+    linear-gradient(var(--holo), var(--holo)) left 0 top 0 / 1px 18px no-repeat,
+    linear-gradient(var(--holo), var(--holo)) right 0 bottom 0 / 18px 1px no-repeat,
+    linear-gradient(var(--holo), var(--holo)) right 0 bottom 0 / 1px 18px no-repeat;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.start-page__pad-close {
+  position: absolute;
+  top: 18px;
+  right: 20px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--pad-ink-dim);
+}
+
+.start-page__pad-close:hover {
+  transform: none;
+  border-color: var(--pad-border);
+  color: var(--holo);
+  box-shadow: 0 0 16px rgba(111, 220, 255, 0.22);
+}
+
+.start-page__pad-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 0 52px 16px 0;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--pad-line);
+}
+
+.start-page__pad-eyebrow {
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  color: var(--holo);
+  opacity: 0.9;
+}
+
+.start-page__pad-title {
+  margin: 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+/* ── 우측 디지털 탭(hover/선택 시 슬라이드 확장) ───────────── */
+.start-page__tabs {
+  position: absolute;
+  top: 84px;
+  left: 100%;
+  margin-left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.start-page__tab {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 58px;
+  padding: 12px 0 12px 14px;
+  overflow: hidden;
+  white-space: nowrap;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left: 2px solid rgba(111, 220, 255, 0.35);
+  border-radius: 0 12px 12px 0;
+  background: linear-gradient(90deg, rgba(23, 33, 58, 0.92), rgba(14, 21, 36, 0.92));
+  color: var(--pad-ink-dim);
+  text-align: left;
+  box-shadow: 0 8px 22px rgba(3, 7, 16, 0.4);
+  transition: width 0.3s cubic-bezier(0.22, 0.7, 0.2, 1), border-color 0.22s ease,
+    box-shadow 0.22s ease, color 0.22s ease;
+}
+
+.start-page__tab:hover,
+.start-page__tab.is-active {
+  width: 176px;
+  transform: none;
+  color: #ffffff;
+  border-left-color: var(--holo);
+  box-shadow: 0 8px 22px rgba(3, 7, 16, 0.4), 0 0 22px rgba(111, 220, 255, 0.28);
+}
+
+.start-page__tab-no {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--holo);
+}
+
+.start-page__tab-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  opacity: 0;
+  transform: translateX(-8px);
+  transition: opacity 0.22s ease 0.05s, transform 0.3s cubic-bezier(0.22, 0.7, 0.2, 1);
+}
+
+.start-page__tab:hover .start-page__tab-name,
+.start-page__tab.is-active .start-page__tab-name {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* ── 지면(좌: 표제 / 우: 본문) ─────────────────────────────── */
+.start-page__panes {
+  display: grid;
+  grid-template-columns: minmax(0, 0.86fr) 1px minmax(0, 1.14fr);
+  gap: 26px;
+  padding: 22px 0 18px;
+}
+
+.start-page__pane {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 300px;
+}
+
+.start-page__pane--body {
+  max-height: 52svh;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+/* 제본선 대신 얇은 홀로그램 분할선 */
+.start-page__divider {
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(111, 220, 255, 0.4) 22%,
+    rgba(111, 220, 255, 0.4) 78%,
+    transparent
+  );
+}
+
+.start-page__pane-no {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.18em;
+  font-variant-numeric: tabular-nums;
+  color: var(--holo);
+}
+
+.start-page__pane-title {
+  margin: 0;
+  font-size: 1.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: #ffffff;
+}
+
+.start-page__pane-label {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  color: var(--pad-ink-dim);
+}
+
+.start-page__pane-summary {
+  margin: 6px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.7;
+  color: var(--pad-ink);
+  word-break: keep-all;
+}
+
+.start-page__pane-formula {
+  display: flex;
+  align-items: center;
+  margin-top: auto;
+  min-height: 54px;
+  padding: 14px 16px;
+  border: 1px solid rgba(111, 220, 255, 0.18);
+  border-left: 2px solid var(--holo);
+  border-radius: 10px;
+  background: var(--pad-inset);
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: #a8ecff;
+  word-break: break-word;
+}
+
+.start-page__pane-body {
+  margin: 0;
+  font-size: 0.96rem;
+  line-height: 1.95;
+  color: var(--pad-ink);
+  word-break: keep-all;
+}
+
+/* ── 하단 페이지 인디케이터 ─────────────────────────────────── */
+.start-page__pad-foot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--pad-line);
+}
+
+.start-page__pad-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--pad-ink-dim);
+}
+
+.start-page__pad-nav:hover {
+  transform: none;
+  border-color: var(--pad-border);
+  color: var(--holo);
+  box-shadow: 0 0 16px rgba(111, 220, 255, 0.22);
+}
+
+.start-page__pad-count {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+  color: var(--holo);
+}
+
+.start-page__pad-count em {
+  font-style: normal;
+  color: var(--pad-ink-dim);
+  opacity: 0.7;
+}
+
+/* ══ 스크롤바(다크 톤 얇은 형태) ══════════════════════════════ */
+.start-page__panel,
+.start-page__pane--body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(111, 220, 255, 0.35) transparent;
+}
+
+.start-page__panel::-webkit-scrollbar,
+.start-page__pane--body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.start-page__panel::-webkit-scrollbar-track,
+.start-page__pane--body::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 999px;
+}
+
+.start-page__panel::-webkit-scrollbar-thumb,
+.start-page__pane--body::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+  background-color: rgba(111, 220, 255, 0.32);
+}
+
+.start-page__panel::-webkit-scrollbar-thumb:hover,
+.start-page__pane--body::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(111, 220, 255, 0.55);
+}
+
+/* ══ 애니메이션 ════════════════════════════════════════════════ */
+@keyframes start-page-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-16px); }
+}
+
+@keyframes start-page-breathe {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-5px) scale(1.015); }
+}
+
+@keyframes start-page-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes start-page-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes start-page-rise {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes start-page-orbit {
+  from { transform: translate(-50%, -50%) rotate(-16deg); }
+  to { transform: translate(-50%, -50%) rotate(344deg); }
+}
+
+@keyframes start-page-drift-far {
+  from { background-position: 0 0; }
+  to { background-position: 132px -118px; }
+}
+
+@keyframes start-page-drift-near {
+  from { background-position: 0 0; }
+  to { background-position: -258px 226px; }
+}
+
+@keyframes start-page-cta-pulse {
+  0%, 100% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -2px 0 rgba(4, 18, 31, 0.22),
+      0 10px 26px rgba(6, 14, 28, 0.42),
+      0 0 26px rgba(53, 200, 244, 0.34);
+  }
+  50% {
+    box-shadow:
+      inset 0 1px 0 rgba(255, 255, 255, 0.55),
+      inset 0 -2px 0 rgba(4, 18, 31, 0.22),
+      0 10px 26px rgba(6, 14, 28, 0.42),
+      0 0 40px rgba(53, 200, 244, 0.6);
+  }
+}
+
+/* 홀로그램 지면 전환 — 방향에 따라 들어오는 쪽이 바뀐다 */
+@keyframes start-page-holo-next {
+  from { opacity: 0; transform: translateX(22px); filter: brightness(1.25); }
+  to { opacity: 1; transform: translateX(0); filter: none; }
+}
+
+@keyframes start-page-holo-prev {
+  from { opacity: 0; transform: translateX(-22px); filter: brightness(1.25); }
+  to { opacity: 1; transform: translateX(0); filter: none; }
+}
+
+.start-page__panes--next .start-page__pane {
+  animation: start-page-holo-next 0.42s cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+.start-page__panes--prev .start-page__pane {
+  animation: start-page-holo-prev 0.42s cubic-bezier(0.22, 0.7, 0.2, 1) both;
+}
+
+/* 본문 쪽을 살짝 늦게 들여 스르륵 이어지게 한다 */
+.start-page__panes .start-page__pane--body {
+  animation-delay: 0.07s;
+}
+
+.start-page__panes .start-page__divider {
+  animation: start-page-fade 0.5s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .start-page__dust,
+  .start-page__orbit,
+  .start-page__mascot,
+  .start-page__bubble,
+  .start-page__cta,
+  .start-page__overlay,
+  .start-page__panel,
+  .start-page__flow-step,
+  .start-page__pad,
+  .start-page__panes--next .start-page__pane,
+  .start-page__panes--prev .start-page__pane,
+  .start-page__panes .start-page__divider {
+    animation: none;
+  }
+}
+
+/* ══ 반응형 ════════════════════════════════════════════════════ */
+@media (max-width: 1280px) {
+  .start-page {
+    gap: 28px;
+    padding: 32px 36px;
+  }
+
+  .start-page__side {
+    flex: 0 0 420px;
+  }
+
+  .start-page__title {
+    font-size: 3.4rem;
+  }
+
+  .start-page__mascot-img,
+  .start-page__mascot-fallback {
+    width: 380px;
+    height: 380px;
+  }
+
+  .start-page__mascot-glow {
+    width: 350px;
+    height: 350px;
+  }
+
+  .start-page__overlay--book {
+    padding: 32px 200px 32px 24px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .start-page {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 24px;
+    padding: 28px 20px 36px;
+  }
+
+  .start-page__side {
+    flex: none;
+  }
+
+  .start-page__title {
+    font-size: 2.8rem;
+  }
+
+  .start-page__mascot-img,
+  .start-page__mascot-fallback {
+    width: 280px;
+    height: 280px;
+  }
+
+  .start-page__mascot-glow {
+    width: 260px;
+    height: 260px;
+  }
+
+  /* 좁은 화면: 탭은 패드 위 가로줄, 지면은 한 단으로 */
+  .start-page__overlay--book {
+    padding: 24px 16px;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .start-page__pad {
+    margin-top: 56px;
+  }
+
+  .start-page__tabs {
+    top: -52px;
+    left: 0;
+    right: 0;
+    margin-left: 0;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .start-page__tab {
+    width: auto;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border-left-width: 1px;
+    border-top: 2px solid rgba(111, 220, 255, 0.35);
+  }
+
+  .start-page__tab:hover,
+  .start-page__tab.is-active {
+    width: auto;
+    border-top-color: var(--holo);
+  }
+
+  .start-page__tab-name {
+    opacity: 1;
+    transform: none;
+  }
+
+  .start-page__panes {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+
+  .start-page__pane {
+    min-height: 0;
+  }
+
+  .start-page__pane--body {
+    max-height: none;
+  }
+
+  .start-page__divider {
+    width: auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(111, 220, 255, 0.4), transparent);
+  }
 }
