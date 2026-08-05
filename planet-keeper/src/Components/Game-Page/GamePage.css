@@ -228,6 +228,139 @@
   margin: 12px 0;
 }
 
+/* 아이템 선택 카드 */
+.item-card-grid {
+  width: 100%;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.item-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+
+.item-card__info-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.item-card__emoji {
+  font-size: 1.8rem;
+}
+
+.item-card__name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.item-card__effect {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.item-card__use-btn {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+}
+
+/* 아이템 정보 모달(원인->결과 미리보기) */
+.item-info-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.item-info-modal {
+  background: var(--bg);
+  color: var(--text-h);
+  padding: 28px;
+  border-radius: 12px;
+  max-width: 420px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.item-info-modal__title {
+  margin: 0;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.item-info-modal__chain p {
+  margin: 4px 0;
+}
+
+.item-info-modal__arrow {
+  text-align: center;
+  color: var(--border);
+}
+
+.item-info-modal button {
+  align-self: flex-end;
+}
+
+/* 상단 핵심 지표 카드 3개 */
+.game-page__key-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.game-page__key-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.game-page__key-card-label {
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.game-page__key-card-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+}
+
+.game-page__details-toggle {
+  align-self: flex-start;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+}
+
 @media (max-width: 900px) {
   .game-page {
     flex-direction: column;

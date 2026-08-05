@@ -74,6 +74,7 @@ function GamePage() {
   const equilibriumTemperature = physicsResult ? equilibriumTemperatureOf(physicsResult) : null;
 
   const [feedback, setFeedback] = useState(null); // "correct" | "wrong" | null
+  const [showDetails, setShowDetails] = useState(false);
 
   // 시간이 지날수록 기후가 악화되는 압박 장치 - CREATOR/REPORT를 제외한 모든
   // 단계에서 계속 돈다. CREATOR는 보통 곧 PROBLEM1/FINAL로 넘어가지만, /game을
@@ -112,53 +113,73 @@ function GamePage() {
     <div className="game-page">
       <div className="game-page__main">
         <div className="game-page__stats-bar">
-          <div className="game-page__stats-row">
+          {physicsResult && (
+            <>
+              {/* 가장 먼저 봐야 할 정보 3개만 카드로 - 나머지는 아래 "상세 물리 정보"에 접어둔다. */}
+              <div className="game-page__key-cards">
+                <div className="game-page__key-card">
+                  <span className="game-page__key-card-label">
+                    🟢 <Term concept={CLIMATE_CONCEPTS.currentTemperature}>현재 평균 온도</Term>
+                  </span>
+                  <span className="game-page__key-card-value">{physicsResult.currentTemperature.toFixed(1)} K</span>
+                </div>
+                <div className="game-page__key-card">
+                  <span className="game-page__key-card-label">
+                    🎯 <Term concept={CLIMATE_CONCEPTS.equilibriumTemperature}>예상 안정 온도</Term>
+                  </span>
+                  <span className="game-page__key-card-value">{equilibriumTemperature.toFixed(1)} K</span>
+                </div>
+                <div className="game-page__key-card">
+                  <span className="game-page__key-card-label">
+                    ⚡ <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형(ΔE)</Term>
+                  </span>
+                  <span className="game-page__key-card-value">
+                    {physicsResult.deltaEnergy >= 0 ? "+" : ""}
+                    {physicsResult.deltaEnergy.toFixed(1)} W/m²
+                  </span>
+                </div>
+              </div>
+
+              <div className="game-page__stats-row">
             {CLIMATE_VARIABLES.map(({ key, label }) => (
               <span key={key}>
                 {label}: {key === "co2" ? `${co2Ppm(values.co2)} ppm` : `${values[key]}%`}
               </span>
             ))}
           </div>
-          {physicsResult && (
-            <>
-              <div className="game-page__stats-row game-page__stats-row--physics">
-                <span>
-                  <Term concept={CLIMATE_CONCEPTS.currentTemperature}>현재 평균 온도</Term>:{" "}
-                  {physicsResult.currentTemperature.toFixed(1)} K
-                </span>
-                <span>
-                  <Term concept={CLIMATE_CONCEPTS.equilibriumTemperature}>예상 안정 온도</Term>:{" "}
-                  {equilibriumTemperature.toFixed(1)} K
-                </span>
-                <span>
-                  <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형(ΔE)</Term>:{" "}
-                  {physicsResult.deltaEnergy.toFixed(2)} W/m²
-                </span>
-                <span>흡수 에너지(ASR): {physicsResult.absorbedRadiation.toFixed(2)}</span>
-                <span>방출 에너지(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
-                <span>
-                  <Term concept={CLIMATE_CONCEPTS.albedo}>알베도</Term>: {physicsResult.albedo.toFixed(2)}
-                </span>
-                <span>
-                  <Term concept={CLIMATE_CONCEPTS.greenhouseEffect}>온실효과</Term>:{" "}
-                  {physicsResult.greenhouseStrength.toFixed(2)}
-                </span>
-                {CLIMATE_TICK_ENABLED && <span>⏱️ 경과 시간: {elapsedSeconds}초</span>}
-              </div>
 
-              {/* ΔE는 숫자만 보여주지 않는다 - 항상 방향 설명을 함께 표시한다. */}
+              {/* 숫자보다 의미가 먼저 보이도록 - ΔE 방향과 현재↔안정 온도 관계를 문장으로 설명한다. */}
               <p className="game-page__stats-note">{deltaEnergyLines(physicsResult.deltaEnergy)[1]}</p>
-
-              {/* 현재 평균 온도가 예상 안정 온도를 향해 움직이는 중이라는 관계를 항상 보여준다. */}
               <p className="game-page__stats-note">
-                현재 평균 온도 {physicsResult.currentTemperature.toFixed(1)} K → 시간이 지나면 → 예상 안정 온도{" "}
-                {equilibriumTemperature.toFixed(1)} K에 가까워집니다.{" "}
+                현재 평균 온도는 시간이 지나면서 예상 안정 온도에 가까워집니다.{" "}
                 {Math.abs(physicsResult.currentTemperature - equilibriumTemperature) < 0.5
-                  ? "이미 안정 상태에 도달했습니다."
-                  : "아직 안정 상태에 도달하지 않았습니다."}
+                  ? "지금은 이미 안정 상태에 도달했습니다."
+                  : "지금은 아직 안정 상태에 도달하지 않았습니다."}
               </p>
-
+              {CLIMATE_TICK_ENABLED && <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>}
               {climateEvent && <p className="game-page__stats-note">{climateEvent}</p>}
+
+              <button
+                type="button"
+                className="game-page__details-toggle"
+                onClick={() => setShowDetails((v) => !v)}
+              >
+                {showDetails ? "▲ 상세 물리 정보 접기" : "▼ 상세 물리 정보 보기"}
+              </button>
+
+              {showDetails && (
+                <div className="game-page__stats-row game-page__stats-row--physics">
+                  <span>흡수 에너지(ASR): {physicsResult.absorbedRadiation.toFixed(2)}</span>
+                  <span>방출 에너지(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
+                  <span>
+                    <Term concept={CLIMATE_CONCEPTS.albedo}>알베도</Term>: {physicsResult.albedo.toFixed(2)}
+                  </span>
+                  <span>
+                    <Term concept={CLIMATE_CONCEPTS.greenhouseEffect}>온실효과</Term>:{" "}
+                    {physicsResult.greenhouseStrength.toFixed(2)}
+                  </span>
+                </div>
+              )}
             </>
           )}
         </div>
