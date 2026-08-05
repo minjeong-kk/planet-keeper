@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
-import { describeTransition, deltaEnergyLines } from "../../utils/planetAnalysis.js";
+import { describeTransition, deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./ReportPage.css";
 
@@ -150,8 +150,7 @@ function ReportPage() {
         {final && (
           <p className="report-page__final-physics">
             🌡️ 최종 물리값: 온도 {fmt(final.physics.currentTemperature, 1)}K · ΔE{" "}
-            {final.physics.deltaEnergy >= 0 ? "+" : ""}
-            {fmt(final.physics.deltaEnergy)} W/m² · 알베도 {fmt(final.physics.albedo)} · 온실효과{" "}
+            {formatSigned(final.physics.deltaEnergy, 2)} W/m² · 알베도 {fmt(final.physics.albedo)} · 온실효과{" "}
             {fmt(final.physics.greenhouseStrength)}
           </p>
         )}
@@ -187,8 +186,8 @@ function ReportPage() {
                 <div className="report-page__timeline-metrics">
                   {group.entries.map((e, idx) => (
                     <span key={idx} className="report-page__metric-badge">
-                      🌡️ {e.physics.currentTemperature.toFixed(1)}K · ΔE {e.physics.deltaEnergy >= 0 ? "+" : ""}
-                      {e.physics.deltaEnergy.toFixed(1)} · {e.ml?.label ?? "-"}
+                      🌡️ {e.physics.currentTemperature.toFixed(1)}K · ΔE {formatSigned(e.physics.deltaEnergy)} ·{" "}
+                      {e.ml?.label ?? "-"}
                     </span>
                   ))}
                 </div>

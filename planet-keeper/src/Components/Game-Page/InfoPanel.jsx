@@ -1,5 +1,6 @@
-import { analyzePlanetState } from "../../utils/planetAnalysis.js";
-import { deltaEnergyLines } from "../../utils/planetAnalysis.js";
+import { useMemo } from "react";
+import { analyzePlanetState, deltaEnergyLines } from "../../utils/planetAnalysis.js";
+import { equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
 
 // 오른쪽 정보 패널. physicsResult/mlResult는 useGameStore가 매 단계(초기 생성,
 // 아이템 사용) 실제 Physics Engine/AI로 채워준다 - 아직 아무것도 계산 전이면 null.
@@ -8,7 +9,12 @@ import { deltaEnergyLines } from "../../utils/planetAnalysis.js";
 // 먼저 봐야 할 정보라 맨 위에 두고, 그 판정을 왜 그렇게 봤는지 설명하는 수치
 // 해석 문구를 같은 섹션에 붙여 보여준다(현재 상태 설명 + ML 예측을 한 곳에서).
 function InfoPanel({ physicsResult, mlResult, co2Ppm, atmThickness }) {
-  const analysis = analyzePlanetState({ physicsResult, mlResult, co2Ppm, atmThickness });
+  // GamePage가 1초마다 elapsedSeconds로 리렌더될 때도 physicsResult/mlResult/
+  // co2Ppm/atmThickness가 그대로면 원인 분석을 다시 만들지 않는다.
+  const analysis = useMemo(
+    () => analyzePlanetState({ physicsResult, mlResult, co2Ppm, atmThickness }),
+    [physicsResult, mlResult, co2Ppm, atmThickness],
+  );
 
   return (
     <div className="game-page__side-box game-page__info-panel">
@@ -36,8 +42,7 @@ function InfoPanel({ physicsResult, mlResult, co2Ppm, atmThickness }) {
               <p className="game-page__stats-note">
                 📍 현재 평균 온도는 예상 안정 온도를 향해 이동합니다.{" "}
                 <strong>
-                  {physicsResult.equilibriumTemperature != null &&
-                  Math.abs(physicsResult.currentTemperature - physicsResult.equilibriumTemperature) < 0.5
+                  {Math.abs(physicsResult.currentTemperature - equilibriumTemperatureOf(physicsResult)) < 0.5
                     ? "현재 안정 상태에 도달했습니다."
                     : "아직 안정 상태에 도달하지 않았습니다."}
                 </strong>

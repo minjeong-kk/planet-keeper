@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import QuizModal from "./QuizModal";
 import ItemStage from "./ItemStage";
@@ -9,7 +9,7 @@ import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore"
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
-import { deltaEnergyLines } from "../../utils/planetAnalysis.js";
+import { deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
 
@@ -29,6 +29,9 @@ const STAGE_LABELS = {
 // 아이템 사용/2단계 확인 후 AI가 판정한 상태 - 일반 안내 문구보다 눈에 띄도록
 // 아이콘/색상을 구분해서 강조 표시한다. Energy Surplus/Deficit은 아이템을 잘못
 // 골라 오히려 에너지 불균형이 커진 경우다.
+// notice(아이템/최종 판정)와 feedback(정답/오답)이 같은 성공/실패 색상 규칙을 쓴다.
+const feedbackClassName = (ok) => `game-page__feedback ${ok ? "game-page__feedback--correct" : "game-page__feedback--wrong"}`;
+
 const STABLE_BADGES = {
   "Earth-like Stable": { icon: "🌍", text: "Earth-like Stable", className: "game-page__stable-badge--earth" },
   "Warm Stable": { icon: "🔥", text: "Warm Stable", className: "game-page__stable-badge--warm" },
@@ -43,12 +46,15 @@ function GamePage() {
   const values = useClimateStore((state) => state.values);
   const resetClimate = useClimateStore((state) => state.resetClimate);
   const visual = slidersToVisual(values);
-  const climateInputs = mapSlidersToClimateInputs(values);
+  // 1초마다 도는 elapsedSeconds 틱에도 GamePage가 리렌더되므로, values/physicsResult/
+  // inventory가 그대로인데 매번 다시 계산되지 않도록 메모이즈한다.
+  const climateInputs = useMemo(() => mapSlidersToClimateInputs(values), [values]);
 
   const currentStage = useGameStore((state) => state.currentStage);
   const currentProblem = useGameStore((state) => state.currentProblem);
   const visibleItems = useGameStore((state) => state.visibleItems);
   const inventory = useGameStore((state) => state.inventory);
+  const quizLog = useGameStore((state) => state.quizLog);
   const wrongCount = useGameStore((state) => state.wrongCount);
   const finalAttempts = useGameStore((state) => state.finalAttempts);
   const physicsResult = useGameStore((state) => state.physicsResult);
@@ -71,18 +77,18 @@ function GamePage() {
   // physicsResult는 useGameStore가 특정 시점(생성/아이템/최종 확인/타이머 틱)에만
   // 채우는 스냅샷이라 CREATOR 단계나 /game 새로고침 직후에는 null일 수 있다 - 아래
   // 파생값들은 그때마다 다시 계산되고, physicsResult가 없으면 그냥 표시를 건너뛴다.
-  const equilibriumTemperature = physicsResult ? equilibriumTemperatureOf(physicsResult) : null;
+  const equilibriumTemperature = useMemo(
+    () => (physicsResult ? equilibriumTemperatureOf(physicsResult) : null),
+    [physicsResult],
+  );
 
   // "🧊 빙하 해빙제" 같은 이름이 여러 번 쓰이면 나열하지 않고 x횟수로 묶어 보여준다.
-  const inventoryCounts = [...inventory.reduce((counts, name) => counts.set(name, (counts.get(name) ?? 0) + 1), new Map())];
+  const inventoryCounts = useMemo(
+    () => [...inventory.reduce((counts, name) => counts.set(name, (counts.get(name) ?? 0) + 1), new Map())],
+    [inventory],
+  );
 
   const [feedback, setFeedback] = useState(null); // "correct" | "wrong" | null
-  const [showExplanation, setShowExplanation] = useState(false); // 해설 열람 여부
-
-  // 문제가 새로 바뀌면 해설 토글 상태 초기화
-  useEffect(() => {
-    setShowExplanation(false);
-  }, [currentProblem]);
 
   // 시간이 지날수록 기후가 악화되는 압박 장치 - CREATOR/REPORT를 제외한 모든
   // 단계에서 계속 돈다. CREATOR는 보통 곧 PROBLEM1/FINAL로 넘어가지만, /game을
@@ -153,10 +159,7 @@ function GamePage() {
                   <span className="game-page__key-card-label">
                     ⚡ <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형(ΔE)</Term>
                   </span>
-                  <span className="game-page__key-card-value">
-                    {physicsResult.deltaEnergy >= 0 ? "+" : ""}
-                    {physicsResult.deltaEnergy.toFixed(1)} W/m²
-                  </span>
+                  <span className="game-page__key-card-value">{formatSigned(physicsResult.deltaEnergy)} W/m²</span>
                 </div>
               </div>
 
@@ -211,11 +214,7 @@ function GamePage() {
           )}
 
           {notice && (
-            <div
-              className={`game-page__feedback ${
-                notice.ok ? "game-page__feedback--correct" : "game-page__feedback--wrong"
-              }`}
-            >
+            <div className={feedbackClassName(notice.ok)}>
               {notice.lines.map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
@@ -224,31 +223,15 @@ function GamePage() {
 
           {/* 정답 / 오답 피드백 영역 */}
           {feedback && (
-            <div className={`game-page__feedback ${feedback === "correct" ? "game-page__feedback--correct" : "game-page__feedback--wrong"}`}>
+            <div className={feedbackClassName(feedback === "correct")}>
               <p>{feedback === "correct" ? "✅ 정답입니다!" : "❌ 오답입니다. 다시 시도하세요."}</p>
             </div>
           )}
 
-          {/* 정답/오답 상관없이 해설을 열람할 수 있는 토글 영역 */}
-          {currentProblem?.explanation && (currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) && (
-            <div className="game-page__explanation-container">
-              <button
-                type="button"
-                className="game-page__explanation-toggle-btn"
-                onClick={() => setShowExplanation((prev) => !prev)}
-              >
-                💡 {showExplanation ? "해설 닫기" : "해설 보기"}
-              </button>
-              {showExplanation && (
-                <div className="game-page__explanation-box">
-                  <p>{currentProblem.explanation}</p>
-                </div>
-              )}
-            </div>
-          )}
-
           {(currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) &&
-            currentProblem && <QuizModal problem={currentProblem} onSubmit={handleAnswer} />}
+            currentProblem && (
+              <QuizModal problem={currentProblem} onSubmit={handleAnswer} number={quizLog.length + 1} />
+            )}
         </div>
       </div>
 

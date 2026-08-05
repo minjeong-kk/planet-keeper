@@ -65,13 +65,18 @@ function relevantFactors(ctx, direction) {
   return matches;
 }
 
+// 부호 있는 숫자 문자열("+9.4" 등) - ΔE처럼 방향(+/-)이 값 자체만큼 중요한
+// 수치를 표시할 때 GamePage/ReportPage가 공유해서 쓴다.
+export function formatSigned(value, digits = 1) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
+}
+
 // ΔE는 숫자만 보여주지 않는다 - 항상 "무엇이 더 많은지 / 어느 방향으로 가는지"를
 // 같은 자리에서 설명한다(describeItemJudgment/describeTransition/energyProblemLines가 공유).
 export function deltaEnergyLines(deltaEnergy) {
-  const sign = deltaEnergy >= 0 ? "+" : "";
   const warming = deltaEnergy > 0;
   return [
-    `에너지 불균형(ΔE): ${sign}${deltaEnergy.toFixed(1)} W/m²`,
+    `에너지 불균형(ΔE): ${formatSigned(deltaEnergy)} W/m²`,
     warming
       ? "흡수하는 에너지가 방출하는 에너지보다 많습니다. 행성은 점점 따뜻해지는 방향입니다."
       : "방출하는 에너지가 흡수하는 에너지보다 많습니다. 행성은 점점 차가워지는 방향입니다.",
@@ -218,6 +223,44 @@ function changeLine(before, after, riseText, fallText) {
   return null;
 }
 
+function greenhouseChangeLine(before, after) {
+  return changeLine(before.greenhouseStrength, after.greenhouseStrength, "온실효과가 더 강해졌습니다.", "온실효과가 약해졌습니다.");
+}
+
+// 알베도/온실효과/OLR/ASR 각각의 변화를 원인->과정 블록으로 만든다. 아이템 사용
+// (describeItemJudgment)과 타임라인 전환(describeTransition)이 그대로 공유한다 -
+// 어떤 아이템이었는지 몰라도 physics 값 비교만으로 동작한다.
+function physicsChangeBlocks(before, after) {
+  const blocks = [];
+
+  const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
+  if (albedoLine) blocks.push([albedoLine]);
+
+  const greenhouseLine = greenhouseChangeLine(before, after);
+  if (greenhouseLine) blocks.push([greenhouseLine]);
+
+  // 온실효과 변화가 "우주로 방출되는 에너지"에 어떻게 이어지는지 명시적으로 보여준다 -
+  // 학생이 "아이템이 ΔE를 직접 조절한다"고 오해하지 않도록, ΔE는 항상 ASR/OLR
+  // 변화의 결과라는 인과 사슬을 끊지 않는다.
+  const outgoingLine = changeLine(
+    before.outgoingRadiation,
+    after.outgoingRadiation,
+    "우주로 방출되는 에너지(OLR)가 증가했습니다.",
+    "우주로 방출되는 에너지(OLR)가 감소했습니다.",
+  );
+  if (outgoingLine) blocks.push([outgoingLine]);
+
+  const absorbedLine = changeLine(
+    before.absorbedRadiation,
+    after.absorbedRadiation,
+    "흡수하는 에너지(ASR)가 증가했습니다.",
+    "흡수하는 에너지(ASR)가 감소했습니다.",
+  );
+  if (absorbedLine) blocks.push([absorbedLine]);
+
+  return blocks;
+}
+
 // blocks: string[][] (블록 하나 = 화살표 없이 붙어 나오는 줄 묶음). 블록 사이에만
 // "↓"를 끼워 원인 -> 과정 -> 결과 흐름이 눈에 보이게 한다.
 function withArrows(blocks) {
@@ -284,37 +327,10 @@ export function describeItemJudgment(item, before, after, label) {
   // 원인 -> 과정 -> 결과 순서의 블록들. 각 블록은 그 자체로는 화살표 없이 붙어
   // 나오고, 블록과 블록 사이에만 withArrows가 "↓"를 넣는다 - 그래야 "ΔE 값 +
   // 방향 설명"처럼 한 덩어리로 읽혀야 하는 줄들이 화살표로 쪼개지지 않는다.
-  const blocks = [[SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다."]];
-
-  const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
-  if (albedoLine) blocks.push([albedoLine]);
-
-  const greenhouseLine = changeLine(
-    before.greenhouseStrength,
-    after.greenhouseStrength,
-    "온실효과가 더 강해졌습니다.",
-    "온실효과가 약해졌습니다.",
-  );
-  if (greenhouseLine) blocks.push([greenhouseLine]);
-
-  // 온실효과 변화가 "우주로 방출되는 에너지"에 어떻게 이어지는지 명시적으로 보여준다 -
-  // 학생이 "아이템이 ΔE를 직접 조절한다"고 오해하지 않도록, ΔE는 항상 ASR/OLR
-  // 변화의 결과라는 인과 사슬을 끊지 않는다.
-  const outgoingLine = changeLine(
-    before.outgoingRadiation,
-    after.outgoingRadiation,
-    "우주로 방출되는 에너지(OLR)가 증가했습니다.",
-    "우주로 방출되는 에너지(OLR)가 감소했습니다.",
-  );
-  if (outgoingLine) blocks.push([outgoingLine]);
-
-  const absorbedLine = changeLine(
-    before.absorbedRadiation,
-    after.absorbedRadiation,
-    "흡수하는 에너지(ASR)가 증가했습니다.",
-    "흡수하는 에너지(ASR)가 감소했습니다.",
-  );
-  if (absorbedLine) blocks.push([absorbedLine]);
+  const blocks = [
+    [SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다."],
+    ...physicsChangeBlocks(before, after),
+  ];
 
   blocks.push(deltaEnergyLines(after.deltaEnergy));
   blocks.push(["AI가 최종 기후 상태를 분석합니다."]);
@@ -339,12 +355,7 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
     blocks.push([SLIDER_CHANGE_LINES.co2(co2Increased ? 1 : -1)]);
   }
 
-  const greenhouseLine = changeLine(
-    before.greenhouseStrength,
-    after.greenhouseStrength,
-    "온실효과가 더 강해졌습니다.",
-    "온실효과가 약해졌습니다.",
-  );
+  const greenhouseLine = greenhouseChangeLine(before, after);
   if (greenhouseLine) blocks.push([greenhouseLine]);
 
   blocks.push([`현재 평균 온도가 예상 안정 온도 방향으로 이동해, 새 평균 온도 ${after.currentTemperature.toFixed(1)}K에 도달했습니다.`]);
@@ -360,34 +371,7 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
  * ReportPage의 timeline에는 각 단계의 physics 스냅샷만 남아 있기 때문이다.
  */
 export function describeTransition(before, after, label) {
-  const blocks = [];
-
-  const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
-  if (albedoLine) blocks.push([albedoLine]);
-
-  const greenhouseLine = changeLine(
-    before.greenhouseStrength,
-    after.greenhouseStrength,
-    "온실효과가 더 강해졌습니다.",
-    "온실효과가 약해졌습니다.",
-  );
-  if (greenhouseLine) blocks.push([greenhouseLine]);
-
-  const outgoingLine = changeLine(
-    before.outgoingRadiation,
-    after.outgoingRadiation,
-    "우주로 방출되는 에너지(OLR)가 증가했습니다.",
-    "우주로 방출되는 에너지(OLR)가 감소했습니다.",
-  );
-  if (outgoingLine) blocks.push([outgoingLine]);
-
-  const absorbedLine = changeLine(
-    before.absorbedRadiation,
-    after.absorbedRadiation,
-    "흡수하는 에너지(ASR)가 증가했습니다.",
-    "흡수하는 에너지(ASR)가 감소했습니다.",
-  );
-  if (absorbedLine) blocks.push([absorbedLine]);
+  const blocks = physicsChangeBlocks(before, after);
 
   blocks.push(deltaEnergyLines(after.deltaEnergy));
 

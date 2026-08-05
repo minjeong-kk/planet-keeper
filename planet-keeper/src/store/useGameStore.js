@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist, createJSONStorage } from "zustand/middleware";
 import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
 import useClimateStore from "./useClimateStore.js";
@@ -181,7 +182,9 @@ function nextSliderValues(values, item) {
   return { ...values, [item.key]: nextValue };
 }
 
-const useGameStore = create((set, get) => ({
+const useGameStore = create(
+  persist(
+    (set, get) => ({
   currentStage: GAME_STAGES.CREATOR,
   inventory: [],
   // ITEM 단계에 보여줄 무작위 후보(ITEM_CHOICES_SHOWN개) - solveProblem이 ITEM으로
@@ -491,6 +494,20 @@ const useGameStore = create((set, get) => ({
     });
     await get().nextProblem();
   },
-}));
+    }),
+    {
+      name: "planet-keeper-game",
+      // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -
+      // 저장해두면 새로고침 시 항상 "AI가 판정하는 중..."에서 멈춘 것처럼 보인다.
+      partialize: ({ isComputing, ...rest }) => rest,
+      // seenIds/correctIds는 Set이라 JSON.stringify/parse가 기본으로는 배열로
+      // 날려버린다 - Set임을 표시해뒀다가 복원 시 되돌린다.
+      storage: createJSONStorage(() => localStorage, {
+        replacer: (_key, value) => (value instanceof Set ? { __isSet: true, values: [...value] } : value),
+        reviver: (_key, value) => (value?.__isSet ? new Set(value.values) : value),
+      }),
+    },
+  ),
+);
 
 export default useGameStore;

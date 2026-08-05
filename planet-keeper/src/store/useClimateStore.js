@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from "zustand/middleware";
 import {
   REFERENCE_TEMP_K,
   computeClimateV2,
@@ -30,7 +31,9 @@ const DEFAULT_VALUES = { ocean: 50, iceThickness: 20, cloud: 30, atmThickness: 5
 // 별도로 관리한다. currentTemperature는 useGameStore가 setCurrentTemperature로
 // 직접 갱신하거나, useGameStore.applyClimateEvent가 advanceTemperature로 매 타이머
 // 틱마다 지금 조성의 평형 방향으로 조금씩 옮긴다.
-const useClimateStore = create((set) => ({
+const useClimateStore = create(
+  persist(
+    (set) => ({
   values: { ...DEFAULT_VALUES },
   currentTemperature: REFERENCE_TEMP_K,
 
@@ -59,6 +62,9 @@ const useClimateStore = create((set) => ({
       values: { ...DEFAULT_VALUES },
       currentTemperature: REFERENCE_TEMP_K,
     }),
-}));
+    }),
+    { name: "planet-keeper-climate" },
+  ),
+);
 
 export default useClimateStore;
