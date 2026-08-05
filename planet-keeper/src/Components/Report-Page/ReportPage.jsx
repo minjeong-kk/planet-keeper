@@ -1,7 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
-import { energyStateOf } from "../../utils/physicsEngine.js";
+import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
 import "./ReportPage.css";
 
 // gameOverReason별 결과 배너. 성공 조건은 오직 "planet_stabilized"(Earth-like
@@ -17,24 +18,43 @@ const RESULT_BANNER_BY_REASON = {
   },
 };
 
+const KOREAN_BY_STATE = Object.fromEntries(PLANET_STATES.map(({ state, korean }) => [state, korean]));
+
+const fmt = (value, digits = 2) => (value == null ? "-" : value.toFixed(digits));
+
 function ReportPage() {
   const navigate = useNavigate();
-  const values = useClimateStore((state) => state.values);
   const resetClimate = useClimateStore((state) => state.resetClimate);
-  // 게임 중 아이템 사용/최종 확인으로 재계산된 최신 Physics 결과(useGameStore)를
-  // 보여준다 - 슬라이더+현재 온도에서 다시 파생시키면 useGameStore가 settle해 둔
-  // currentTemperature를 useClimateStore에서 그대로 다시 읽어야 해서 같은 값이긴
-  // 하지만, 스냅샷을 한 곳(useGameStore)에서만 관리하는 게 더 단순하다.
-  const physicsResult = useGameStore((state) => state.physicsResult);
   const gameOverReason = useGameStore((state) => state.gameOverReason);
-  // GamePage가 REPORT로 넘어가는 순간부터 더 이상 늘리지 않으므로 그 값 그대로
-  // "총 걸린 시간"이 된다.
   const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
+  const timeline = useGameStore((state) => state.timeline);
+  const quizLog = useGameStore((state) => state.quizLog);
+  const inventory = useGameStore((state) => state.inventory);
   const resetGame = useGameStore((state) => state.resetGame);
+  const replayGame = useGameStore((state) => state.replayGame);
 
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
     title: "행성 진단 결과",
     detail: "",
+  };
+
+  // timeline[0]=행성 생성 시점, 마지막=최종 상태. 정상 플레이라면 항상 최소 1개는
+  // 있지만(nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
+  const initial = timeline[0] ?? null;
+  const final = timeline[timeline.length - 1] ?? null;
+  const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
+
+  const correctLog = quizLog.filter((q) => q.correct);
+  const wrongLog = quizLog.filter((q) => !q.correct);
+
+  // "문제 풀이 결과" 목록에서 클릭한 문제 - 인덱스로 저장해서 클릭할 때마다 다시
+  // 최신 quizLog를 참조한다(값 자체를 복사해두지 않음).
+  const [selectedQuizIndex, setSelectedQuizIndex] = useState(null);
+  const selectedQuiz = selectedQuizIndex != null ? quizLog[selectedQuizIndex] : null;
+
+  const handleReplay = async () => {
+    await replayGame();
+    navigate("/game");
   };
 
   const handleRestart = () => {
@@ -47,76 +67,160 @@ function ReportPage() {
     <div className="report-page">
       <h1 className="report-page__title">피드백 창</h1>
 
+      {/* 최종 결과 */}
       <div className="report-page__section">
         <h2>{resultBanner.title}</h2>
         {resultBanner.detail && <p>{resultBanner.detail}</p>}
         <p>⏱️ 총 걸린 시간: {elapsedSeconds}초</p>
-
-        {/* 행성 변수값 리스트 */}
-        <div className="report-page__values-box">
-          <h3>현재 행성 변수 설정값</h3>
-          <ul className="report-page__values-list">
-            {CLIMATE_VARIABLES.map(({ key, label }) => (
-              <li key={key} className="report-page__value-item">
-                <span className="label">{label}</span>
-                <span className="value">{values ? values[key] : 50}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        <p>피드백 루프 한줄 정리</p>
-
-        {/* Physics Engine 결과 (PlanetCreatePage에서 계산해 Store에 저장한 값 그대로 사용) */}
-        <div className="report-page__values-box">
-          <h3>Physics 진단</h3>
-          <ul className="report-page__values-list">
-            <li className="report-page__value-item">
-              <span className="label">Current Temperature</span>
-              <span className="value">{physicsResult ? `${physicsResult.currentTemperature.toFixed(1)} K` : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">ASR</span>
-              <span className="value">{physicsResult ? physicsResult.absorbedRadiation.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">OLR</span>
-              <span className="value">{physicsResult ? physicsResult.outgoingRadiation.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Delta Energy</span>
-              <span className="value">{physicsResult ? physicsResult.deltaEnergy.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Albedo</span>
-              <span className="value">{physicsResult ? physicsResult.albedo.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Greenhouse Strength</span>
-              <span className="value">{physicsResult ? physicsResult.greenhouseStrength.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Energy State</span>
-              <span className="value">{physicsResult ? energyStateOf(physicsResult.deltaEnergy) : "-"}</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="report-page__section">
-        <p>틀린 문제와 해설</p>
       </div>
 
       <hr className="report-page__divider" />
 
+      {/* 최종 행성 상태 / ML 분류 결과 */}
       <div className="report-page__section">
-        <p>푼 문제 서술 / 해설 - 어떤 개념 문제임</p>
-        <p>재도전 피드백</p>
+        <h3>최종 행성 상태</h3>
+        <p>{final ? `${KOREAN_BY_STATE[finalRuleState]} (물리엔진 규칙 판정)` : "-"}</p>
+        <h3>ML 분류 결과</h3>
+        <p>{final?.ml ? `${final.ml.label}${final.ml.confidence != null ? ` (확신도 ${Math.round(final.ml.confidence * 100)}%)` : ""}` : "-"}</p>
       </div>
 
-      <button className="report-page__restart" onClick={handleRestart}>
-        행성 만들기로 가기 (초기화)
-      </button>
+      <hr className="report-page__divider" />
+
+      {/* 행성 변화 타임라인: 초기 → 아이템 → 최종 */}
+      <div className="report-page__section">
+        <h3>행성 변화 타임라인</h3>
+        {timeline.length ? (
+          <ol className="report-page__timeline">
+            {timeline.map((entry, i) => (
+              <li key={i} className="report-page__timeline-item">
+                <span className="report-page__timeline-stage">{entry.stage}</span>
+                <span className="report-page__timeline-label">{entry.label}</span>
+                <span>
+                  {entry.physics.currentTemperature.toFixed(1)}K · ΔE {entry.physics.deltaEnergy >= 0 ? "+" : ""}
+                  {entry.physics.deltaEnergy.toFixed(1)} · {entry.ml?.label ?? "-"}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>기록된 변화가 없습니다.</p>
+        )}
+      </div>
+
+      <hr className="report-page__divider" />
+
+      {/* 초기 / 최종 물리값 비교 */}
+      <div className="report-page__section">
+        <h3>초기 / 최종 물리값 비교</h3>
+        {initial && final ? (
+          <table className="report-page__compare-table">
+            <thead>
+              <tr>
+                <th></th>
+                <th>초기</th>
+                <th>최종</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>평균 온도</td>
+                <td>{fmt(initial.physics.currentTemperature, 1)} K</td>
+                <td>{fmt(final.physics.currentTemperature, 1)} K</td>
+              </tr>
+              <tr>
+                <td>ΔEnergy</td>
+                <td>{fmt(initial.physics.deltaEnergy)} W/m²</td>
+                <td>{fmt(final.physics.deltaEnergy)} W/m²</td>
+              </tr>
+              <tr>
+                <td>알베도</td>
+                <td>{fmt(initial.physics.albedo)}</td>
+                <td>{fmt(final.physics.albedo)}</td>
+              </tr>
+              <tr>
+                <td>온실효과</td>
+                <td>{fmt(initial.physics.greenhouseStrength)}</td>
+                <td>{fmt(final.physics.greenhouseStrength)}</td>
+              </tr>
+            </tbody>
+          </table>
+        ) : (
+          <p>비교할 데이터가 없습니다.</p>
+        )}
+      </div>
+
+      <hr className="report-page__divider" />
+
+      {/* 문제 풀이 결과 */}
+      <div className="report-page__section">
+        <h3>문제 풀이 결과</h3>
+        <p>
+          맞은 문제 {correctLog.length}개 / 틀린 문제 {wrongLog.length}개 — 문제를 클릭하면 해설을 볼 수 있습니다.
+        </p>
+
+        {quizLog.length ? (
+          <ul className="report-page__quiz-list">
+            {quizLog.map((q, i) => (
+              <li
+                key={i}
+                className={`report-page__quiz-item ${
+                  q.correct ? "report-page__quiz-item--correct" : "report-page__quiz-item--wrong"
+                }`}
+                onClick={() => setSelectedQuizIndex(i)}
+              >
+                <span className="report-page__quiz-mark">{q.correct ? "✓" : "✗"}</span>
+                <span className="report-page__quiz-title">{q.title}</span>
+                {q.isRetry && <span className="report-page__quiz-retry-badge">재도전 문제</span>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>푼 문제가 없습니다.</p>
+        )}
+      </div>
+
+      {selectedQuiz && (
+        <div className="report-page__modal-overlay" onClick={() => setSelectedQuizIndex(null)}>
+          <div className="report-page__modal" onClick={(e) => e.stopPropagation()}>
+            <p className="report-page__modal-question">{selectedQuiz.title}</p>
+            <p>내 답: {selectedQuiz.selectedAnswer}</p>
+            <p>정답: {selectedQuiz.correctAnswer}</p>
+            <hr className="report-page__divider" />
+            {selectedQuiz.explanation && (
+              <>
+                <h4>해설</h4>
+                <p>{selectedQuiz.explanation}</p>
+              </>
+            )}
+            {selectedQuiz.concepts?.length > 0 && (
+              <>
+                <h4>관련 개념</h4>
+                <ul className="report-page__concept-list">
+                  {selectedQuiz.concepts.map((concept) => (
+                    <li key={concept}>{concept}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <button onClick={() => setSelectedQuizIndex(null)}>닫기</button>
+          </div>
+        </div>
+      )}
+
+      <hr className="report-page__divider" />
+
+      {/* 사용한 아이템 */}
+      <div className="report-page__section">
+        <h3>사용한 아이템</h3>
+        <p>{inventory.length ? inventory.join(", ") : "없음"}</p>
+      </div>
+
+      <div className="report-page__actions">
+        <button className="btn-primary" onClick={handleReplay}>
+          다시 플레이 (같은 행성)
+        </button>
+        <button onClick={handleRestart}>행성 다시 만들기</button>
+      </div>
     </div>
   );
 }

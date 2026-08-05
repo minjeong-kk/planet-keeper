@@ -14,6 +14,7 @@ function QuizModal({ problem, onSubmit }) {
 
   return (
     <div className="game-page__modal">
+      {problem.isRetry && <span className="game-page__quiz-retry-badge">재도전 문제</span>}
       <p>{problem.title}</p>
       <ul className="game-page__quiz-choices">
         {problem.choices.map((choice) => (

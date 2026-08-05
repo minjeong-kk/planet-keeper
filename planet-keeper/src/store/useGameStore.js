@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { STAGE1_QUESTIONS, STAGE2_QUESTIONS } from "../data/quizBank.js";
+import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
 import useClimateStore from "./useClimateStore.js";
 import {
@@ -187,6 +187,20 @@ const useGameStore = create((set, get) => ({
   // ITEM 단계에 보여줄 무작위 후보(ITEM_CHOICES_SHOWN개) - solveProblem이 ITEM으로
   // 넘어갈 때마다 pickVisibleItems로 새로 채운다.
   visibleItems: [],
+  // 행성 생성 시점의 슬라이더 조성 스냅샷 - replayGame이 "같은 행성으로 다시
+  // 시작"할 때 이 값으로 되돌린다. nextProblem이 채운다.
+  initialValues: null,
+  // 리포트 페이지의 "행성 변화 타임라인" - 행성 생성/아이템 사용/최종 확인마다
+  // { stage: "초기"|"아이템"|"최종", label, physics, ml } 하나씩 쌓인다.
+  timeline: [],
+  // 리포트 페이지의 "문제 풀이 결과" - 1단계/2단계 문제를 풀 때마다
+  // { title, choices, selectedAnswer, correctAnswer, correct, explanation, concepts, isRetry, stage } 하나씩 쌓인다.
+  quizLog: [],
+  // 이번 플레이에서 한 번이라도 출제된 문제 id 집합 - pickNextProblem이 "아직 안
+  // 나온 문제 우선" 판단에 쓴다.
+  seenIds: new Set(),
+  // 이번 플레이에서 정답을 맞힌 문제 id 집합 - pickNextProblem이 다시는 출제하지 않는다.
+  correctIds: new Set(),
   currentProblem: null,
   wrongCount: 0,
   finalAttempts: 0,
@@ -205,6 +219,25 @@ const useGameStore = create((set, get) => ({
   gameOverReason: null,
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
+
+  pushTimeline: (stage, label, physics, ml) =>
+    set((state) => ({ timeline: [...state.timeline, { stage, label, physics, ml }] })),
+
+  // 이번 플레이에서 정답을 맞힌 문제(correctIds)는 절대 다시 내지 않는다. 아직 한
+  // 번도 안 나온 문제(seenIds에 없는 것)를 우선 내고, 풀 전체가 이미 나왔으면
+  // 틀렸던 문제 중에서 재출제한다(반환값의 isRetry로 표시 - QuizModal/ReportPage가
+  // "재도전 문제" 배지를 보여준다). 정답 처리된 것을 빼고도 후보가 하나도 없는
+  // 극단적인 경우(사실상 거의 불가능한 안전망)만 전체 풀에서 다시 무작위로 낸다.
+  pickNextProblem: (pool) => {
+    const { seenIds, correctIds } = get();
+    const available = pool.filter((q) => !correctIds.has(q.id));
+    const unseen = available.filter((q) => !seenIds.has(q.id));
+    const isRetry = unseen.length === 0 && available.length > 0;
+    const question = pickRandom(unseen.length > 0 ? unseen : available.length > 0 ? available : pool);
+
+    set((state) => ({ seenIds: new Set(state.seenIds).add(question.id) }));
+    return { ...question, isRetry };
+  },
 
   // 지금 ΔE 부호를 보고 악화 방향(온난화/냉각)을 정한 뒤, 그 방향 후보 중 하나를
   // 무작위로 골라 적용한다. 이미 평형(|ΔE|≤ENERGY_BALANCE_EPSILON)이면 악화시킬
@@ -246,13 +279,14 @@ const useGameStore = create((set, get) => ({
   nextProblem: async () => {
     if (get().currentStage !== GAME_STAGES.CREATOR) return;
 
-    set({ isComputing: true });
+    set({ isComputing: true, initialValues: { ...useClimateStore.getState().values } });
     try {
       const { physics, ml } = await computeSnapshotResult();
       set({ physicsResult: physics, mlResult: ml });
+      get().pushTimeline("초기", "행성 생성", physics, ml);
 
       if (ml.label === EARTH_LIKE_STABLE_LABEL) {
-        set({ currentStage: GAME_STAGES.FINAL, currentProblem: pickRandom(STAGE2_QUESTIONS) });
+        set({ currentStage: GAME_STAGES.FINAL, currentProblem: get().pickNextProblem(STAGE4_QUESTIONS) });
         return;
       }
     } catch (err) {
@@ -260,7 +294,7 @@ const useGameStore = create((set, get) => ({
     } finally {
       set({ isComputing: false });
       if (get().currentStage === GAME_STAGES.CREATOR) {
-        set({ currentStage: GAME_STAGES.PROBLEM1, currentProblem: pickRandom(STAGE1_QUESTIONS) });
+        set({ currentStage: GAME_STAGES.PROBLEM1, currentProblem: get().pickNextProblem(STAGE3_QUESTIONS) });
       }
     }
   },
@@ -290,12 +324,13 @@ const useGameStore = create((set, get) => ({
       const { physics, ml } = await computeItemStepResult(nextValues);
       const balanced = STABLE_LABELS.has(ml.label);
       const lines = describeItemJudgment(item, physicsResult, physics, ml.label);
+      get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml);
       set({
         physicsResult: physics,
         mlResult: ml,
         notice: { ok: balanced, lines },
         currentStage: balanced ? GAME_STAGES.FINAL : GAME_STAGES.PROBLEM1,
-        currentProblem: pickRandom(balanced ? STAGE2_QUESTIONS : STAGE1_QUESTIONS),
+        currentProblem: get().pickNextProblem(balanced ? STAGE4_QUESTIONS : STAGE3_QUESTIONS),
       });
     } catch (err) {
       console.error("[useGameStore] 아이템 효과 재계산 실패:", err);
@@ -309,7 +344,26 @@ const useGameStore = create((set, get) => ({
     const { currentProblem, currentStage, wrongCount } = get();
     if (!currentProblem) return false;
 
-    if (answer !== currentProblem.answer) {
+    const correct = answer === currentProblem.answer;
+    set((state) => ({
+      quizLog: [
+        ...state.quizLog,
+        {
+          title: currentProblem.title,
+          selectedAnswer: answer,
+          correctAnswer: currentProblem.answer,
+          explanation: currentProblem.explanation,
+          concepts: currentProblem.concepts,
+          isRetry: currentProblem.isRetry ?? false,
+          correct,
+          stage: currentStage,
+        },
+      ],
+      // 정답을 맞힌 문제는 pickNextProblem이 다시는 후보에 넣지 않도록 기록한다.
+      ...(correct ? { correctIds: new Set(state.correctIds).add(currentProblem.id) } : {}),
+    }));
+
+    if (!correct) {
       const nextWrongCount = wrongCount + 1;
       // 2단계 문제를 틀리면 그동안 쌓인 진행 체크(finalAttempts)도 전부 초기화된다 -
       // 목숨은 깎이고, 안정화 진행도는 처음부터 다시 쌓아야 한다.
@@ -349,6 +403,7 @@ const useGameStore = create((set, get) => ({
     const alreadyStable = mlResult?.label === EARTH_LIKE_STABLE_LABEL;
 
     if (alreadyStable) {
+      get().pushTimeline("최종", `최종 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`, physicsResult, mlResult);
       set({
         finalAttempts: nextAttempt,
         notice: { ok: true, lines: ["🌍 이미 지구형 평형 상태입니다.", `안정화 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`] },
@@ -357,7 +412,7 @@ const useGameStore = create((set, get) => ({
         get().goReport("planet_stabilized");
         return;
       }
-      set({ currentStage: GAME_STAGES.FINAL, currentProblem: pickRandom(STAGE2_QUESTIONS) });
+      set({ currentStage: GAME_STAGES.FINAL, currentProblem: get().pickNextProblem(STAGE4_QUESTIONS) });
       return;
     }
 
@@ -379,6 +434,7 @@ const useGameStore = create((set, get) => ({
       const co2Increased = newCo2Slider === prevCo2Slider ? null : newCo2Slider > prevCo2Slider;
       const { physics, ml } = await computeSettledResult();
       const lines = describeFinalizeJudgment(physicsResult, physics, ml.label, { co2Increased });
+      get().pushTimeline("최종", `최종 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`, physics, ml);
       set({
         physicsResult: physics,
         mlResult: ml,
@@ -396,7 +452,7 @@ const useGameStore = create((set, get) => ({
       return;
     }
 
-    set({ currentStage: GAME_STAGES.FINAL, currentProblem: pickRandom(STAGE2_QUESTIONS) });
+    set({ currentStage: GAME_STAGES.FINAL, currentProblem: get().pickNextProblem(STAGE4_QUESTIONS) });
   },
 
   goReport: (reason = null) => set({ currentStage: GAME_STAGES.REPORT, gameOverReason: reason }),
@@ -406,6 +462,11 @@ const useGameStore = create((set, get) => ({
       currentStage: GAME_STAGES.CREATOR,
       inventory: [],
       visibleItems: [],
+      initialValues: null,
+      timeline: [],
+      quizLog: [],
+      seenIds: new Set(),
+      correctIds: new Set(),
       currentProblem: null,
       wrongCount: 0,
       finalAttempts: 0,
@@ -417,6 +478,19 @@ const useGameStore = create((set, get) => ({
       elapsedSeconds: 0,
       gameOverReason: null,
     }),
+
+  // "다시 플레이" - 행성을 새로 만들지 않고 이번에 만들었던 조성(initialValues) 그대로
+  // 처음부터 다시 시작한다. "행성 다시 만들기"(resetClimate + /planet-create)와 달리
+  // 슬라이더를 다시 만지지 않아도 된다.
+  replayGame: async () => {
+    const { initialValues } = get();
+    get().resetGame();
+    useClimateStore.setState({
+      values: initialValues ? { ...initialValues } : useClimateStore.getState().values,
+      currentTemperature: REFERENCE_TEMP_K,
+    });
+    await get().nextProblem();
+  },
 }));
 
 export default useGameStore;

@@ -28,9 +28,143 @@
   width: 100%;
 }
 
-.report-page__restart {
-  position: absolute;
-  right: 24px;
-  bottom: 24px;
+.report-page__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.report-page__actions button {
   padding: 12px 20px;
+}
+
+.report-page__timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-left: 20px;
+}
+
+.report-page__timeline-item {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.report-page__timeline-stage {
+  font-weight: 600;
+  min-width: 40px;
+}
+
+.report-page__timeline-label {
+  color: var(--text);
+}
+
+.report-page__compare-table {
+  border-collapse: collapse;
+  width: 100%;
+  max-width: 420px;
+}
+
+.report-page__compare-table th,
+.report-page__compare-table td {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+  text-align: left;
+}
+
+.report-page__quiz-list {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-page__quiz-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.report-page__quiz-item:hover {
+  background: var(--accent-bg);
+}
+
+.report-page__quiz-item--correct {
+  border-color: #4caf7d;
+}
+
+.report-page__quiz-item--wrong {
+  border-color: #ff7043;
+}
+
+.report-page__quiz-mark {
+  font-weight: 700;
+}
+
+.report-page__quiz-item--correct .report-page__quiz-mark {
+  color: #2e7d32;
+}
+
+.report-page__quiz-item--wrong .report-page__quiz-mark {
+  color: #c62828;
+}
+
+.report-page__quiz-title {
+  flex: 1;
+}
+
+.report-page__quiz-retry-badge {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #ffe0d6;
+  color: #8a2c0d;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.report-page__concept-list {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.report-page__modal-question {
+  font-weight: 600;
+  font-size: 1.1rem;
+}
+
+.report-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.report-page__modal {
+  background: var(--bg);
+  color: var(--text-h);
+  padding: 32px;
+  border-radius: 12px;
+  max-width: 560px;
+  max-height: 80svh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.report-page__modal button {
+  align-self: flex-end;
+  margin-top: 12px;
 }
