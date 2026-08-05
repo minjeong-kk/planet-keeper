@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
@@ -23,10 +23,12 @@ const RESULT_BANNER_BY_REASON = {
   planet_stabilized: {
     title: "🎉 미션 성공 - 행성 평형 안정 도달",
     detail: "최종 확인 결과 행성이 지구형 안정(Earth-like Stable) 상태에 도달해 게임을 성공적으로 마쳤습니다.",
+    statusClass: "report-page__banner--success",
   },
   life_over: {
     title: "💔 미션 실패 - 목숨 소진",
     detail: "오답이 3회 누적되어 행성을 안정시키지 못한 채 게임이 종료됐습니다.",
+    statusClass: "report-page__banner--failure",
   },
 };
 
@@ -48,13 +50,53 @@ function ReportPage() {
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
     title: "행성 진단 결과",
     detail: "",
+    statusClass: "",
   };
 
-  // timeline[0]=행성 생성 시점, 마지막=최종 상태. 정상 플레이라면 항상 최소 1개는
-  // 있지만(nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
-  const initial = timeline[0] ?? null;
+  // timeline 마지막 = 최종 상태. 정상 플레이라면 항상 최소 1개는 있지만
+  // (nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
   const final = timeline[timeline.length - 1] ?? null;
   const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
+
+  // 연속으로 동일한 상태나 행동이 중복 기록된 타임라인 제거
+  const uniqueTimeline = useMemo(() => {
+    return timeline.filter((entry, index) => {
+      if (index === 0) return true;
+      const prev = timeline[index - 1];
+      const isSameStage = entry.stage === prev.stage;
+      const isSameLabel = entry.label === prev.label;
+      const isSameTemp = entry.physics.currentTemperature === prev.physics.currentTemperature;
+      const isSameDelta = entry.physics.deltaEnergy === prev.physics.deltaEnergy;
+      return !(isSameStage && isSameLabel && isSameTemp && isSameDelta);
+    });
+  }, [timeline]);
+
+  // 원인->과정->결과 설명이 완전히 같은 단계(똑같은 방향의 아이템을 여러 번 쓴
+  // 경우 등)는 설명을 반복해서 보여주지 않고 하나로 묶는다 - 숫자만 다르고
+  // 문장이 같은 설명 박스가 줄줄이 나오는 걸 막는다.
+  const timelineGroups = useMemo(() => {
+    const groups = [];
+    const bySignature = new Map();
+    uniqueTimeline.forEach((entry, i) => {
+      const prev = i > 0 ? uniqueTimeline[i - 1] : null;
+      const explanation = prev
+        ? describeTransition(prev.physics, entry.physics, entry.ml?.label)
+        : deltaEnergyLines(entry.physics.deltaEnergy);
+      const signature = `${entry.stage}::${explanation.join("|").replace(/[-+]?\d+(\.\d+)?/g, "#")}`;
+      const existing = bySignature.get(signature);
+      if (existing) {
+        existing.entries.push(entry);
+      } else {
+        const group = { stage: entry.stage, explanation, entries: [entry] };
+        bySignature.set(signature, group);
+        groups.push(group);
+      }
+    });
+    return groups;
+  }, [uniqueTimeline]);
+
+  // 사용한 아이템 중복 제거
+  const uniqueInventory = useMemo(() => [...new Set(inventory)], [inventory]);
 
   const correctLog = quizLog.filter((q) => q.correct);
   const wrongLog = quizLog.filter((q) => !q.correct);
@@ -79,92 +121,80 @@ function ReportPage() {
     <div className="report-page">
       <h1 className="report-page__title">피드백 창</h1>
 
-      {/* 최종 결과 */}
-      <div className="report-page__section">
-        <h2>{resultBanner.title}</h2>
-        {resultBanner.detail && <p>{resultBanner.detail}</p>}
-        <p>⏱️ 총 걸린 시간: {elapsedSeconds}초</p>
-      </div>
+      {/* 최종 결과 위주 배너 */}
+      <div className={`report-page__section report-page__summary-card ${resultBanner.statusClass}`}>
+        <div className="report-page__summary-main">
+          <h2>{resultBanner.title}</h2>
+          {resultBanner.detail && <p className="report-page__summary-detail">{resultBanner.detail}</p>}
+        </div>
+        
+        <div className="report-page__summary-metrics">
+          <div className="report-page__metric-box">
+            <span className="report-page__metric-label">최종 행성 상태</span>
+            <span className="report-page__metric-value">
+              {final ? KOREAN_BY_STATE[finalRuleState] : "-"}
+            </span>
+          </div>
+          <div className="report-page__metric-box">
+            <span className="report-page__metric-label">ML 분류 (확신도)</span>
+            <span className="report-page__metric-value">
+              {final?.ml ? `${final.ml.label} ${final.ml.confidence != null ? `(${Math.round(final.ml.confidence * 100)}%)` : ""}` : "-"}
+            </span>
+          </div>
+          <div className="report-page__metric-box">
+            <span className="report-page__metric-label">총 소요 시간</span>
+            <span className="report-page__metric-value">⏱️ {elapsedSeconds}초</span>
+          </div>
+        </div>
 
-      <hr className="report-page__divider" />
-
-      {/* 최종 행성 상태 / ML 분류 결과 */}
-      <div className="report-page__section">
-        <h3>최종 행성 상태</h3>
-        <p>{final ? `${KOREAN_BY_STATE[finalRuleState]} (물리엔진 규칙 판정)` : "-"}</p>
-        <h3>ML 분류 결과</h3>
-        <p>{final?.ml ? `${final.ml.label}${final.ml.confidence != null ? ` (확신도 ${Math.round(final.ml.confidence * 100)}%)` : ""}` : "-"}</p>
-      </div>
-
-      <hr className="report-page__divider" />
-
-      {/* 초기 / 최종 물리값 비교 */}
-      <div className="report-page__section">
-        <h3>최종 물리값 비교</h3>
-        {initial && final ? (
-          <table className="report-page__compare-table">
-            <thead>
-              <tr>
-                <th></th>
-                <th>초기</th>
-                <th>최종</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td>평균 온도</td>
-                <td>{fmt(final.physics.currentTemperature, 1)} K</td>
-              </tr>
-              <tr>
-                <td>ΔEnergy</td>
-                <td>{fmt(final.physics.deltaEnergy)} W/m²</td>
-              </tr>
-              <tr>
-                <td>알베도</td>
-                <td>{fmt(final.physics.albedo)}</td>
-              </tr>
-              <tr>
-                <td>온실효과</td>
-                <td>{fmt(final.physics.greenhouseStrength)}</td>
-              </tr>
-            </tbody>
-          </table>
-        ) : (
-          <p>비교할 데이터가 없습니다.</p>
+        {final && (
+          <p className="report-page__final-physics">
+            🌡️ 최종 물리값: 온도 {fmt(final.physics.currentTemperature, 1)}K · ΔE{" "}
+            {final.physics.deltaEnergy >= 0 ? "+" : ""}
+            {fmt(final.physics.deltaEnergy)} W/m² · 알베도 {fmt(final.physics.albedo)} · 온실효과{" "}
+            {fmt(final.physics.greenhouseStrength)}
+          </p>
         )}
       </div>
 
       <hr className="report-page__divider" />
 
-      {/* 행성 변화 타임라인: 초기 → 아이템 → 최종 */}
+      {/* 행성 변화 타임라인: 가로 2열 컴팩트 카드 그리드 방식 */}
       <div className="report-page__section">
         <h3>행성 변화 타임라인</h3>
-        {timeline.length ? (
-          <ol className="report-page__timeline">
-            {timeline.map((entry, i) => {
-              const prev = i > 0 ? timeline[i - 1] : null;
-              // 왜 이렇게 됐는지: 이전 단계와 비교해서 원인 -> 과정 -> 결과 순서로 설명한다.
-              // 첫 단계(행성 생성)는 비교할 이전 값이 없으니 ΔE 방향 설명만 보여준다.
-              const explanation = prev
-                ? describeTransition(prev.physics, entry.physics, entry.ml?.label)
-                : deltaEnergyLines(entry.physics.deltaEnergy);
-              return (
-                <li key={i} className="report-page__timeline-item">
-                  <span className="report-page__timeline-stage">{entry.stage}</span>
-                  <span className="report-page__timeline-label">{entry.label}</span>
-                  <span>
-                    {entry.physics.currentTemperature.toFixed(1)}K · ΔE {entry.physics.deltaEnergy >= 0 ? "+" : ""}
-                    {entry.physics.deltaEnergy.toFixed(1)} · {entry.ml?.label ?? "-"}
-                  </span>
-                  <div className="report-page__timeline-explain">
-                    {explanation.map((line, j) => (
-                      <p key={j}>{line}</p>
+        {timelineGroups.length ? (
+          <div className="report-page__timeline-grid">
+            {timelineGroups.map((group, i) => (
+              <div key={i} className="report-page__timeline-card">
+                <div className="report-page__timeline-card-header">
+                  <span className="report-page__timeline-step-tag">Step {i + 1}</span>
+                  <span className="report-page__timeline-stage">{group.stage}</span>
+                  <div className="report-page__timeline-chips">
+                    {group.entries.map((e, idx) => (
+                      <span key={idx} className="report-page__timeline-chip">
+                        {e.label}
+                      </span>
                     ))}
                   </div>
-                </li>
-              );
-            })}
-          </ol>
+                </div>
+
+                <div className="report-page__timeline-explain">
+                  {group.explanation.map((line, j) => (
+                    <p key={j}>{line}</p>
+                  ))}
+                </div>
+
+                <div className="report-page__timeline-metrics">
+                  {group.entries.map((e, idx) => (
+                    <span key={idx} className="report-page__metric-badge">
+                      🌡️ {e.physics.currentTemperature.toFixed(1)}K · ΔE {e.physics.deltaEnergy >= 0 ? "+" : ""}
+                      {e.physics.deltaEnergy.toFixed(1)} · {e.ml?.label ?? "-"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
         ) : (
           <p>기록된 변화가 없습니다.</p>
         )}
@@ -175,8 +205,8 @@ function ReportPage() {
       {/* 문제 풀이 결과 */}
       <div className="report-page__section">
         <h3>문제 풀이 결과</h3>
-        <p>
-          맞은 문제 {correctLog.length}개 / 틀린 문제 {wrongLog.length}개 — 문제를 클릭하면 해설을 볼 수 있습니다.
+        <p className="report-page__subtext">
+          맞은 문제 <strong>{correctLog.length}</strong>개 / 틀린 문제 <strong>{wrongLog.length}</strong>개 — 문제를 클릭하면 해설을 볼 수 있습니다.
         </p>
 
         {quizLog.length ? (
@@ -200,36 +230,59 @@ function ReportPage() {
         )}
       </div>
 
+      {/* 고급화된 문제 해설 모달 */}
       {selectedQuiz && (
         <div className="report-page__modal-overlay" onClick={() => setSelectedQuizIndex(null)}>
           <div className="report-page__modal" onClick={(e) => e.stopPropagation()}>
-            <p className="report-page__modal-question">{selectedQuiz.title}</p>
-            <p>내 답: {selectedQuiz.selectedAnswer}</p>
-            <p>정답: {selectedQuiz.correctAnswer}</p>
-            <hr className="report-page__divider" />
+            <div className="report-page__modal-header">
+              <span className={`report-page__modal-badge ${selectedQuiz.correct ? "report-page__modal-badge--correct" : "report-page__modal-badge--wrong"}`}>
+                {selectedQuiz.correct ? "정답" : "오답"}
+              </span>
+              <p className="report-page__modal-question">{selectedQuiz.title}</p>
+            </div>
+
+            <div className="report-page__modal-answers">
+              <div className="report-page__modal-answer-row">
+                <span className="report-page__modal-label">제출한 답</span>
+                <span className={selectedQuiz.correct ? "text-correct" : "text-wrong"}>
+                  {selectedQuiz.selectedAnswer}
+                </span>
+              </div>
+              <div className="report-page__modal-answer-row">
+                <span className="report-page__modal-label">정답</span>
+                <span className="text-correct">{selectedQuiz.correctAnswer}</span>
+              </div>
+            </div>
+
             {selectedQuiz.explanation && (
-              <>
-                <h4>해설</h4>
-                <p>{selectedQuiz.explanation}</p>
-              </>
+              <div className="report-page__modal-section">
+                <h4 className="report-page__modal-subtitle">💡 해설</h4>
+                <div className="report-page__modal-explanation">
+                  <p>{selectedQuiz.explanation}</p>
+                </div>
+              </div>
             )}
+
             {selectedQuiz.concepts?.length > 0 && (
-              <>
-                <h4>관련 개념</h4>
+              <div className="report-page__modal-section">
+                <h4 className="report-page__modal-subtitle">📚 관련 개념</h4>
                 <ul className="report-page__concept-list">
                   {selectedQuiz.concepts.map((concept) => {
                     const matched = lookupConcept(concept);
                     return (
                       <li key={concept}>
-                        <strong>{concept}</strong>
+                        <strong className="report-page__concept-term">{concept}</strong>
                         {matched && <span> — {matched.detail}</span>}
                       </li>
                     );
                   })}
                 </ul>
-              </>
+              </div>
             )}
-            <button onClick={() => setSelectedQuizIndex(null)}>닫기</button>
+
+            <button className="report-page__modal-close-btn" onClick={() => setSelectedQuizIndex(null)}>
+              닫기
+            </button>
           </div>
         </div>
       )}
@@ -239,7 +292,7 @@ function ReportPage() {
       {/* 사용한 아이템 */}
       <div className="report-page__section">
         <h3>사용한 아이템</h3>
-        <p>{inventory.length ? inventory.join(", ") : "없음"}</p>
+        <p>{uniqueInventory.length ? uniqueInventory.join(", ") : "없음"}</p>
       </div>
 
       <hr className="report-page__divider" />

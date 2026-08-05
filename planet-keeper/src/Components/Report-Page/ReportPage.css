@@ -1,107 +1,248 @@
 .report-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
   padding: 40px;
   flex: 1;
   text-align: left;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 12px;
   margin: 24px;
   position: relative;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow, 0 4px 12px rgba(0,0,0,0.05));
+  background: var(--bg, #ffffff);
 }
 
 .report-page__title {
   text-align: center;
+  margin: 0;
+  font-size: 1.8rem;
 }
 
 .report-page__section {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
+}
+
+/* 상단 최종 결과 배너 카드 */
+.report-page__summary-card {
+  border-radius: 12px;
+  padding: 24px;
+  background: var(--accent-bg, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.report-page__banner--success {
+  border-color: #2e7d32;
+  background-color: rgba(46, 125, 50, 0.05);
+}
+
+.report-page__banner--failure {
+  border-color: #c62828;
+  background-color: rgba(198, 40, 40, 0.05);
+}
+
+.report-page__summary-main h2 {
+  margin: 0 0 8px 0;
+  font-size: 1.4rem;
+}
+
+.report-page__summary-detail {
+  margin: 0;
+  color: var(--text, #334155);
+  font-size: 0.95rem;
+}
+
+.report-page__summary-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.report-page__metric-box {
+  background: var(--bg, #ffffff);
+  padding: 12px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #e2e8f0);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.report-page__metric-label {
+  font-size: 0.8rem;
+  color: var(--text-muted, #64748b);
+}
+
+.report-page__metric-value {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.report-page__subtext {
+  margin: 0;
+  color: var(--text, #334155);
 }
 
 .report-page__divider {
   border: none;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border, #e2e8f0);
   width: 100%;
+  margin: 0;
 }
 
 .report-page__actions {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  margin-top: 8px;
 }
 
 .report-page__actions button {
   padding: 12px 20px;
 }
 
-.report-page__timeline {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding-left: 20px;
+/* =========================================
+   행성 타임라인: 가로 2열 컴팩트 그리드 레이아웃
+   ========================================= */
+.report-page__timeline-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
 }
 
-.report-page__timeline-item {
+.report-page__timeline-card {
+  background: var(--bg, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 14px 16px;
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
-  align-items: baseline;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.report-page__timeline-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+}
+
+.report-page__timeline-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.report-page__timeline-step-tag {
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: var(--primary, #0284c7);
+  color: #ffffff;
+  padding: 2px 7px;
+  border-radius: 4px;
 }
 
 .report-page__timeline-stage {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text, #1e293b);
+}
+
+.report-page__timeline-chips {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-left: auto;
+}
+
+.report-page__timeline-chip {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 1px 8px;
+  border-radius: 10px;
   font-weight: 600;
-  min-width: 40px;
+  font-size: 0.8rem;
 }
 
-.report-page__timeline-label {
-  color: var(--text);
+.report-page__timeline-explain {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--accent-bg, #f8fafc);
+  border-left: 3px solid var(--primary, #0284c7);
+  font-size: 0.88rem;
+  color: #334155;
+  line-height: 1.4;
 }
 
-.report-page__compare-table {
-  border-collapse: collapse;
-  width: 100%;
-  max-width: 420px;
+.report-page__timeline-explain p {
+  margin: 0;
 }
 
-.report-page__compare-table th,
-.report-page__compare-table td {
-  border: 1px solid var(--border);
-  padding: 6px 12px;
-  text-align: left;
+.report-page__timeline-metrics {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
 }
 
+.report-page__metric-badge {
+  font-size: 0.8rem;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: monospace;
+}
+
+.report-page__final-physics {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text, #334155);
+}
+
+/* =========================================
+   퀴즈 목록 및 해설 모달 UI
+   ========================================= */
 .report-page__quiz-list {
   list-style: none;
   padding: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin: 0;
 }
 
 .report-page__quiz-item {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border, #e2e8f0);
   cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .report-page__quiz-item:hover {
-  background: var(--accent-bg);
+  background: var(--accent-bg, #f8fafc);
 }
 
 .report-page__quiz-item--correct {
-  border-color: #4caf7d;
+  border-color: #2e7d32;
 }
 
 .report-page__quiz-item--wrong {
-  border-color: #ff7043;
+  border-color: #c62828;
 }
 
 .report-page__quiz-mark {
@@ -123,82 +264,191 @@
 .report-page__quiz-retry-badge {
   padding: 2px 10px;
   border-radius: 999px;
-  background: #ffe0d6;
-  color: #8a2c0d;
+  background: #fee2e2;
+  color: #991b1b;
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+/* 모달 스타일 개편 (형광 느낌 완벽 제거) */
+.report-page__modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  backdrop-filter: blur(3px);
+}
+
+.report-page__modal {
+  background: #ffffff;
+  color: #1e293b;
+  padding: 28px;
+  border-radius: 16px;
+  max-width: 540px;
+  width: 90%;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+}
+
+.report-page__modal-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.report-page__modal-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* 차분하고 정갈한 톤의 정답/오답 뱃지 */
+.report-page__modal-badge--correct {
+  background: #e6f4ea;
+  color: #137333;
+  border: 1px solid #ceead6;
+}
+
+.report-page__modal-badge--wrong {
+  background: #fce8e6;
+  color: #c5221f;
+  border: 1px solid #fad2cf;
+}
+
+.report-page__modal-question {
+  font-weight: 700;
+  font-size: 1.05rem;
+  margin: 0;
+  line-height: 1.45;
+  color: #0f172a;
+}
+
+/* 형광색 제거한 차분하고 가독성 높은 내 답 / 정답 박스 */
+.report-page__modal-answers {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: #f8fafc;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.report-page__modal-answer-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 0.95rem;
+}
+
+.report-page__modal-label {
+  font-weight: 600;
+  color: #64748b;
+  min-width: 75px;
+  font-size: 0.88rem;
+}
+
+/* 차분하고 신뢰감을 주는 딥 그린 (형광 텍스트 완전 제거) */
+.text-correct {
+  color: #15803d;
+  font-weight: 700;
+}
+
+.text-wrong {
+  color: #b91c1c;
+  font-weight: 700;
+}
+
+.report-page__modal-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-page__modal-subtitle {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #334155;
+}
+
+.report-page__modal-explanation {
+  background: #f1f5f9;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: #334155;
+  border-left: 3px solid #0284c7;
+}
+
+.report-page__modal-explanation p {
+  margin: 0;
 }
 
 .report-page__concept-list {
   margin: 0;
   padding-left: 20px;
+  font-size: 0.9rem;
+  color: #334155;
+  line-height: 1.5;
 }
 
-.report-page__modal-question {
-  font-weight: 600;
-  font-size: 1.1rem;
+.report-page__concept-term {
+  color: #0369a1;
 }
 
-.report-page__modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-}
-
-.report-page__modal {
-  background: var(--bg);
-  color: var(--text-h);
-  padding: 32px;
-  border-radius: 12px;
-  max-width: 560px;
-  max-height: 80svh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
-}
-
-.report-page__modal button {
+.report-page__modal-close-btn {
   align-self: flex-end;
-  margin-top: 12px;
-}
-
-/* 타임라인 각 단계의 원인->과정->결과 설명. flex-basis:100%로 부모(flex-wrap 행)
-   안에서 줄바꿈해 온전한 문단으로 보이게 한다. */
-.report-page__timeline-explain {
-  flex-basis: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 8px 12px;
   margin-top: 4px;
+  padding: 8px 20px;
   border-radius: 8px;
-  background: var(--accent-bg);
-  font-size: 0.92rem;
-  color: var(--text);
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.15s ease;
 }
 
+.report-page__modal-close-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+/* 개념 카드 그리드 */
 .report-page__concept-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 10px;
+  gap: 12px;
 }
 
 .report-page__concept-card {
-  border: 1px solid var(--border);
+  border: 1px solid var(--border, #e2e8f0);
   border-radius: 8px;
-  padding: 10px 12px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  background: var(--bg, #ffffff);
+}
+
+.report-page__concept-card p {
+  margin: 0;
 }
 
 .report-page__concept-card-term {
   font-weight: 700;
+  color: var(--primary, #0284c7);
 }

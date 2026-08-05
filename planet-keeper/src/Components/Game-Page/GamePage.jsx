@@ -77,6 +77,12 @@ function GamePage() {
   const inventoryCounts = [...inventory.reduce((counts, name) => counts.set(name, (counts.get(name) ?? 0) + 1), new Map())];
 
   const [feedback, setFeedback] = useState(null); // "correct" | "wrong" | null
+  const [showExplanation, setShowExplanation] = useState(false); // 해설 열람 여부
+
+  // 문제가 새로 바뀌면 해설 토글 상태 초기화
+  useEffect(() => {
+    setShowExplanation(false);
+  }, [currentProblem]);
 
   // 시간이 지날수록 기후가 악화되는 압박 장치 - CREATOR/REPORT를 제외한 모든
   // 단계에서 계속 돈다. CREATOR는 보통 곧 PROBLEM1/FINAL로 넘어가지만, /game을
@@ -216,9 +222,29 @@ function GamePage() {
             </div>
           )}
 
-          {feedback === "correct" && <p className="game-page__feedback game-page__feedback--correct">✅ 정답입니다!</p>}
-          {feedback === "wrong" && (
-            <p className="game-page__feedback game-page__feedback--wrong">❌ 오답입니다. 다시 시도하세요.</p>
+          {/* 정답 / 오답 피드백 영역 */}
+          {feedback && (
+            <div className={`game-page__feedback ${feedback === "correct" ? "game-page__feedback--correct" : "game-page__feedback--wrong"}`}>
+              <p>{feedback === "correct" ? "✅ 정답입니다!" : "❌ 오답입니다. 다시 시도하세요."}</p>
+            </div>
+          )}
+
+          {/* 정답/오답 상관없이 해설을 열람할 수 있는 토글 영역 */}
+          {currentProblem?.explanation && (currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) && (
+            <div className="game-page__explanation-container">
+              <button
+                type="button"
+                className="game-page__explanation-toggle-btn"
+                onClick={() => setShowExplanation((prev) => !prev)}
+              >
+                💡 {showExplanation ? "해설 닫기" : "해설 보기"}
+              </button>
+              {showExplanation && (
+                <div className="game-page__explanation-box">
+                  <p>{currentProblem.explanation}</p>
+                </div>
+              )}
+            </div>
           )}
 
           {(currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) &&
