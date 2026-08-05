@@ -4,10 +4,13 @@ import QuizModal from "./QuizModal";
 import ItemStage from "./ItemStage";
 import InfoPanel from "./InfoPanel";
 import PlanetUI from "../Planet-ui.jsx";
+import Term from "../common/Term.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
+import { deltaEnergyLines } from "../../utils/planetAnalysis.js";
+import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
 
 // 정답/오답 피드백 메시지를 화면에 유지하는 시간(ms). 그 사이에 REPORT로
@@ -119,15 +122,42 @@ function GamePage() {
           {physicsResult && (
             <>
               <div className="game-page__stats-row game-page__stats-row--physics">
-                <span>현재 온도: {physicsResult.currentTemperature.toFixed(1)} K</span>
-                <span>평형 온도: {equilibriumTemperature.toFixed(1)} K</span>
-                <span>ΔE: {physicsResult.deltaEnergy.toFixed(2)} W/m²</span>
-                <span>흡수(ASR): {physicsResult.absorbedRadiation.toFixed(2)}</span>
-                <span>방출(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
-                <span>알베도: {physicsResult.albedo.toFixed(2)}</span>
-                <span>온실효과: {physicsResult.greenhouseStrength.toFixed(2)}</span>
+                <span>
+                  <Term concept={CLIMATE_CONCEPTS.currentTemperature}>현재 평균 온도</Term>:{" "}
+                  {physicsResult.currentTemperature.toFixed(1)} K
+                </span>
+                <span>
+                  <Term concept={CLIMATE_CONCEPTS.equilibriumTemperature}>예상 안정 온도</Term>:{" "}
+                  {equilibriumTemperature.toFixed(1)} K
+                </span>
+                <span>
+                  <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형(ΔE)</Term>:{" "}
+                  {physicsResult.deltaEnergy.toFixed(2)} W/m²
+                </span>
+                <span>흡수 에너지(ASR): {physicsResult.absorbedRadiation.toFixed(2)}</span>
+                <span>방출 에너지(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
+                <span>
+                  <Term concept={CLIMATE_CONCEPTS.albedo}>알베도</Term>: {physicsResult.albedo.toFixed(2)}
+                </span>
+                <span>
+                  <Term concept={CLIMATE_CONCEPTS.greenhouseEffect}>온실효과</Term>:{" "}
+                  {physicsResult.greenhouseStrength.toFixed(2)}
+                </span>
                 {CLIMATE_TICK_ENABLED && <span>⏱️ 경과 시간: {elapsedSeconds}초</span>}
               </div>
+
+              {/* ΔE는 숫자만 보여주지 않는다 - 항상 방향 설명을 함께 표시한다. */}
+              <p className="game-page__stats-note">{deltaEnergyLines(physicsResult.deltaEnergy)[1]}</p>
+
+              {/* 현재 평균 온도가 예상 안정 온도를 향해 움직이는 중이라는 관계를 항상 보여준다. */}
+              <p className="game-page__stats-note">
+                현재 평균 온도 {physicsResult.currentTemperature.toFixed(1)} K → 시간이 지나면 → 예상 안정 온도{" "}
+                {equilibriumTemperature.toFixed(1)} K에 가까워집니다.{" "}
+                {Math.abs(physicsResult.currentTemperature - equilibriumTemperature) < 0.5
+                  ? "이미 안정 상태에 도달했습니다."
+                  : "아직 안정 상태에 도달하지 않았습니다."}
+              </p>
+
               {climateEvent && <p className="game-page__stats-note">{climateEvent}</p>}
             </>
           )}

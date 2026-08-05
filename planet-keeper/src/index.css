@@ -105,3 +105,11 @@ button:hover {
   background: var(--accent);
   filter: brightness(1.08);
 }
+
+/* 교과 개념 용어(Term 컴포넌트) - 마우스 오버 시 브라우저 기본 title 툴팁이 뜬다는 걸
+   점선 밑줄로 미리 알려준다. */
+.concept-term {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+  cursor: help;
+}

@@ -3,7 +3,19 @@ import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
+import { describeTransition, deltaEnergyLines } from "../../utils/planetAnalysis.js";
+import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./ReportPage.css";
+
+// 퀴즈 데이터의 concepts 태그(예: "피드백", "에너지 평형")를 용어집 항목에 연결한다.
+// 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
+const CONCEPT_ALIASES = {
+  피드백: "climateFeedback",
+  "에너지 평형": "energyBalance",
+  평균기온: "currentTemperature",
+};
+const CONCEPTS_BY_TERM = Object.fromEntries(Object.values(CLIMATE_CONCEPTS).map((c) => [c.term, c]));
+const lookupConcept = (name) => CLIMATE_CONCEPTS[CONCEPT_ALIASES[name]] ?? CONCEPTS_BY_TERM[name] ?? null;
 
 // gameOverReason별 결과 배너. 성공 조건은 오직 "planet_stabilized"(Earth-like
 // Stable 도달) 하나뿐이다 - Warm/Cold Stable, Energy Surplus/Deficit는 클리어가 아니다.
@@ -91,16 +103,29 @@ function ReportPage() {
         <h3>행성 변화 타임라인</h3>
         {timeline.length ? (
           <ol className="report-page__timeline">
-            {timeline.map((entry, i) => (
-              <li key={i} className="report-page__timeline-item">
-                <span className="report-page__timeline-stage">{entry.stage}</span>
-                <span className="report-page__timeline-label">{entry.label}</span>
-                <span>
-                  {entry.physics.currentTemperature.toFixed(1)}K · ΔE {entry.physics.deltaEnergy >= 0 ? "+" : ""}
-                  {entry.physics.deltaEnergy.toFixed(1)} · {entry.ml?.label ?? "-"}
-                </span>
-              </li>
-            ))}
+            {timeline.map((entry, i) => {
+              const prev = i > 0 ? timeline[i - 1] : null;
+              // 왜 이렇게 됐는지: 이전 단계와 비교해서 원인 -> 과정 -> 결과 순서로 설명한다.
+              // 첫 단계(행성 생성)는 비교할 이전 값이 없으니 ΔE 방향 설명만 보여준다.
+              const explanation = prev
+                ? describeTransition(prev.physics, entry.physics, entry.ml?.label)
+                : deltaEnergyLines(entry.physics.deltaEnergy);
+              return (
+                <li key={i} className="report-page__timeline-item">
+                  <span className="report-page__timeline-stage">{entry.stage}</span>
+                  <span className="report-page__timeline-label">{entry.label}</span>
+                  <span>
+                    {entry.physics.currentTemperature.toFixed(1)}K · ΔE {entry.physics.deltaEnergy >= 0 ? "+" : ""}
+                    {entry.physics.deltaEnergy.toFixed(1)} · {entry.ml?.label ?? "-"}
+                  </span>
+                  <div className="report-page__timeline-explain">
+                    {explanation.map((line, j) => (
+                      <p key={j}>{line}</p>
+                    ))}
+                  </div>
+                </li>
+              );
+            })}
           </ol>
         ) : (
           <p>기록된 변화가 없습니다.</p>
@@ -196,9 +221,15 @@ function ReportPage() {
               <>
                 <h4>관련 개념</h4>
                 <ul className="report-page__concept-list">
-                  {selectedQuiz.concepts.map((concept) => (
-                    <li key={concept}>{concept}</li>
-                  ))}
+                  {selectedQuiz.concepts.map((concept) => {
+                    const matched = lookupConcept(concept);
+                    return (
+                      <li key={concept}>
+                        <strong>{concept}</strong>
+                        {matched && <span> — {matched.detail}</span>}
+                      </li>
+                    );
+                  })}
                 </ul>
               </>
             )}
@@ -213,6 +244,21 @@ function ReportPage() {
       <div className="report-page__section">
         <h3>사용한 아이템</h3>
         <p>{inventory.length ? inventory.join(", ") : "없음"}</p>
+      </div>
+
+      <hr className="report-page__divider" />
+
+      {/* 교과 개념 정리 - 지구과학Ⅰ 수준으로 핵심 개념만 짧게 다시 정리한다. */}
+      <div className="report-page__section">
+        <h3>핵심 개념 정리</h3>
+        <div className="report-page__concept-grid">
+          {Object.values(CLIMATE_CONCEPTS).map((concept) => (
+            <div key={concept.term} className="report-page__concept-card">
+              <p className="report-page__concept-card-term">{concept.term}</p>
+              <p>{concept.detail}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="report-page__actions">

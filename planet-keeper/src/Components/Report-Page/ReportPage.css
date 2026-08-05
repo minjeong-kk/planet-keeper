@@ -168,3 +168,37 @@
   align-self: flex-end;
   margin-top: 12px;
 }
+
+/* 타임라인 각 단계의 원인->과정->결과 설명. flex-basis:100%로 부모(flex-wrap 행)
+   안에서 줄바꿈해 온전한 문단으로 보이게 한다. */
+.report-page__timeline-explain {
+  flex-basis: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  margin-top: 4px;
+  border-radius: 8px;
+  background: var(--accent-bg);
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.report-page__concept-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.report-page__concept-card {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.report-page__concept-card-term {
+  font-weight: 700;
+}
