@@ -352,6 +352,7 @@ const useGameStore = create(
       quizLog: [
         ...state.quizLog,
         {
+          id: currentProblem.id,
           title: currentProblem.title,
           selectedAnswer: answer,
           correctAnswer: currentProblem.answer,

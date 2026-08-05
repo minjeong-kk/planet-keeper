@@ -98,13 +98,43 @@ function ReportPage() {
   // 사용한 아이템 중복 제거
   const uniqueInventory = useMemo(() => [...new Set(inventory)], [inventory]);
 
-  const correctLog = quizLog.filter((q) => q.correct);
-  const wrongLog = quizLog.filter((q) => !q.correct);
+  // 오답 후 같은 문제를 다시 제출하면 quizLog에는 시도마다 한 줄씩 쌓인다 -
+  // id로 묶어서 "문제 하나당 한 줄 + 시도 목록"으로 보여준다. 오답이었다가
+  // 결국 맞힌 문제도 여기서는 최종 시도 결과(correct)로 판단한다.
+  const quizGroups = useMemo(() => {
+    const groups = [];
+    const byId = new Map();
+    quizLog.forEach((q) => {
+      const key = q.id ?? q.title;
+      let group = byId.get(key);
+      if (!group) {
+        group = {
+          key,
+          title: q.title,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation,
+          concepts: q.concepts,
+          attempts: [],
+        };
+        byId.set(key, group);
+        groups.push(group);
+      }
+      group.attempts.push({ selectedAnswer: q.selectedAnswer, correct: q.correct });
+    });
+    return groups.map((g) => ({
+      ...g,
+      correct: g.attempts[g.attempts.length - 1].correct,
+      isRetry: g.attempts.length > 1,
+    }));
+  }, [quizLog]);
 
-  // "문제 풀이 결과" 목록에서 클릭한 문제 - 인덱스로 저장해서 클릭할 때마다 다시
-  // 최신 quizLog를 참조한다(값 자체를 복사해두지 않음).
-  const [selectedQuizIndex, setSelectedQuizIndex] = useState(null);
-  const selectedQuiz = selectedQuizIndex != null ? quizLog[selectedQuizIndex] : null;
+  const correctGroups = quizGroups.filter((g) => g.correct);
+  const wrongGroups = quizGroups.filter((g) => !g.correct);
+
+  // "문제 풀이 결과" 목록에서 클릭한 문제 - key로 저장해서 클릭할 때마다 다시
+  // 최신 quizGroups를 참조한다(값 자체를 복사해두지 않음).
+  const [selectedGroupKey, setSelectedGroupKey] = useState(null);
+  const selectedGroup = selectedGroupKey != null ? quizGroups.find((g) => g.key === selectedGroupKey) : null;
 
   const handleReplay = async () => {
     await replayGame();
@@ -205,22 +235,22 @@ function ReportPage() {
       <div className="report-page__section">
         <h3>문제 풀이 결과</h3>
         <p className="report-page__subtext">
-          맞은 문제 <strong>{correctLog.length}</strong>개 / 틀린 문제 <strong>{wrongLog.length}</strong>개 — 문제를 클릭하면 해설을 볼 수 있습니다.
+          맞은 문제 <strong>{correctGroups.length}</strong>개 / 틀린 문제 <strong>{wrongGroups.length}</strong>개 — 문제를 클릭하면 해설을 볼 수 있습니다.
         </p>
 
-        {quizLog.length ? (
+        {quizGroups.length ? (
           <ul className="report-page__quiz-list">
-            {quizLog.map((q, i) => (
+            {quizGroups.map((g) => (
               <li
-                key={i}
+                key={g.key}
                 className={`report-page__quiz-item ${
-                  q.correct ? "report-page__quiz-item--correct" : "report-page__quiz-item--wrong"
+                  g.correct ? "report-page__quiz-item--correct" : "report-page__quiz-item--wrong"
                 }`}
-                onClick={() => setSelectedQuizIndex(i)}
+                onClick={() => setSelectedGroupKey(g.key)}
               >
-                <span className="report-page__quiz-mark">{q.correct ? "✓" : "✗"}</span>
-                <span className="report-page__quiz-title">{q.title}</span>
-                {q.isRetry && <span className="report-page__quiz-retry-badge">재도전 문제</span>}
+                <span className="report-page__quiz-mark">{g.correct ? "✓" : "✗"}</span>
+                <span className="report-page__quiz-title">{g.title}</span>
+                {g.isRetry && <span className="report-page__quiz-retry-badge">재도전 문제</span>}
               </li>
             ))}
           </ul>
@@ -230,43 +260,45 @@ function ReportPage() {
       </div>
 
       {/* 고급화된 문제 해설 모달 */}
-      {selectedQuiz && (
-        <div className="report-page__modal-overlay" onClick={() => setSelectedQuizIndex(null)}>
+      {selectedGroup && (
+        <div className="report-page__modal-overlay" onClick={() => setSelectedGroupKey(null)}>
           <div className="report-page__modal" onClick={(e) => e.stopPropagation()}>
             <div className="report-page__modal-header">
-              <span className={`report-page__modal-badge ${selectedQuiz.correct ? "report-page__modal-badge--correct" : "report-page__modal-badge--wrong"}`}>
-                {selectedQuiz.correct ? "정답" : "오답"}
+              <span className={`report-page__modal-badge ${selectedGroup.correct ? "report-page__modal-badge--correct" : "report-page__modal-badge--wrong"}`}>
+                {selectedGroup.correct ? "정답" : "오답"}
               </span>
-              <p className="report-page__modal-question">{selectedQuiz.title}</p>
+              <p className="report-page__modal-question">{selectedGroup.title}</p>
             </div>
 
             <div className="report-page__modal-answers">
-              <div className="report-page__modal-answer-row">
-                <span className="report-page__modal-label">제출한 답</span>
-                <span className={selectedQuiz.correct ? "text-correct" : "text-wrong"}>
-                  {selectedQuiz.selectedAnswer}
-                </span>
-              </div>
+              {selectedGroup.attempts.map((attempt, i) => (
+                <div key={i} className="report-page__modal-answer-row">
+                  <span className="report-page__modal-label">
+                    {selectedGroup.attempts.length > 1 ? `${i + 1}차 제출` : "제출한 답"}
+                  </span>
+                  <span className={attempt.correct ? "text-correct" : "text-wrong"}>{attempt.selectedAnswer}</span>
+                </div>
+              ))}
               <div className="report-page__modal-answer-row">
                 <span className="report-page__modal-label">정답</span>
-                <span className="text-correct">{selectedQuiz.correctAnswer}</span>
+                <span className="text-correct">{selectedGroup.correctAnswer}</span>
               </div>
             </div>
 
-            {selectedQuiz.explanation && (
+            {selectedGroup.explanation && (
               <div className="report-page__modal-section">
                 <h4 className="report-page__modal-subtitle">💡 해설</h4>
                 <div className="report-page__modal-explanation">
-                  <p>{selectedQuiz.explanation}</p>
+                  <p>{selectedGroup.explanation}</p>
                 </div>
               </div>
             )}
 
-            {selectedQuiz.concepts?.length > 0 && (
+            {selectedGroup.concepts?.length > 0 && (
               <div className="report-page__modal-section">
                 <h4 className="report-page__modal-subtitle">📚 관련 개념</h4>
                 <ul className="report-page__concept-list">
-                  {selectedQuiz.concepts.map((concept) => {
+                  {selectedGroup.concepts.map((concept) => {
                     const matched = lookupConcept(concept);
                     return (
                       <li key={concept}>
@@ -279,7 +311,7 @@ function ReportPage() {
               </div>
             )}
 
-            <button className="report-page__modal-close-btn" onClick={() => setSelectedQuizIndex(null)}>
+            <button className="report-page__modal-close-btn" onClick={() => setSelectedGroupKey(null)}>
               닫기
             </button>
           </div>
