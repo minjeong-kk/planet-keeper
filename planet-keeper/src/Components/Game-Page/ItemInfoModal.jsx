@@ -1,9 +1,22 @@
-import { previewItemEffect } from "../../utils/planetAnalysis.js";
+import useGameStore, { itemDeltaEnergyChange } from "../../store/useGameStore.js";
+import useClimateStore from "../../store/useClimateStore.js";
+import { previewItemEffect, formatSigned } from "../../utils/planetAnalysis.js";
 
 // 아이템 카드의 (ⓘ) 버튼/카드 클릭 시 뜨는 원인->과정->결과 설명 모달.
-// 실제 물리엔진 재계산 없이 슬라이더 방향만으로 만든 미리보기다(previewItemEffect).
+// info.concept/chain/science는 실제 물리엔진 재계산 없이 슬라이더 방향만으로 만든
+// 고정 미리보기(previewItemEffect)라 아이템마다 항상 같은 문구다. 그 아래
+// "지금 사용하면" 문단만은 지금 행성의 실제 조성/온도로 itemDeltaEnergyChange를
+// 돌려서 이 판(play-through)에 한정된 실측 예측치를 보여준다.
 function ItemInfoModal({ item, onClose }) {
   const info = previewItemEffect(item);
+  const values = useClimateStore((state) => state.values);
+  const currentTemperature = useClimateStore((state) => state.currentTemperature);
+  const physicsResult = useGameStore((state) => state.physicsResult);
+
+  const before = physicsResult?.deltaEnergy;
+  const change = physicsResult ? itemDeltaEnergyChange(item, values, currentTemperature) : null;
+  const after = before != null && change != null ? before + change : null;
+  const trend = change == null || Math.abs(change) < 0.01 ? "거의 변하지 않을" : change < 0 ? "줄어들" : "늘어날";
 
   return (
     <div className="item-info-modal-overlay" onClick={onClose}>
@@ -41,6 +54,19 @@ function ItemInfoModal({ item, onClose }) {
               )
             ))}
           </div>
+        </div>
+
+
+        <div className="item-info-section">
+          <h3>📊 지금 사용하면</h3>
+
+          {before != null ? (
+            <p>
+              지금 상태에서는 ΔE가 {formatSigned(before)} → {formatSigned(after)}로 {trend} 것으로 예상됩니다.
+            </p>
+          ) : (
+            <p>아직 계산된 행성 상태가 없어 예측할 수 없습니다.</p>
+          )}
         </div>
 
 

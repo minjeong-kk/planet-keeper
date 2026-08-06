@@ -107,7 +107,7 @@ const ITEM_EFFECT_EPSILON = 0.01;
 // 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
 // 차이). 정적 태그가 아니라 매번 물리엔진으로 직접 계산한다 - 정적 태그만 보면
 // clamp에 걸려 효과가 0인 아이템도 "맞는 방향"으로 보이기 때문이다.
-function itemDeltaEnergyChange(item, values, currentTemperature) {
+export function itemDeltaEnergyChange(item, values, currentTemperature) {
   const before = computeClimateV2({ ...mapSlidersToClimateInputs(values), currentTemperature }).deltaEnergy;
   const after = computeClimateV2({
     ...mapSlidersToClimateInputs(nextSliderValues(values, item)),
