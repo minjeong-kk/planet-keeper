@@ -7,8 +7,9 @@
   --glass-border: rgba(255, 255, 255, 0.12);
   --ink: #eef2fa;
   --ink-dim: #a9b6cd;
-  /* 페이지 배경 위에 그대로 놓이는 글자색(타이틀/부제목). 글로우·그림자 없이
-     단색만 쓰므로, 나중에 배경이 어두워지면 이 세 값만 밝은 쪽으로 바꾸면 된다. */
+  /* 페이지 배경 위에 그대로 놓이는 글자색(타이틀/부제목/eyebrow). 글로우·그림자
+     없이 단색만 쓴다. 라이트 모드용 어두운 값이고, 아래 다크 모드 블록에서 밝은
+     값으로 뒤집는다(index.css 가 --bg 를 어둡게 바꾸므로 함께 따라가야 한다). */
   --on-page: #131c2f;
   --on-page-sub: #2b3547; /* 부제목 - 타이틀보다 살짝 옅게 */
   --on-page-accent: #256b7e;
@@ -28,6 +29,16 @@
   padding: 36px 52px;
   flex: 1;
   text-align: left;
+}
+
+/* 다크 모드: 배경이 어두워지므로 페이지 위 글자를 밝은 쪽으로 뒤집는다.
+   (메뉴/CTA/말풍선은 원래 어두운 패널이라 그대로 둔다) */
+@media (prefers-color-scheme: dark) {
+  .start-page {
+    --on-page: #f4f8ff;
+    --on-page-sub: #cbd8ec;
+    --on-page-accent: #7fd9f5;
+  }
 }
 
 /* ══ 장식 레이어 ═══════════════════════════════════════════════ */
@@ -301,8 +312,9 @@
 .start-page__bubble {
   position: relative;
   width: max-content;
-  /* nowrap 으로 묶은 가장 긴 구절("너무 뜨겁지도 차갑지도 않게")이 한 줄에 들어가는 폭 */
-  max-width: 292px;
+  /* nowrap 으로 묶은 가장 긴 구절("너무 뜨겁지도 차갑지도 않게")이 한 줄에 들어가는 폭.
+     좁은 화면(320px 등)에서는 화면을 넘지 않도록 100% 로 제한한다. */
+  max-width: min(292px, 100%);
   margin-bottom: 30px; /* 꼬리(30px)가 마스코트와 겹치지 않게 확보 */
   padding: 20px 22px;
   border: 1px solid var(--bubble-edge);
