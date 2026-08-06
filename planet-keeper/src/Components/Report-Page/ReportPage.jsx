@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
-import { describeTransition, deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
+import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./ReportPage.css";
 
@@ -73,10 +73,17 @@ function ReportPage() {
     statusClass: "",
   };
 
-  // timeline 마지막 = 최종 상태. 정상 플레이라면 항상 최소 1개는 있지만
-  // (nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
+  // timeline[0]=행성 생성 시점, 마지막=최종 상태. 정상 플레이라면 항상 최소 1개는
+  // 있지만(nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
+  const initial = timeline[0] ?? null;
   const final = timeline[timeline.length - 1] ?? null;
   const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
+
+  // "핵심 개념 정리"에서 9개 전부가 아니라 이번 판에 실제로 나타난 개념만 고른다.
+  const relevantKeys = useMemo(
+    () => relevantConceptKeys({ initial, final, timeline, gameOverReason }),
+    [initial, final, timeline, gameOverReason],
+  );
 
   // 연속으로 동일한 상태나 행동이 중복 기록된 타임라인 제거
   const uniqueTimeline = useMemo(() => {
@@ -347,13 +354,16 @@ function ReportPage() {
 
       {/* 교과 개념 정리 - 지구과학Ⅰ 수준으로 핵심 개념만 짧게 다시 정리한다. */}
       <CollapsibleSection title="핵심 개념 정리">
+        <p className="report-page__subtext">이번 플레이에서 실제로 나타난 개념만 골랐습니다.</p>
         <div className="report-page__concept-grid">
-          {Object.values(CLIMATE_CONCEPTS).map((concept) => (
-            <div key={concept.term} className="report-page__concept-card">
-              <p className="report-page__concept-card-term">{concept.term}</p>
-              <p>{concept.detail}</p>
-            </div>
-          ))}
+          {Object.entries(CLIMATE_CONCEPTS)
+            .filter(([key]) => relevantKeys.has(key))
+            .map(([key, concept]) => (
+              <div key={key} className="report-page__concept-card">
+                <p className="report-page__concept-card-term">{concept.term}</p>
+                <p>{concept.detail}</p>
+              </div>
+            ))}
         </div>
       </CollapsibleSection>
 
