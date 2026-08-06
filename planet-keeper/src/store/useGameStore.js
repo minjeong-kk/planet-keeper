@@ -339,14 +339,19 @@ const useGameStore = create(
     const elapsedSeconds = get().elapsedSeconds + 1;
     set({ elapsedSeconds });
 
-    const { pendingClimateEvent, nextClimateEventAt } = get();
+    const { pendingClimateEvent, nextClimateEventAt, currentStage } = get();
     if (pendingClimateEvent) {
       if (elapsedSeconds >= pendingClimateEvent.expiresAt) {
         get().resolveClimateEvent();
       }
       return;
     }
-    if (elapsedSeconds >= nextClimateEventAt) {
+    // 아이템 선택/2단계 문제 풀이 중에는 새 경고를 띄우지 않는다 - 카드를 고르는
+    // 중에 슬라이더 대응 UI까지 겹치면 어느 쪽에 반응해야 할지 헷갈린다.
+    // nextClimateEventAt은 그대로 둬서, 이 단계를 벗어나는 다음 tick에 밀린
+    // 경고가 바로 뜬다(더 미뤄지지 않음).
+    const overlapsOtherStage = currentStage === GAME_STAGES.ITEM || currentStage === GAME_STAGES.FINAL;
+    if (!overlapsOtherStage && elapsedSeconds >= nextClimateEventAt) {
       get().triggerClimateEvent();
     }
   },

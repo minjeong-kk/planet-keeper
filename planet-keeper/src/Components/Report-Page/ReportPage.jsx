@@ -5,7 +5,14 @@ import useGameStore from "../../store/useGameStore";
 import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
 import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
+import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
+
+// 타임라인 항목의 label("☁️ 인공 구름 생성기" 등, useGameStore.useItem이 `${item.emoji}
+// ${item.name}`로 저장)을 아이템 key로 되돌린다 - "아이템" 단계만 이 형식과 일치하고,
+// "행성 생성"/"⚠️ ..."/"최종 확인 N/3" 같은 다른 단계 label은 매칭되지 않아 undefined를
+// 돌려준다(원인을 하나로 특정할 수 없는 단계에 잘못 아이템 설명을 붙이지 않기 위함).
+const ITEM_KEY_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${item.name}`, item.key]));
 
 // 퀴즈 데이터의 concepts 태그(예: "피드백", "에너지 평형")를 용어집 항목에 연결한다.
 // 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
@@ -107,7 +114,7 @@ function ReportPage() {
     uniqueTimeline.forEach((entry, i) => {
       const prev = i > 0 ? uniqueTimeline[i - 1] : null;
       const explanation = prev
-        ? describeTransition(prev.physics, entry.physics, entry.ml?.label)
+        ? describeTransition(prev.physics, entry.physics, entry.ml?.label, ITEM_KEY_BY_LABEL.get(entry.label))
         : deltaEnergyLines(entry.physics.deltaEnergy);
       const signature = `${entry.stage}::${explanation.join("|").replace(/[-+]?\d+(\.\d+)?/g, "#")}`;
       const existing = bySignature.get(signature);

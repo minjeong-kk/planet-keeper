@@ -171,6 +171,15 @@
   gap: 16px;
 }
 
+/* 이상기후 경고 응답 중에는 아이템 선택/문제 풀이 카드를 통째로 잠근다 -
+   pointer-events:none이라 하위의 버튼/라디오를 개별로 disabled 처리하지 않아도
+   클릭이 전부 막힌다(각 컴포넌트가 접근성을 위해 버튼 disabled도 별도로 준다). */
+.item-card-grid.is-locked,
+.game-quiz-card.is-locked {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
 .item-card {
   background: var(--bg);
   position: relative;
@@ -506,7 +515,8 @@
    ========================================= */
 .game-page__feedback {
   width: 100%;
-  max-width: 680px;
+  /* 문제 카드(.game-quiz-card)/스테이지 라벨과 같은 폭으로 맞춘다. */
+  max-width: 900px;
   border-radius: 10px;
   padding: 10px 14px;
   font-size: 0.88rem;
@@ -516,7 +526,7 @@
   gap: 2px;
   text-align: center;
   box-sizing: border-box;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .game-page__feedback p {

@@ -4,7 +4,10 @@ import { useState } from "react";
 // 번째로 푸는 문제인지"(quizLog.length + 1)를 넘겨준다 - 문제 자체는 quizBank.js에서
 // "s3-cloud-effect" 같은 슬러그 id로 무작위로 뽑히므로, problem.id를 그대로
 // 번호처럼 보여주면 학생에게 무의미한 영문 문자열이 노출된다.
-function QuizModal({ problem, onSubmit, number }) {
+// disabled: 이상기후 경고에 응답하는 중(pendingClimateEvent)에는 true - 문제
+// 풀이와 슬라이더 대응이 동시에 가능하면 어느 쪽에 반응해야 할지 헷갈리므로,
+// 경고가 해소될 때까지 카드 전체를 잠근다.
+function QuizModal({ problem, onSubmit, number, disabled = false }) {
   const [selected, setSelected] = useState(null);
   const [showExplanationModal, setShowExplanationModal] = useState(false);
 
@@ -17,7 +20,7 @@ function QuizModal({ problem, onSubmit, number }) {
   const problemNumber = number ?? 1;
 
   return (
-    <div className="game-quiz-card">
+    <div className={`game-quiz-card ${disabled ? "is-locked" : ""}`}>
       {/* 카드 상단 헤더 (재도전 뱃지 & 💡 해설 모달 버튼) */}
       <div className="game-quiz-card__header">
         <div className="game-quiz-card__tags">
@@ -60,6 +63,7 @@ function QuizModal({ problem, onSubmit, number }) {
                 name={`quiz-${problem.id}`}
                 checked={selected === choice}
                 onChange={() => setSelected(choice)}
+                disabled={disabled}
               />
               <span className="game-quiz-card__choice-text">{choice}</span>
             </label>
@@ -69,7 +73,7 @@ function QuizModal({ problem, onSubmit, number }) {
 
       <button
         className="btn-primary game-quiz-card__submit-btn"
-        disabled={selected === null}
+        disabled={disabled || selected === null}
         onClick={handleSubmit}
       >
         제출하기

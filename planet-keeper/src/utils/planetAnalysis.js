@@ -256,25 +256,50 @@ function greenhouseChangeLine(before, after) {
   return changeLine(before.greenhouseStrength, after.greenhouseStrength, "온실효과가 더 강해졌습니다.", "온실효과가 약해졌습니다.");
 }
 
-// 알베도와 온실효과가 "같이" 바뀌는 유일한 경우(구름)는 둘이 ΔE에 반대 방향으로
-// 작용한다 - 알베도 변화는 ASR(냉각/온난 방향)을, 온실효과 변화는 OLR(그
-// 반대 방향)을 움직인다. 어느 쪽이 더 센지 말해주지 않으면 "온실효과가
-// 강해졌다"는 줄과 뒤이어 나오는 평형 성공 문구가 서로 모순처럼 읽힌다 -
-// 실제로는 알베도 쪽 계수(0.5)가 온실효과 쪽(0.1)보다 커서 알베도가 이기는
-// 경우가 많지만, 계수를 하드코딩하지 않고 실제 ASR/OLR 변화량을 비교해서 매번
-// 다시 판단한다.
-function netCloudEffectLine(before, after) {
-  const asrDelta = after.absorbedRadiation - before.absorbedRadiation;
+// 알베도와 온실효과가 "같이" 바뀌는 경우, 둘이 ΔE에 항상 반대 방향으로 작용하는
+// 건 아니다 - 구름 아이템처럼 "하나의 원인"(cloudRatio)이 둘 다 움직이면 항상
+// 반대 방향(알베도 변화는 ASR을, 온실효과 변화는 그 반대인 OLR을 움직인다)이지만,
+// 이상기후 경고 대응처럼 서로 "다른 원인"(예: 빙하 슬라이더 + CO2 슬라이더를 동시에
+// 조정)으로 둘이 같이 바뀌면 오히려 같은 방향(둘 다 냉각 또는 둘 다 온난화)으로
+// 힘을 보탤 수도 있다. 그래서 매번 실제 ASR/OLR 변화량의 부호를 보고 반대인지
+// 같은 방향인지부터 판단한 뒤에만 "어느 쪽이 이겼는지"를 말한다.
+function netAlbedoGreenhouseEffectLine(before, after) {
+  const asrDelta = after.absorbedRadiation - before.absorbedRadiation; // 알베도발 ΔE 기여
   const olrDelta = after.outgoingRadiation - before.outgoingRadiation;
-  const albedoWins = Math.abs(asrDelta) >= Math.abs(olrDelta);
-  const netWarming = albedoWins ? asrDelta > 0 : olrDelta < 0;
+  const greenhousePull = -olrDelta; // 온실효과발 ΔE 기여(ΔE = ASR - OLR이므로 부호 반전)
+
+  const sameDirection = (asrDelta > 0) === (greenhousePull > 0);
+  if (sameDirection) {
+    const netWarming = asrDelta > 0;
+    return `이 둘은 ΔE에 같은 방향으로 함께 작용해 전체적으로 ${netWarming ? "데워지는" : "식는"} 방향입니다.`;
+  }
+
+  const albedoWins = Math.abs(asrDelta) >= Math.abs(greenhousePull);
+  const netWarming = albedoWins ? asrDelta > 0 : greenhousePull > 0;
   return `이 둘은 ΔE에 반대 방향으로 작용하지만, ${albedoWins ? "알베도" : "온실효과"} 쪽 영향이 더 커서 전체적으로는 ${netWarming ? "데워지는" : "식는"} 방향입니다.`;
 }
 
+// "왜" 알베도/온실효과가 움직였는지 물리적 이유를 슬라이더별로 한 줄 덧붙인다.
+// itemKey로 어느 슬라이더가 움직였는지 확실히 알 때만 쓴다 - 슬라이더 여러 개가
+// 동시에 바뀌는 경우(이상기후 대응 등, itemKey 없음)는 원인을 하나로 특정할 수
+// 없으므로 여기서 걸러지고(physicsChangeBlocks가 itemKey 없이 부르면 아예 추가
+// 안 함), 잘못된 인과를 덧붙이지 않는다.
+const ALBEDO_REASON = {
+  iceThickness: "빙하는 태양빛을 강하게 반사하는 밝은 표면이라, 비율이 바뀌면 알베도도 함께 움직입니다.",
+  cloud: "구름은 태양빛을 반사하는 밝은 표면 역할을 합니다.",
+};
+
+const GREENHOUSE_REASON = {
+  cloud: "구름은 지표 복사를 가두는 온실 역할도 동시에 합니다.",
+  co2: "CO₂는 대표적인 온실기체로, 지표 복사를 흡수해 대기 중에 가둡니다.",
+  atmThickness: "대기가 두꺼워질수록 열을 가두는 능력(온실효과)이 커집니다.",
+};
+
 // 알베도/온실효과/OLR/ASR 각각의 변화를 원인->과정 블록으로 만든다. 아이템 사용
 // (describeItemJudgment)과 타임라인 전환(describeTransition)이 그대로 공유한다 -
-// 어떤 아이템이었는지 몰라도 physics 값 비교만으로 동작한다.
-function physicsChangeBlocks(before, after) {
+// itemKey를 안 넘기면(타임라인처럼 어떤 아이템이었는지 모르거나, 슬라이더 여러 개가
+// 동시에 바뀌어 원인을 하나로 특정할 수 없을 때) physics 값 비교만으로 동작한다.
+function physicsChangeBlocks(before, after, itemKey) {
   const blocks = [];
 
   const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
@@ -285,7 +310,15 @@ function physicsChangeBlocks(before, after) {
   // 결과일 뿐, 알베도가 바뀌어서 온실효과가 바뀌는 인과관계가 아니다. 그래서 둘 다
   // 있으면 화살표로 잇지 않고 같은 블록에 나란히 묶어(withArrows가 블록 "안"에는
   // 화살표를 안 넣는다) 인과관계처럼 안 읽히면서도 둘 다 보여준다.
-  const causeLines = [albedoLine, greenhouseLine].filter(Boolean);
+  const causeLines = [];
+  if (albedoLine) {
+    causeLines.push(albedoLine);
+    if (itemKey && ALBEDO_REASON[itemKey]) causeLines.push(ALBEDO_REASON[itemKey]);
+  }
+  if (greenhouseLine) {
+    causeLines.push(greenhouseLine);
+    if (itemKey && GREENHOUSE_REASON[itemKey]) causeLines.push(GREENHOUSE_REASON[itemKey]);
+  }
   if (causeLines.length) blocks.push(causeLines);
 
   // 온실효과 변화가 "우주로 방출되는 에너지"에 어떻게 이어지는지 명시적으로 보여준다 -
@@ -320,9 +353,9 @@ function physicsChangeBlocks(before, after) {
     : null;
   if (absorbedLine) blocks.push([absorbedLine]);
 
-  // 알베도/온실효과가 둘 다 바뀐 경우에만(구름) 어느 쪽이 이겼는지 짚어준다 -
-  // 하나만 바뀐 아이템(빙하/CO2 등)은 애초에 반대 방향으로 다툴 두 효과가 없다.
-  if (albedoLine && greenhouseLine) blocks.push([netCloudEffectLine(before, after)]);
+  // 알베도/온실효과가 둘 다 바뀐 경우에만 설명을 붙인다 - 하나만 바뀐 아이템(빙하/
+  // CO2 등)은 애초에 서로 견줄 두 효과가 없다.
+  if (albedoLine && greenhouseLine) blocks.push([netAlbedoGreenhouseEffectLine(before, after)]);
 
   return blocks;
 }
@@ -395,7 +428,7 @@ export function describeItemJudgment(item, before, after, label) {
   // 방향 설명"처럼 한 덩어리로 읽혀야 하는 줄들이 화살표로 쪼개지지 않는다.
   const blocks = [
     [SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다."],
-    ...physicsChangeBlocks(before, after),
+    ...physicsChangeBlocks(before, after, item.key),
   ];
 
   blocks.push(deltaEnergyLines(after.deltaEnergy));
@@ -422,7 +455,7 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
   }
 
   const greenhouseLine = greenhouseChangeLine(before, after);
-  if (greenhouseLine) blocks.push([greenhouseLine]);
+  if (greenhouseLine) blocks.push([greenhouseLine, GREENHOUSE_REASON.co2]);
 
   blocks.push([`현재 평균 온도가 예상 안정 온도 방향으로 이동해, 새 평균 온도 ${after.currentTemperature.toFixed(1)}K에 도달했습니다.`]);
   blocks.push(describeStableLabel(label));
@@ -433,11 +466,14 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
 /**
  * 리포트 페이지의 "행성 변화 타임라인" 각 단계(초기 -> 아이템 -> 최종)를 before/after
  * Physics 비교로 설명한다. describeItemJudgment와 같은 원인->과정->결과 문장을
- * 쓰지만, 어떤 아이템이었는지(item 객체)를 몰라도 physics 값 비교만으로 동작한다 -
- * ReportPage의 timeline에는 각 단계의 physics 스냅샷만 남아 있기 때문이다.
+ * 쓰지만, ReportPage의 timeline에는 각 단계의 physics 스냅샷만 남아 있어 기본적으로는
+ * 어떤 아이템이었는지 몰라도 physics 값 비교만으로 동작한다. itemKey를 알 때만(예:
+ * "아이템" 단계처럼 어느 슬라이더였는지 확실할 때) 넘기면 describeItemJudgment와 같은
+ * "왜" 설명도 붙는다 - 슬라이더 여러 개가 동시에 바뀐 단계(이상기후 대응 등)는 원인을
+ * 하나로 특정할 수 없으니 호출하는 쪽에서 itemKey를 넘기지 않아야 한다.
  */
-export function describeTransition(before, after, label) {
-  const blocks = physicsChangeBlocks(before, after);
+export function describeTransition(before, after, label, itemKey) {
+  const blocks = physicsChangeBlocks(before, after, itemKey);
 
   blocks.push(deltaEnergyLines(after.deltaEnergy));
 
@@ -471,8 +507,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 감소",
           "↓",
           "예상 안정 온도 감소",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -498,8 +532,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 증가",
           "↓",
           "예상 안정 온도 증가",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -524,8 +556,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 감소",
           "↓",
           "예상 안정 온도 감소",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -550,8 +580,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 증가",
           "↓",
           "예상 안정 온도 증가",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -577,8 +605,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 감소",
           "↓",
           "예상 안정 온도 감소",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -604,8 +630,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 증가",
           "↓",
           "예상 안정 온도 증가",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -627,8 +651,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 감소",
           "↓",
           "예상 안정 온도 감소",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -653,8 +675,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 증가",
           "↓",
           "예상 안정 온도 증가",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",
@@ -679,8 +699,6 @@ export function previewItemEffect(item) {
           "에너지 불균형(ΔE) 감소",
           "↓",
           "예상 안정 온도 감소",
-          "↓",
-          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
         ],
         science: [
           "💡 지구과학 개념",

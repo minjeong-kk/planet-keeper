@@ -250,7 +250,9 @@ function GamePage() {
             </div>
           )}
 
-          {currentStage === GAME_STAGES.ITEM && !isComputing && <ItemStage items={visibleItems} onSelect={useItem} />}
+          {currentStage === GAME_STAGES.ITEM && !isComputing && (
+            <ItemStage items={visibleItems} onSelect={useItem} disabled={!!pendingClimateEvent} />
+          )}
 
           {isComputing && <p>AI가 행성 상태를 판정하는 중...</p>}
 
@@ -278,7 +280,12 @@ function GamePage() {
 
           {(currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) &&
             currentProblem && (
-              <QuizModal problem={currentProblem} onSubmit={handleAnswer} number={quizLog.length + 1} />
+              <QuizModal
+                problem={currentProblem}
+                onSubmit={handleAnswer}
+                number={quizLog.length + 1}
+                disabled={!!pendingClimateEvent}
+              />
             )}
         </div>
       </div>
