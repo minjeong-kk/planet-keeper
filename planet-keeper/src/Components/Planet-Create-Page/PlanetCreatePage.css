@@ -23,8 +23,9 @@
 
 /* ── 글래스모피즘 다크 컨트롤 패널 ── */
 .planet-create-page__controls {
-  --neon: #58e0ff;
-  --neon-glow: rgba(88, 224, 255, 0.55);
+  /* 게임 페이지 문제 카드와 같은 계열의 파란색으로 맞춘다 */
+  --neon: #0284c7;
+  --neon-glow: rgba(2, 132, 199, 0.55);
   flex: 1;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 16px;

@@ -1,8 +1,21 @@
+import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
+import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
-import { energyStateOf } from "../../utils/physicsEngine.js";
+import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
+import { describeTransition, deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
+import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./ReportPage.css";
+
+// 퀴즈 데이터의 concepts 태그(예: "피드백", "에너지 평형")를 용어집 항목에 연결한다.
+// 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
+const CONCEPT_ALIASES = {
+  피드백: "climateFeedback",
+  "에너지 평형": "energyBalance",
+  평균기온: "currentTemperature",
+};
+const CONCEPTS_BY_TERM = Object.fromEntries(Object.values(CLIMATE_CONCEPTS).map((c) => [c.term, c]));
+const lookupConcept = (name) => CLIMATE_CONCEPTS[CONCEPT_ALIASES[name]] ?? CONCEPTS_BY_TERM[name] ?? null;
 
 // gameOverReason별 결과 배너. 성공 조건은 오직 "planet_stabilized"(Earth-like
 // Stable 도달) 하나뿐이다 - Warm/Cold Stable, Energy Surplus/Deficit는 클리어가 아니다.
@@ -10,31 +23,122 @@ const RESULT_BANNER_BY_REASON = {
   planet_stabilized: {
     title: "🎉 미션 성공 - 행성 평형 안정 도달",
     detail: "최종 확인 결과 행성이 지구형 안정(Earth-like Stable) 상태에 도달해 게임을 성공적으로 마쳤습니다.",
+    statusClass: "report-page__banner--success",
   },
   life_over: {
     title: "💔 미션 실패 - 목숨 소진",
     detail: "오답이 3회 누적되어 행성을 안정시키지 못한 채 게임이 종료됐습니다.",
+    statusClass: "report-page__banner--failure",
   },
 };
 
+const KOREAN_BY_STATE = Object.fromEntries(PLANET_STATES.map(({ state, korean }) => [state, korean]));
+
+const fmt = (value, digits = 2) => (value == null ? "-" : value.toFixed(digits));
+
 function ReportPage() {
   const navigate = useNavigate();
-  const values = useClimateStore((state) => state.values);
   const resetClimate = useClimateStore((state) => state.resetClimate);
-  // 게임 중 아이템 사용/최종 확인으로 재계산된 최신 Physics 결과(useGameStore)를
-  // 보여준다 - 슬라이더+현재 온도에서 다시 파생시키면 useGameStore가 settle해 둔
-  // currentTemperature를 useClimateStore에서 그대로 다시 읽어야 해서 같은 값이긴
-  // 하지만, 스냅샷을 한 곳(useGameStore)에서만 관리하는 게 더 단순하다.
-  const physicsResult = useGameStore((state) => state.physicsResult);
   const gameOverReason = useGameStore((state) => state.gameOverReason);
-  // GamePage가 REPORT로 넘어가는 순간부터 더 이상 늘리지 않으므로 그 값 그대로
-  // "총 걸린 시간"이 된다.
   const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
+  const timeline = useGameStore((state) => state.timeline);
+  const quizLog = useGameStore((state) => state.quizLog);
+  const inventory = useGameStore((state) => state.inventory);
   const resetGame = useGameStore((state) => state.resetGame);
+  const replayGame = useGameStore((state) => state.replayGame);
 
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
     title: "행성 진단 결과",
     detail: "",
+    statusClass: "",
+  };
+
+  // timeline 마지막 = 최종 상태. 정상 플레이라면 항상 최소 1개는 있지만
+  // (nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
+  const final = timeline[timeline.length - 1] ?? null;
+  const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
+
+  // 연속으로 동일한 상태나 행동이 중복 기록된 타임라인 제거
+  const uniqueTimeline = useMemo(() => {
+    return timeline.filter((entry, index) => {
+      if (index === 0) return true;
+      const prev = timeline[index - 1];
+      const isSameStage = entry.stage === prev.stage;
+      const isSameLabel = entry.label === prev.label;
+      const isSameTemp = entry.physics.currentTemperature === prev.physics.currentTemperature;
+      const isSameDelta = entry.physics.deltaEnergy === prev.physics.deltaEnergy;
+      return !(isSameStage && isSameLabel && isSameTemp && isSameDelta);
+    });
+  }, [timeline]);
+
+  // 원인->과정->결과 설명이 완전히 같은 단계(똑같은 방향의 아이템을 여러 번 쓴
+  // 경우 등)는 설명을 반복해서 보여주지 않고 하나로 묶는다 - 숫자만 다르고
+  // 문장이 같은 설명 박스가 줄줄이 나오는 걸 막는다.
+  const timelineGroups = useMemo(() => {
+    const groups = [];
+    const bySignature = new Map();
+    uniqueTimeline.forEach((entry, i) => {
+      const prev = i > 0 ? uniqueTimeline[i - 1] : null;
+      const explanation = prev
+        ? describeTransition(prev.physics, entry.physics, entry.ml?.label)
+        : deltaEnergyLines(entry.physics.deltaEnergy);
+      const signature = `${entry.stage}::${explanation.join("|").replace(/[-+]?\d+(\.\d+)?/g, "#")}`;
+      const existing = bySignature.get(signature);
+      if (existing) {
+        existing.entries.push(entry);
+      } else {
+        const group = { stage: entry.stage, explanation, entries: [entry] };
+        bySignature.set(signature, group);
+        groups.push(group);
+      }
+    });
+    return groups;
+  }, [uniqueTimeline]);
+
+  // 사용한 아이템 중복 제거
+  const uniqueInventory = useMemo(() => [...new Set(inventory)], [inventory]);
+
+  // 오답 후 같은 문제를 다시 제출하면 quizLog에는 시도마다 한 줄씩 쌓인다 -
+  // id로 묶어서 "문제 하나당 한 줄 + 시도 목록"으로 보여준다. 오답이었다가
+  // 결국 맞힌 문제도 여기서는 최종 시도 결과(correct)로 판단한다.
+  const quizGroups = useMemo(() => {
+    const groups = [];
+    const byId = new Map();
+    quizLog.forEach((q) => {
+      const key = q.id ?? q.title;
+      let group = byId.get(key);
+      if (!group) {
+        group = {
+          key,
+          title: q.title,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation,
+          concepts: q.concepts,
+          attempts: [],
+        };
+        byId.set(key, group);
+        groups.push(group);
+      }
+      group.attempts.push({ selectedAnswer: q.selectedAnswer, correct: q.correct });
+    });
+    return groups.map((g) => ({
+      ...g,
+      correct: g.attempts[g.attempts.length - 1].correct,
+      isRetry: g.attempts.length > 1,
+    }));
+  }, [quizLog]);
+
+  const correctGroups = quizGroups.filter((g) => g.correct);
+  const wrongGroups = quizGroups.filter((g) => !g.correct);
+
+  // "문제 풀이 결과" 목록에서 클릭한 문제 - key로 저장해서 클릭할 때마다 다시
+  // 최신 quizGroups를 참조한다(값 자체를 복사해두지 않음).
+  const [selectedGroupKey, setSelectedGroupKey] = useState(null);
+  const selectedGroup = selectedGroupKey != null ? quizGroups.find((g) => g.key === selectedGroupKey) : null;
+
+  const handleReplay = async () => {
+    await replayGame();
+    navigate("/game");
   };
 
   const handleRestart = () => {
@@ -47,76 +151,202 @@ function ReportPage() {
     <div className="report-page">
       <h1 className="report-page__title">피드백 창</h1>
 
-      <div className="report-page__section">
-        <h2>{resultBanner.title}</h2>
-        {resultBanner.detail && <p>{resultBanner.detail}</p>}
-        <p>⏱️ 총 걸린 시간: {elapsedSeconds}초</p>
-
-        {/* 행성 변수값 리스트 */}
-        <div className="report-page__values-box">
-          <h3>현재 행성 변수 설정값</h3>
-          <ul className="report-page__values-list">
-            {CLIMATE_VARIABLES.map(({ key, label }) => (
-              <li key={key} className="report-page__value-item">
-                <span className="label">{label}</span>
-                <span className="value">{values ? values[key] : 50}</span>
-              </li>
-            ))}
-          </ul>
+      {/* 최종 결과 위주 배너 */}
+      <div className={`report-page__section report-page__summary-card ${resultBanner.statusClass}`}>
+        <div className="report-page__summary-main">
+          <h2>{resultBanner.title}</h2>
+          {resultBanner.detail && <p className="report-page__summary-detail">{resultBanner.detail}</p>}
+        </div>
+        
+        <div className="report-page__summary-metrics">
+          <div className="report-page__metric-box">
+            <span className="report-page__metric-label">최종 행성 상태</span>
+            <span className="report-page__metric-value">
+              {final ? KOREAN_BY_STATE[finalRuleState] : "-"}
+            </span>
+          </div>
+          <div className="report-page__metric-box">
+            <span className="report-page__metric-label">ML 분류 (확신도)</span>
+            <span className="report-page__metric-value">
+              {final?.ml ? `${final.ml.label} ${final.ml.confidence != null ? `(${Math.round(final.ml.confidence * 100)}%)` : ""}` : "-"}
+            </span>
+          </div>
+          <div className="report-page__metric-box">
+            <span className="report-page__metric-label">총 소요 시간</span>
+            <span className="report-page__metric-value">⏱️ {elapsedSeconds}초</span>
+          </div>
         </div>
 
-        <p>피드백 루프 한줄 정리</p>
-
-        {/* Physics Engine 결과 (PlanetCreatePage에서 계산해 Store에 저장한 값 그대로 사용) */}
-        <div className="report-page__values-box">
-          <h3>Physics 진단</h3>
-          <ul className="report-page__values-list">
-            <li className="report-page__value-item">
-              <span className="label">Current Temperature</span>
-              <span className="value">{physicsResult ? `${physicsResult.currentTemperature.toFixed(1)} K` : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">ASR</span>
-              <span className="value">{physicsResult ? physicsResult.absorbedRadiation.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">OLR</span>
-              <span className="value">{physicsResult ? physicsResult.outgoingRadiation.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Delta Energy</span>
-              <span className="value">{physicsResult ? physicsResult.deltaEnergy.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Albedo</span>
-              <span className="value">{physicsResult ? physicsResult.albedo.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Greenhouse Strength</span>
-              <span className="value">{physicsResult ? physicsResult.greenhouseStrength.toFixed(2) : "-"}</span>
-            </li>
-            <li className="report-page__value-item">
-              <span className="label">Energy State</span>
-              <span className="value">{physicsResult ? energyStateOf(physicsResult.deltaEnergy) : "-"}</span>
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div className="report-page__section">
-        <p>틀린 문제와 해설</p>
+        {final && (
+          <p className="report-page__final-physics">
+            🌡️ 최종 물리값: 온도 {fmt(final.physics.currentTemperature, 1)}K · ΔE{" "}
+            {formatSigned(final.physics.deltaEnergy, 2)} W/m² · 알베도 {fmt(final.physics.albedo)} · 온실효과{" "}
+            {fmt(final.physics.greenhouseStrength)}
+          </p>
+        )}
       </div>
 
       <hr className="report-page__divider" />
 
+      {/* 행성 변화 타임라인: 가로 2열 컴팩트 카드 그리드 방식 */}
       <div className="report-page__section">
-        <p>푼 문제 서술 / 해설 - 어떤 개념 문제임</p>
-        <p>재도전 피드백</p>
+        <h3>행성 변화 타임라인</h3>
+        {timelineGroups.length ? (
+          <div className="report-page__timeline-grid">
+            {timelineGroups.map((group, i) => (
+              <div key={i} className="report-page__timeline-card">
+                <div className="report-page__timeline-card-header">
+                  <span className="report-page__timeline-step-tag">Step {i + 1}</span>
+                  <span className="report-page__timeline-stage">{group.stage}</span>
+                  <div className="report-page__timeline-chips">
+                    {group.entries.map((e, idx) => (
+                      <span key={idx} className="report-page__timeline-chip">
+                        {e.label}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="report-page__timeline-explain">
+                  {group.explanation.map((line, j) => (
+                    <p key={j}>{line}</p>
+                  ))}
+                </div>
+
+                <div className="report-page__timeline-metrics">
+                  {group.entries.map((e, idx) => (
+                    <span key={idx} className="report-page__metric-badge">
+                      🌡️ {e.physics.currentTemperature.toFixed(1)}K · ΔE {formatSigned(e.physics.deltaEnergy)} ·{" "}
+                      {e.ml?.label ?? "-"}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p>기록된 변화가 없습니다.</p>
+        )}
       </div>
 
-      <button className="report-page__restart" onClick={handleRestart}>
-        행성 만들기로 가기 (초기화)
-      </button>
+      <hr className="report-page__divider" />
+
+      {/* 문제 풀이 결과 */}
+      <div className="report-page__section">
+        <h3>문제 풀이 결과</h3>
+        <p className="report-page__subtext">
+          맞은 문제 <strong>{correctGroups.length}</strong>개 / 틀린 문제 <strong>{wrongGroups.length}</strong>개 — 문제를 클릭하면 해설을 볼 수 있습니다.
+        </p>
+
+        {quizGroups.length ? (
+          <ul className="report-page__quiz-list">
+            {quizGroups.map((g) => (
+              <li
+                key={g.key}
+                className={`report-page__quiz-item ${
+                  g.correct ? "report-page__quiz-item--correct" : "report-page__quiz-item--wrong"
+                }`}
+                onClick={() => setSelectedGroupKey(g.key)}
+              >
+                <span className="report-page__quiz-mark">{g.correct ? "✓" : "✗"}</span>
+                <span className="report-page__quiz-title">{g.title}</span>
+                {g.isRetry && <span className="report-page__quiz-retry-badge">재도전 문제</span>}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>푼 문제가 없습니다.</p>
+        )}
+      </div>
+
+      {/* 고급화된 문제 해설 모달 */}
+      {selectedGroup && (
+        <div className="report-page__modal-overlay" onClick={() => setSelectedGroupKey(null)}>
+          <div className="report-page__modal" onClick={(e) => e.stopPropagation()}>
+            <div className="report-page__modal-header">
+              <span className={`report-page__modal-badge ${selectedGroup.correct ? "report-page__modal-badge--correct" : "report-page__modal-badge--wrong"}`}>
+                {selectedGroup.correct ? "정답" : "오답"}
+              </span>
+              <p className="report-page__modal-question">{selectedGroup.title}</p>
+            </div>
+
+            <div className="report-page__modal-answers">
+              {selectedGroup.attempts.map((attempt, i) => (
+                <div key={i} className="report-page__modal-answer-row">
+                  <span className="report-page__modal-label">
+                    {selectedGroup.attempts.length > 1 ? `${i + 1}차 제출` : "제출한 답"}
+                  </span>
+                  <span className={attempt.correct ? "text-correct" : "text-wrong"}>{attempt.selectedAnswer}</span>
+                </div>
+              ))}
+              <div className="report-page__modal-answer-row">
+                <span className="report-page__modal-label">정답</span>
+                <span className="text-correct">{selectedGroup.correctAnswer}</span>
+              </div>
+            </div>
+
+            {selectedGroup.explanation && (
+              <div className="report-page__modal-section">
+                <h4 className="report-page__modal-subtitle">💡 해설</h4>
+                <div className="report-page__modal-explanation">
+                  <p>{selectedGroup.explanation}</p>
+                </div>
+              </div>
+            )}
+
+            {selectedGroup.concepts?.length > 0 && (
+              <div className="report-page__modal-section">
+                <h4 className="report-page__modal-subtitle">📚 관련 개념</h4>
+                <ul className="report-page__concept-list">
+                  {selectedGroup.concepts.map((concept) => {
+                    const matched = lookupConcept(concept);
+                    return (
+                      <li key={concept}>
+                        <strong className="report-page__concept-term">{concept}</strong>
+                        {matched && <span> — {matched.detail}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            <button className="report-page__modal-close-btn" onClick={() => setSelectedGroupKey(null)}>
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
+
+      <hr className="report-page__divider" />
+
+      {/* 사용한 아이템 */}
+      <div className="report-page__section">
+        <h3>사용한 아이템</h3>
+        <p>{uniqueInventory.length ? uniqueInventory.join(", ") : "없음"}</p>
+      </div>
+
+      <hr className="report-page__divider" />
+
+      {/* 교과 개념 정리 - 지구과학Ⅰ 수준으로 핵심 개념만 짧게 다시 정리한다. */}
+      <div className="report-page__section">
+        <h3>핵심 개념 정리</h3>
+        <div className="report-page__concept-grid">
+          {Object.values(CLIMATE_CONCEPTS).map((concept) => (
+            <div key={concept.term} className="report-page__concept-card">
+              <p className="report-page__concept-card-term">{concept.term}</p>
+              <p>{concept.detail}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="report-page__actions">
+        <button className="btn-primary" onClick={handleReplay}>
+          다시 플레이 (같은 행성)
+        </button>
+        <button onClick={handleRestart}>행성 다시 만들기</button>
+      </div>
     </div>
   );
 }
