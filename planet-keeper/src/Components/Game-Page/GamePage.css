@@ -18,16 +18,6 @@
   text-align: left; /* "아이템 선택" 제목은 좌상단 유지 */
 }
 
-.game-page__quiz-retry-badge {
-  align-self: flex-start;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: #ffe0d6;
-  color: #8a2c0d;
-  font-size: 0.8rem;
-  font-weight: 600;
-}
-
 .game-page__modal button {
   align-self: flex-end;
 }
@@ -40,14 +30,6 @@
   padding: 20px;
 }
 
-.game-page__quiz-choices {
-  list-style: none;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 /* 2단계 안정화 진행 체크(빨간 체크) - 채워질수록 붉게, 아직이면 회색 */
 .game-page__final-check {
   font-size: 1.2rem;
@@ -56,7 +38,7 @@
 }
 
 .game-page__final-check--filled {
-  color: #d32f2f;
+  color: var(--danger);
 }
 
 .game-page__info-panel {
@@ -76,7 +58,7 @@
 
 /* Planet Summary 내 서브 리스트 정돈 */
 .game-page__summary-block {
-  background: var(--bg-card, rgba(0, 0, 0, 0.02));
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
@@ -86,7 +68,7 @@
 .game-page__summary-title {
   font-weight: 700;
   font-size: 0.85rem;
-  color: var(--primary, #65a30d);
+  color: var(--accent);
   margin-bottom: 4px;
 }
 
@@ -94,13 +76,13 @@
   margin: 0;
   padding-left: 16px;
   font-size: 0.83rem;
-  color: var(--text-p);
+  color: var(--text-muted);
   line-height: 1.45;
 }
 
 /* ML Prediction 카드 형태 디자인 */
 .info-panel__ml-card {
-  background: var(--bg-card, rgba(101, 163, 13, 0.05));
+  background: var(--code-bg);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 12px;
@@ -117,8 +99,8 @@
 }
 
 .info-panel__badge {
-  background: var(--primary-light, #ecfccb);
-  color: var(--primary-dark, #3f6212);
+  background: var(--accent-bg);
+  color: var(--accent);
   padding: 2px 8px;
   border-radius: 12px;
   font-size: 0.8rem;
@@ -129,19 +111,6 @@
   border: none;
   border-top: 1px dashed var(--border);
   margin: 14px 0;
-}
-
-/* 하단 해석 가이드 상자 */
-.info-panel__guide-box {
-  background: rgba(101, 163, 13, 0.05);
-  border: 1px solid rgba(101, 163, 13, 0.2);
-  border-radius: 8px;
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  font-size: 0.82rem;
-  line-height: 1.4;
 }
 
 .game-page__info-panel hr {
@@ -222,7 +191,7 @@
 .item-info-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -249,15 +218,15 @@
 
 .game-page__used-items-empty {
   font-size: 0.83rem;
-  color: #888;
+  color: var(--text-muted);
   margin: 0;
 }
 
 /* 경고 문구 토스트 팝업 */
 .game-page__event-toast {
-  background: #fef2f2;
-  color: #dc2626;
-  border: 1px solid #fca5a5;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
   font-size: 0.8rem;
   font-weight: 600;
   padding: 4px 10px;
@@ -265,13 +234,6 @@
   box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
   animation: toastPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
   white-space: nowrap;
-}
-
-.game-quiz-card__choice-number {
-  font-weight: 700;
-  color: #0284c7;
-  font-size: 0.95rem;
-  min-width: 18px;
 }
 
 .game-page {
@@ -292,14 +254,14 @@
 }
 
 .game-page__stats-bar {
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
   text-align: left;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow);
 }
 
 .game-page__stats-row {
@@ -310,10 +272,10 @@
   gap: 16px;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px dashed var(--border, #e2e8f0);
+  border-top: 1px dashed var(--border);
   font-size: 0.88rem;
-  color: var(--text-p, #475569);
-  background: rgba(0, 0, 0, 0.02);
+  color: var(--text-muted);
+  background: var(--code-bg);
   border-radius: 8px;
   padding: 8px 12px;
   line-height: 1.5;
@@ -327,21 +289,21 @@
 .game-page__stats-note {
   margin: 0;
   font-size: 0.9rem;
-  color: var(--text, #334155);
+  color: var(--text);
 }
 
 .game-page__arena {
   flex: 1;
   min-height: 0;
   border-radius: 12px;
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
   padding: 20px;
   overflow-y: auto;
-  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow);
 }
 
 .game-page__planet-placeholder {
@@ -359,7 +321,7 @@
   max-width: 900px;
   margin: 0 auto;
   font-size: 1rem;
-  color: var(--text, #334155);
+  color: var(--text);
 }
 
 /* =========================================
@@ -385,15 +347,15 @@
 }
 
 .game-page__feedback--correct {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #15803d;
+  background: var(--success-bg);
+  border: 1px solid var(--success-border);
+  color: var(--success);
 }
 
 .game-page__feedback--wrong {
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  color: #b91c1c;
+  background: var(--danger-bg);
+  border: 1px solid var(--danger-border);
+  color: var(--danger);
 }
 
 .game-page__stable-badge {
@@ -417,21 +379,21 @@
 }
 
 .game-page__stable-badge--earth {
-  background: #f0fdf4;
-  color: #15803d;
-  border: 1px solid #86efac;
+  background: var(--success-bg);
+  color: var(--success);
+  border: 1px solid var(--success-border);
 }
 
 .game-page__stable-badge--warm {
-  background: #fff7ed;
-  color: #c2410c;
-  border: 1px solid #ffedd5;
+  background: var(--warm-bg);
+  color: var(--warm);
+  border: 1px solid var(--warm-border);
 }
 
 .game-page__stable-badge--cold {
-  background: #f0f9ff;
-  color: #0369a1;
-  border: 1px solid #bae6fd;
+  background: var(--info-bg);
+  color: var(--info);
+  border: 1px solid var(--info-border);
 }
 
 /* =========================================
@@ -440,8 +402,8 @@
 .game-quiz-card {
   width: 100%;
   max-width: 900px;
-  background: var(--bg, #ffffff);
-  border: 1px solid var(--border, #cbd5e1);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px 20px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
@@ -465,9 +427,9 @@
 }
 
 .game-quiz-card__retry-badge {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #fca5a5;
+  background: var(--danger-bg);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
   font-size: 0.78rem;
   font-weight: 700;
   padding: 2px 8px;
@@ -475,8 +437,8 @@
 }
 
 .game-quiz-card__hint-btn {
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
   border-radius: 50%;
   width: 30px;
   height: 30px;
@@ -491,7 +453,7 @@
 }
 
 .game-quiz-card__hint-btn:hover {
-  background: #e2e8f0;
+  background: var(--border);
   transform: scale(1.08);
 }
 
@@ -500,7 +462,7 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-h);
   line-height: 1.4;
   display: flex;
   align-items: baseline;
@@ -508,7 +470,7 @@
 }
 
 .game-quiz-card__title-num {
-  color: #0284c7;
+  color: var(--info);
   font-size: 1.1rem;
   font-weight: 800;
 }
@@ -524,22 +486,22 @@
 }
 
 .game-quiz-card__choice-item {
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 8px 12px;
   cursor: pointer;
   transition: background-color 0.15s ease, border-color 0.15s ease;
-  background: var(--bg, #ffffff);
+  background: var(--bg);
 }
 
 .game-quiz-card__choice-item:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
+  background: var(--code-bg);
+  border-color: var(--border);
 }
 
 .game-quiz-card__choice-item--selected {
-  border-color: #0284c7;
-  background: #f0f9ff;
+  border-color: var(--info);
+  background: var(--info-bg);
 }
 
 .game-quiz-card__choice-label {
@@ -552,12 +514,12 @@
 
 .game-quiz-card__choice-label input[type="radio"] {
   cursor: pointer;
-  accent-color: #0284c7;
+  accent-color: var(--info);
 }
 
 .game-quiz-card__choice-text {
   font-size: 0.9rem;
-  color: #334155;
+  color: var(--text);
   line-height: 1.35;
 }
 
@@ -575,7 +537,7 @@
 .game-quiz-modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -584,7 +546,7 @@
 }
 
 .game-quiz-modal {
-  background: #ffffff;
+  background: var(--bg);
   border-radius: 14px;
   width: 90%;
   max-width: 480px;
@@ -592,7 +554,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border);
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   text-align: left;
 }
@@ -606,7 +568,7 @@
 .game-quiz-modal__header h4 {
   margin: 0;
   font-size: 1.05rem;
-  color: #0f172a;
+  color: var(--text-h);
 }
 
 .game-quiz-modal__icon {
@@ -617,19 +579,19 @@
   margin: 0;
   font-weight: 700;
   font-size: 0.92rem;
-  color: #334155;
+  color: var(--text);
   padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border);
 }
 
 .game-quiz-modal__content {
-  background: #f8fafc;
+  background: var(--code-bg);
   padding: 10px 12px;
   border-radius: 8px;
-  border-left: 3px solid #0284c7;
+  border-left: 3px solid var(--info);
   font-size: 0.88rem;
   line-height: 1.5;
-  color: #334155;
+  color: var(--text);
 }
 
 .game-quiz-modal__content p {
@@ -639,14 +601,14 @@
 .game-quiz-modal__concepts h5 {
   margin: 0 0 4px 0;
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-muted);
 }
 
 .game-quiz-modal__concepts ul {
   margin: 0;
   padding-left: 18px;
   font-size: 0.85rem;
-  color: #0284c7;
+  color: var(--info);
   font-weight: 600;
 }
 
@@ -654,33 +616,33 @@
   align-self: flex-end;
   padding: 6px 16px;
   border-radius: 6px;
-  border: 1px solid #cbd5e1;
-  background: #ffffff;
-  color: #334155;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
   cursor: pointer;
   font-weight: 600;
   font-size: 0.85rem;
 }
 
 .game-quiz-modal__close-btn:hover {
-  background: #f1f5f9;
+  background: var(--code-bg);
 }
 
 /* 우측 사이드 영역 */
 .game-page__side {
   flex: 1;
   min-height: 0;
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 16px;
-  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow);
 }
 
 .game-page__side-box {
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border);
   border-radius: 8px;
   padding: 16px;
   text-align: left;
@@ -695,7 +657,7 @@
 }
 
 .game-page__key-card {
-  border: 1px solid var(--border, #e2e8f0);
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
   display: flex;
@@ -705,7 +667,7 @@
 
 .game-page__key-card-label {
   font-size: 0.85rem;
-  color: var(--text, #334155);
+  color: var(--text);
 }
 
 .game-page__key-card-value {
@@ -724,10 +686,10 @@
   align-items: flex-end;
   gap: 6px;
   padding: 8px 14px;
-  background: var(--bg, #ffffff);
-  border: 1px solid var(--border, #e2e8f0);
+  background: var(--bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
-  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+  box-shadow: var(--shadow);
 
   backdrop-filter: blur(8px);
   transition: all 0.2s ease;
@@ -736,13 +698,13 @@
 .game-page__floating-timer .game-page__stats-note {
   margin: 0;
   font-weight: 600;
-  color: var(--text-h, #0f172a);
+  color: var(--text-h);
   font-size: 0.9rem;
 }
 
 .game-page__used-items-container {
   margin-top: 10px;
-  border-top: 1px dashed var(--border, #e2e8f0);
+  border-top: 1px dashed var(--border);
   padding-top: 8px;
 }
 
@@ -765,23 +727,14 @@
 
 .game-page__used-item-row {
   font-size: 0.83rem;
-  color: var(--text-p, #475569);
+  color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  background: rgba(0, 0, 0, 0.02);
+  background: var(--code-bg);
   padding: 4px 8px;
   border-radius: 4px;
-  border: 1px solid var(--border, #e2e8f0);
-}
-
-/* 다크 모드에서의 토스트 팝업 색상 */
-@media (prefers-color-scheme: dark) {
-  .game-page__event-toast {
-    background: #450a0a;
-    color: #fca5a5;
-    border-color: #991b1b;
-  }
+  border: 1px solid var(--border);
 }
 
 /* 살짝 확대되며 올라오는 통통 튀는 애니메이션 */

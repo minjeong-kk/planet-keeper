@@ -12,6 +12,31 @@
   --shadow:
     rgba(0, 0, 0, 0.08) 0 10px 15px -3px, rgba(0, 0, 0, 0.04) 0 4px 6px -2px;
 
+  /* 보조 텍스트(라벨/캡션 등, --text보다 한 단계 옅음) */
+  --text-muted: #64748b;
+  /* 모달 뒤 배경을 어둡게 덮는 오버레이 - 라이트/다크 공통으로 같은 톤을 쓴다 */
+  --overlay: rgba(15, 23, 42, 0.55);
+
+  /* 정보/강조(파란색) - 문제 카드, Cold Stable 배지 등 */
+  --info: #0284c7;
+  --info-bg: #f0f9ff;
+  --info-border: #bae6fd;
+
+  /* 성공(초록) - 정답, Earth-like Stable 등 */
+  --success: #15803d;
+  --success-bg: #f0fdf4;
+  --success-border: #bbf7d0;
+
+  /* 실패/위험(빨강) - 오답, 목숨 소진, 에너지 과다 등 */
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+
+  /* 경고(주황) - Warm Stable, 재도전 문제 등 */
+  --warm: #c2410c;
+  --warm-bg: #fff7ed;
+  --warm-border: #ffedd5;
+
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
@@ -45,6 +70,25 @@
     --social-bg: rgba(35, 51, 37, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+
+    --text-muted: #8a9a88;
+    --overlay: rgba(0, 0, 0, 0.6);
+
+    --info: #38bdf8;
+    --info-bg: rgba(56, 189, 248, 0.15);
+    --info-border: rgba(56, 189, 248, 0.4);
+
+    --success: #4ade80;
+    --success-bg: rgba(74, 222, 128, 0.15);
+    --success-border: rgba(74, 222, 128, 0.4);
+
+    --danger: #f87171;
+    --danger-bg: rgba(248, 113, 113, 0.15);
+    --danger-border: rgba(248, 113, 113, 0.4);
+
+    --warm: #fb923c;
+    --warm-bg: rgba(251, 146, 60, 0.15);
+    --warm-border: rgba(251, 146, 60, 0.4);
   }
 
   #social .button-icon {
