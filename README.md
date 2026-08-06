@@ -250,3 +250,10 @@ All textures are bundled locally (not hot-linked) to avoid runtime/CORS dependen
 - **Atmosphere / CO₂ glow**
   - Fresnel rim-glow shader technique from public Three.js examples
   - (a technique, not a copyrighted asset)
+
+- **기상청 마스코트 '기상이'** (`public/assets/gisangi_10.png`)
+  - 저작물명: **기상청 캐릭터 기상이** / 제공: **기상청(Korea Meteorological Administration)**
+  - 원본 파일: 기상청 캐릭터 이미지 배포본 중 `10인사-기상이.png` (2022) — 프로젝트에서는 `gisangi_10.png`로 이름만 바꿔 사용
+  - 이용조건: **공공누리 제2유형 — 출처표시 + 상업적 이용금지**
+  - 출처(공유마당): https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=227435
+  - ⚠️ **비상업적 목적(교육·경진대회)에서만 사용할 수 있습니다.** 상업적 배포·수익화를 하게 되면 이 이미지를 빼거나 기상청의 별도 이용 허락을 받아야 합니다. (이미지 표시는 `src/Components/Start-Page/MascotGuide.jsx` 한 곳에서만 하며, 파일이 없으면 자체 제작 SVG 실루엣으로 자동 대체됩니다.)
