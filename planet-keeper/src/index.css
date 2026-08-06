@@ -4,10 +4,10 @@
   --bg: #fff;
   --border: #e2e8e0;
   --code-bg: #f3f6f2;
-  /* 라이트 모드: 화사한 연두 (Lime Green) */
-  --accent: #65a30d;
-  --accent-bg: rgba(101, 163, 13, 0.1);
-  --accent-border: rgba(101, 163, 13, 0.4);
+  /* 라이트 모드: 차분한 블루-그린 (Teal) */
+  --accent: #0d9488;
+  --accent-bg: rgba(13, 148, 136, 0.1);
+  --accent-border: rgba(13, 148, 136, 0.4);
   --social-bg: rgba(243, 246, 242, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.08) 0 10px 15px -3px, rgba(0, 0, 0, 0.04) 0 4px 6px -2px;
@@ -42,11 +42,11 @@
      값이다(스타 패드가 늘 어두운 패널인 것과 동일). StartPage.css 자체는
      createPortal 팝업 스코프 문제로 이 값들을 로컬에도 따로 갖고 있다 -
      여기서 지우지 않는다(다른 페이지에서 쓰려고 전역에 "추가"만 한 것).*/
-  --neon: #58e0ff;
-  --holo: #6fdcff;
+  --neon: #2dd4bf;
+  --holo: #5eead4;
   --panel: linear-gradient(160deg, #17213a 0%, #0e1524 100%);
-  --panel-border: rgba(111, 220, 255, 0.22);
-  --panel-line: rgba(111, 220, 255, 0.16);
+  --panel-border: rgba(94, 234, 212, 0.18);
+  --panel-line: rgba(94, 234, 212, 0.13);
   --panel-inset: rgba(6, 11, 20, 0.55);
   --panel-ink: #e9f0fb;
   --panel-ink-dim: #9fb2cf;
@@ -77,10 +77,10 @@
     --bg: #121913; /* 답답하지 않은 깊은 딥 그린 톤 배경 */
     --border: #233325;
     --code-bg: #1a261c;
-    /* 다크 모드: 시원하고 선명한 에메랄드/브라이트 초록 */
-    --accent: #4ade80;
-    --accent-bg: rgba(74, 222, 128, 0.15);
-    --accent-border: rgba(74, 222, 128, 0.4);
+    /* 다크 모드: 시원한 블루-그린 (Teal), --neon과 같은 계열로 통일 */
+    --accent: #2dd4bf;
+    --accent-bg: rgba(45, 212, 191, 0.13);
+    --accent-border: rgba(45, 212, 191, 0.34);
     --social-bg: rgba(35, 51, 37, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;

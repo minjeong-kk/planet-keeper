@@ -10,31 +10,36 @@
   margin: 24px;
   position: relative;
   box-shadow: var(--shadow);
-  background: var(--bg);
+  /* 라이트/다크 모두 살짝 accent 색을 얹어 - 밋밋한 var(--bg) 단색 대신 위쪽에서
+     은은하게 색이 도는 느낌을 준다(index.css 바디 배경과 같은 방식). */
+  background: linear-gradient(180deg, var(--accent-bg), transparent 220px), var(--bg);
 }
 
-/* 다크 모드에서만 시작 페이지와 같은 다크 SF 패널 톤으로 - 라이트 모드는 원래
-   라이트 그린 테마를 그대로 쓴다. var(--bg) 등을 여기서 다시 정의하면 이 페이지
-   안의 모든 하위 규칙(이미 전부 var()로 되어 있다)이 그대로 새 값을 물려받아서
-   개별 규칙은 하나도 안 건드려도 된다. */
+/* 다크 모드: 시작 페이지보다 더 어둡고, 그린을 유지하되 블루 쪽으로 기운 패널
+   톤을 쓴다(게임/리포트 전용 - StartPage/PlanetCreatePage는 원래 블루 쪽 톤을
+   유지). var(--bg) 등을 여기서 다시 정의하면 이 페이지 안의 모든 하위
+   규칙(이미 전부 var()로 되어 있다)이 그대로 새 값을 물려받아서 개별 규칙은
+   하나도 안 건드려도 된다. */
 @media (prefers-color-scheme: dark) {
   .report-page {
-    --bg: #1c2740;
+    --bg: #0f2027;
     --text: var(--panel-ink-dim);
     --text-h: #ffffff;
     --text-muted: var(--panel-ink-dim);
-    --border: var(--panel-border);
+    --border: rgba(8, 145, 178, 0.26);
     --code-bg: rgba(255, 255, 255, 0.05);
     --shadow: 0 14px 32px rgba(3, 7, 16, 0.45);
-    --accent: var(--holo);
-    --accent-bg: rgba(111, 220, 255, 0.12);
+    --accent: #22b8cf;
+    --accent-bg: rgba(8, 145, 178, 0.16);
+    --accent-border: rgba(8, 145, 178, 0.48);
 
     --info: #38bdf8;
     --info-bg: rgba(56, 189, 248, 0.15);
     --info-border: rgba(56, 189, 248, 0.4);
-    --success: #4ade80;
-    --success-bg: rgba(74, 222, 128, 0.15);
-    --success-border: rgba(74, 222, 128, 0.4);
+    /* 형광 라임그린 대신 페이지 전체 톤과 맞는 청록(teal) - index.css의 --neon과 같은 계열 */
+    --success: #2dd4bf;
+    --success-bg: rgba(45, 212, 191, 0.15);
+    --success-border: rgba(45, 212, 191, 0.4);
     --danger: #f87171;
     --danger-bg: rgba(248, 113, 113, 0.15);
     --danger-border: rgba(248, 113, 113, 0.4);
@@ -42,13 +47,13 @@
     --warm-bg: rgba(251, 146, 60, 0.15);
     --warm-border: rgba(251, 146, 60, 0.4);
 
-    background: var(--panel);
+    background: linear-gradient(160deg, #11242c 0%, #060e12 100%);
     color: var(--panel-ink);
   }
 
-  /* .btn-primary는 전역에서 --accent(위에서 홀로 시안으로 바뀜)를 배경으로
-     쓰는데, 전역 텍스트색(#052e16, 초록 배경 기준)은 시안 배경과 어울리지
-     않는다 - 시작 페이지 CTA와 같은 남색 텍스트로 맞춘다. */
+  /* .btn-primary는 전역에서 --accent(위에서 그린으로 바뀜)를 배경으로 쓰는데,
+     전역 텍스트색(#052e16, 라이트 초록 배경 기준)은 이 어두운 패널 배경과
+     어울리지 않는다 - 시작 페이지 CTA와 같은 남색 텍스트로 맞춘다. */
   .report-page .btn-primary {
     color: #04121f;
   }
@@ -268,6 +273,34 @@
   font-family: monospace;
 }
 
+/* 칩 안의 상태 라벨(Energy Surplus/Earth-like Stable 등)만 따로 떼어 - 톤별로
+   색이 바뀌어야 스텝마다 라벨이 바뀐 게 한눈에 들어온다. labelTone()과 짝. */
+.report-page__metric-badge-label {
+  font-weight: 800;
+  font-size: 0.85rem;
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+
+.report-page__metric-badge-label--neutral {
+  color: var(--text-muted);
+}
+
+.report-page__metric-badge-label--earth {
+  color: var(--success);
+  background: var(--success-bg);
+}
+
+.report-page__metric-badge-label--warm {
+  color: var(--warm);
+  background: var(--warm-bg);
+}
+
+.report-page__metric-badge-label--cold {
+  color: var(--info);
+  background: var(--info-bg);
+}
+
 .report-page__final-physics {
   margin: 0;
   font-size: 0.9rem;
@@ -287,7 +320,7 @@
 }
 
 .report-page__quiz-item {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--code-bg);
   display: flex;
   align-items: center;
   gap: 8px;

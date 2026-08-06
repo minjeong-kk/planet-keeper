@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
-import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys } from "../../utils/planetAnalysis.js";
+import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./ReportPage.css";
 
@@ -243,7 +243,9 @@ function ReportPage() {
                   {group.entries.map((e, idx) => (
                     <span key={idx} className="report-page__metric-badge">
                       🌡️ {e.physics.currentTemperature.toFixed(1)}K · ΔE {formatSigned(e.physics.deltaEnergy)} ·{" "}
-                      {e.ml?.label ?? "-"}
+                      <span className={`report-page__metric-badge-label report-page__metric-badge-label--${labelTone(e.ml?.label)}`}>
+                        {e.ml?.label ?? "-"}
+                      </span>
                     </span>
                   ))}
                 </div>

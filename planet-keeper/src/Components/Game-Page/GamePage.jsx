@@ -9,7 +9,7 @@ import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore"
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
-import { deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
+import { deltaEnergyLines, formatSigned, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
 
@@ -136,7 +136,11 @@ function GamePage() {
       {CLIMATE_TICK_ENABLED && (
         <div className="game-page__floating-stack">
           <div className="game-page__floating-timer">
-            <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>
+            <span className="game-page__floating-timer-label">⏱️ 경과 시간</span>
+            <p className="game-page__stats-note">{elapsedSeconds}초</p>
+            <span className={`info-panel__badge info-panel__badge--${labelTone(mlResult?.label)}`}>
+              {mlResult ? mlResult.label : "대기 중..."}
+            </span>
             {/* pending 중엔 아래 경고 패널에 이미 같은 문구가 있으니 중복 표시하지 않는다. */}
             {climateEvent && !pendingClimateEvent && (
               <div className="game-page__event-toast">

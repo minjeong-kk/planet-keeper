@@ -228,6 +228,22 @@ export function shortSliderChangeLabel(key, delta) {
   return `${label} ${delta > 0 ? "증가" : "감소"}`;
 }
 
+// ML/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(ML Prediction 배지)와
+// ReportPage(타임라인 라벨 칩)가 같은 상태를 같은 색으로 보여주도록 공유한다.
+// 라벨이 없으면(아직 판정 전) "neutral"로 - 실제 상태처럼 색이 칠해지면 안 된다.
+const LABEL_TONE = {
+  "Earth-like Stable": "earth",
+  Stable: "earth",
+  "Warm Stable": "warm",
+  "Energy Surplus": "warm",
+  "Cold Stable": "cold",
+  "Energy Deficit": "cold",
+};
+
+export function labelTone(label) {
+  return LABEL_TONE[label] ?? "neutral";
+}
+
 const CHANGE_EPSILON = 0.005;
 
 function changeLine(before, after, riseText, fallText) {
@@ -238,6 +254,21 @@ function changeLine(before, after, riseText, fallText) {
 
 function greenhouseChangeLine(before, after) {
   return changeLine(before.greenhouseStrength, after.greenhouseStrength, "온실효과가 더 강해졌습니다.", "온실효과가 약해졌습니다.");
+}
+
+// 알베도와 온실효과가 "같이" 바뀌는 유일한 경우(구름)는 둘이 ΔE에 반대 방향으로
+// 작용한다 - 알베도 변화는 ASR(냉각/온난 방향)을, 온실효과 변화는 OLR(그
+// 반대 방향)을 움직인다. 어느 쪽이 더 센지 말해주지 않으면 "온실효과가
+// 강해졌다"는 줄과 뒤이어 나오는 평형 성공 문구가 서로 모순처럼 읽힌다 -
+// 실제로는 알베도 쪽 계수(0.5)가 온실효과 쪽(0.1)보다 커서 알베도가 이기는
+// 경우가 많지만, 계수를 하드코딩하지 않고 실제 ASR/OLR 변화량을 비교해서 매번
+// 다시 판단한다.
+function netCloudEffectLine(before, after) {
+  const asrDelta = after.absorbedRadiation - before.absorbedRadiation;
+  const olrDelta = after.outgoingRadiation - before.outgoingRadiation;
+  const albedoWins = Math.abs(asrDelta) >= Math.abs(olrDelta);
+  const netWarming = albedoWins ? asrDelta > 0 : olrDelta < 0;
+  return `이 둘은 ΔE에 반대 방향으로 작용하지만, ${albedoWins ? "알베도" : "온실효과"} 쪽 영향이 더 커서 전체적으로는 ${netWarming ? "데워지는" : "식는"} 방향입니다.`;
 }
 
 // 알베도/온실효과/OLR/ASR 각각의 변화를 원인->과정 블록으로 만든다. 아이템 사용
@@ -288,6 +319,10 @@ function physicsChangeBlocks(before, after) {
       )
     : null;
   if (absorbedLine) blocks.push([absorbedLine]);
+
+  // 알베도/온실효과가 둘 다 바뀐 경우에만(구름) 어느 쪽이 이겼는지 짚어준다 -
+  // 하나만 바뀐 아이템(빙하/CO2 등)은 애초에 반대 방향으로 다툴 두 효과가 없다.
+  if (albedoLine && greenhouseLine) blocks.push([netCloudEffectLine(before, after)]);
 
   return blocks;
 }

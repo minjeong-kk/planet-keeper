@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { analyzePlanetState, deltaEnergyLines } from "../../utils/planetAnalysis.js";
+import { analyzePlanetState, deltaEnergyLines, labelTone } from "../../utils/planetAnalysis.js";
 import { equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
 
 // 오른쪽 정보 패널. physicsResult/mlResult는 useGameStore가 매 단계(초기 생성,
@@ -24,7 +24,7 @@ function InfoPanel({ physicsResult, mlResult, co2Ppm, atmThickness }) {
         <div className="info-panel__ml-card">
           <div className="info-panel__ml-row">
             <span className="info-panel__label">State:</span>
-            <span className="info-panel__badge">
+            <span className={`info-panel__badge info-panel__badge--${labelTone(mlResult?.label)}`}>
               {mlResult ? mlResult.label : "대기 중..."}
             </span>
           </div>
