@@ -72,7 +72,7 @@ export const MOCK_ITEMS = [
     // (SOLAR_CONSTANT는 고정 상수, 슬라이더가 아님) - 반사판 효과를 구름 슬라이더로 근사함.
     // 실제로 "태양 유입 총량"을 조절하는 기능이 생기면 그때 제대로 연결할 것.
     id: "space_mirror",
-    name: "반사판 설치/제거",
+    name: "반사판 설치",
     emoji: "☀️",
     description: "행성 외곽의 궤도 반사경을 조절해 태양 유입 에너지 총량과 알베도를 미세하게 조정합니다.",
     key: "cloud",

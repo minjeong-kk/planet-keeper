@@ -17,6 +17,11 @@ import "./GamePage.css";
 // 넘어가더라도 이 시간만큼은 메시지를 보여준 뒤 페이지를 이동한다.
 const FEEDBACK_DISPLAY_MS = 2000;
 
+// 이상기후 경고 슬라이더의 조절 폭(±). 행성 만들기 때와 같은 0~100 풀
+// 레인지를 그대로 쓰면 몇 초 안에 미세하게 조정하기엔 한 번 드래그로 너무
+// 크게 움직인다 - 경고가 뜬 시점 값(startValues) 기준 좁은 구간만 허용한다.
+const CLIMATE_ALERT_SLIDER_RANGE = 15;
+
 // 코드는 그대로 두고 실행만 끈다 - 다시 끌 땐 이 플래그만 false로.
 const CLIMATE_TICK_ENABLED = true;
 
@@ -152,20 +157,25 @@ function GamePage() {
               <p className="game-page__climate-alert-timer">
                 ⏳ {Math.max(0, pendingClimateEvent.expiresAt - elapsedSeconds)}초 안에 막아보세요
               </p>
-              {CLIMATE_VARIABLES.map(({ key, label }) => (
-                <div key={key} className="game-page__climate-alert-slider-row">
-                  <span className="game-page__climate-alert-slider-label">{label}</span>
-                  <input
-                    type="range"
-                    min={0}
-                    max={100}
-                    value={values[key]}
-                    onChange={(e) => setClimateValue(key, Number(e.target.value))}
-                    className="game-page__climate-alert-slider"
-                  />
-                  <span className="game-page__climate-alert-slider-value">{values[key]}%</span>
-                </div>
-              ))}
+              {CLIMATE_VARIABLES.map(({ key, label }) => {
+                const startValue = pendingClimateEvent.startValues[key];
+                const min = Math.max(0, startValue - CLIMATE_ALERT_SLIDER_RANGE);
+                const max = Math.min(100, startValue + CLIMATE_ALERT_SLIDER_RANGE);
+                return (
+                  <div key={key} className="game-page__climate-alert-slider-row">
+                    <span className="game-page__climate-alert-slider-label">{label}</span>
+                    <input
+                      type="range"
+                      min={min}
+                      max={max}
+                      value={values[key]}
+                      onChange={(e) => setClimateValue(key, Number(e.target.value))}
+                      className="game-page__climate-alert-slider"
+                    />
+                    <span className="game-page__climate-alert-slider-value">{values[key]}%</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>

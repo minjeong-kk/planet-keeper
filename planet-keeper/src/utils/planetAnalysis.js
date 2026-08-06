@@ -247,16 +247,15 @@ function physicsChangeBlocks(before, after) {
   const blocks = [];
 
   const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
-  if (albedoLine) blocks.push([albedoLine]);
+  const greenhouseLine = greenhouseChangeLine(before, after);
 
   // 구름은 albedoOf/greenhouseStrengthOf 둘 다에 들어가는 유일한 변수라 알베도와
-  // 온실효과가 "같이" 바뀔 수 있다 - 하지만 이건 구름이라는 같은 원인의 서로
-  // 독립된 두 결과일 뿐, 알베도가 바뀌어서 온실효과가 바뀌는 인과관계가 아니다.
-  // withArrows는 블록을 무조건 순서대로 이어서 "알베도 증가 → 온실효과 증가"처럼
-  // 마치 하나가 다른 하나를 일으킨 것으로 읽히게 만들므로, 알베도가 이미 바뀌었다면
-  // 온실효과/OLR 줄은 아예 보여주지 않고 알베도→ASR→ΔE 흐름만 남긴다.
-  const greenhouseLine = albedoLine ? null : greenhouseChangeLine(before, after);
-  if (greenhouseLine) blocks.push([greenhouseLine]);
+  // 온실효과가 "같이" 바뀔 수 있다 - 이건 구름이라는 같은 원인의 서로 독립된 두
+  // 결과일 뿐, 알베도가 바뀌어서 온실효과가 바뀌는 인과관계가 아니다. 그래서 둘 다
+  // 있으면 화살표로 잇지 않고 같은 블록에 나란히 묶어(withArrows가 블록 "안"에는
+  // 화살표를 안 넣는다) 인과관계처럼 안 읽히면서도 둘 다 보여준다.
+  const causeLines = [albedoLine, greenhouseLine].filter(Boolean);
+  if (causeLines.length) blocks.push(causeLines);
 
   // 온실효과 변화가 "우주로 방출되는 에너지"에 어떻게 이어지는지 명시적으로 보여준다 -
   // 학생이 "아이템이 ΔE를 직접 조절한다"고 오해하지 않도록, ΔE는 항상 ASR/OLR
