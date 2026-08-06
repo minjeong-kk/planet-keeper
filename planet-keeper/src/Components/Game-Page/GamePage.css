@@ -216,6 +216,39 @@
   align-self: flex-end;
 }
 
+.item-info-section h3 {
+  margin: 0 0 6px;
+  font-size: 0.92rem;
+}
+
+.item-info-section p {
+  margin: 2px 0;
+  font-size: 0.88rem;
+  color: var(--text-p, var(--text));
+}
+
+/* 원인->과정->결과 사슬 - 각 단계를 줄바꿈해서 세로로 쌓고, 화살표는 그
+   사이에 한 줄로 가운데 놓는다(기본 span은 inline이라 이 규칙이 없으면
+   전부 한 줄로 쭉 이어져 보인다). */
+.item-chain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.item-step {
+  font-size: 0.88rem;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.item-arrow {
+  color: var(--text-p, var(--text));
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
 .game-page__used-items-empty {
   font-size: 0.83rem;
   color: var(--text-muted);
