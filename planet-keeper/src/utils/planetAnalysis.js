@@ -65,13 +65,27 @@ function relevantFactors(ctx, direction) {
   return matches;
 }
 
-function energyProblemLines(deltaEnergy, direction) {
-  const sign = deltaEnergy >= 0 ? "+" : "";
+// 부호 있는 숫자 문자열("+9.4" 등) - ΔE처럼 방향(+/-)이 값 자체만큼 중요한
+// 수치를 표시할 때 GamePage/ReportPage가 공유해서 쓴다.
+export function formatSigned(value, digits = 1) {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(digits)}`;
+}
+
+// ΔE는 숫자만 보여주지 않는다 - 항상 "무엇이 더 많은지 / 어느 방향으로 가는지"를
+// 같은 자리에서 설명한다(describeItemJudgment/describeTransition/energyProblemLines가 공유).
+export function deltaEnergyLines(deltaEnergy) {
+  const warming = deltaEnergy > 0;
   return [
-    `Delta Energy : ${sign}${deltaEnergy.toFixed(1)} W/m²`,
-    direction === "warming"
-      ? "흡수 에너지가 방출 에너지보다 많습니다."
-      : "방출 에너지가 흡수 에너지보다 많습니다.",
+    `에너지 불균형(ΔE): ${formatSigned(deltaEnergy)} W/m²`,
+    warming
+      ? "흡수하는 에너지가 방출하는 에너지보다 많습니다. 행성은 점점 따뜻해지는 방향입니다."
+      : "방출하는 에너지가 흡수하는 에너지보다 많습니다. 행성은 점점 차가워지는 방향입니다.",
+  ];
+}
+
+function energyProblemLines(deltaEnergy, direction) {
+  return [
+    ...deltaEnergyLines(deltaEnergy),
     direction === "warming" ? "장기적으로 온도가 계속 상승합니다." : "장기적으로 온도가 계속 하강합니다.",
   ];
 }
@@ -105,8 +119,8 @@ export function analyzePlanetState({ physicsResult, mlResult, co2Ppm, atmThickne
         {
           title: "설명",
           lines: [
-          "Delta Energy가 거의 0이며",
-          "평균 온도도 기준 범위 안에 있습니다.",
+          "에너지 불균형(ΔE)이 거의 0이며",
+          "현재 평균 온도도 기준 범위 안에 있습니다.",
           "장기간 안정적으로 유지될 수 있습니다.",
         ],
       },
@@ -125,8 +139,8 @@ export function analyzePlanetState({ physicsResult, mlResult, co2Ppm, atmThickne
         {
           title: "",
           lines: [
-            `Delta Energy는 거의 0(${physicsResult.deltaEnergy.toFixed(2)} W/m²)이며`,
-            "평균 온도도 기준 범위 내에 있습니다.",
+            `에너지 불균형(ΔE)이 거의 0(${physicsResult.deltaEnergy.toFixed(2)} W/m²)이며`,
+            "현재 평균 온도도 기준 범위 내에 있습니다.",
             "현재 행성은 장기간 안정적으로 유지될 수 있습니다.",
           ],
         },
@@ -187,12 +201,75 @@ const SLIDER_CHANGE_LINES = {
   co2: (delta) => `CO₂가 ${delta > 0 ? "증가" : "감소"}했습니다.`,
 };
 
+// 아이템 카드에 쓰는 짧은 라벨용(문장이 아니라 "빙하 감소" 같은 명사형).
+const SLIDER_KEY_LABELS = {
+  iceThickness: "빙하",
+  ocean: "바다",
+  cloud: "구름",
+  atmThickness: "대기 두께",
+  co2: "CO₂",
+};
+
+export function shortSliderChangeLabel(key, delta) {
+  const label = SLIDER_KEY_LABELS[key] ?? "행성 조성";
+  return `${label} ${delta > 0 ? "증가" : "감소"}`;
+}
+
 const CHANGE_EPSILON = 0.005;
 
 function changeLine(before, after, riseText, fallText) {
   if (after > before + CHANGE_EPSILON) return riseText;
   if (after < before - CHANGE_EPSILON) return fallText;
   return null;
+}
+
+function greenhouseChangeLine(before, after) {
+  return changeLine(before.greenhouseStrength, after.greenhouseStrength, "온실효과가 더 강해졌습니다.", "온실효과가 약해졌습니다.");
+}
+
+// 알베도/온실효과/OLR/ASR 각각의 변화를 원인->과정 블록으로 만든다. 아이템 사용
+// (describeItemJudgment)과 타임라인 전환(describeTransition)이 그대로 공유한다 -
+// 어떤 아이템이었는지 몰라도 physics 값 비교만으로 동작한다.
+function physicsChangeBlocks(before, after) {
+  const blocks = [];
+
+  const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
+  if (albedoLine) blocks.push([albedoLine]);
+
+  const greenhouseLine = greenhouseChangeLine(before, after);
+  if (greenhouseLine) blocks.push([greenhouseLine]);
+
+  // 온실효과 변화가 "우주로 방출되는 에너지"에 어떻게 이어지는지 명시적으로 보여준다 -
+  // 학생이 "아이템이 ΔE를 직접 조절한다"고 오해하지 않도록, ΔE는 항상 ASR/OLR
+  // 변화의 결과라는 인과 사슬을 끊지 않는다.
+  const outgoingLine = changeLine(
+    before.outgoingRadiation,
+    after.outgoingRadiation,
+    "우주로 방출되는 에너지(OLR)가 증가했습니다.",
+    "우주로 방출되는 에너지(OLR)가 감소했습니다.",
+  );
+  if (outgoingLine) blocks.push([outgoingLine]);
+
+  const absorbedLine = changeLine(
+    before.absorbedRadiation,
+    after.absorbedRadiation,
+    "흡수하는 에너지(ASR)가 증가했습니다.",
+    "흡수하는 에너지(ASR)가 감소했습니다.",
+  );
+  if (absorbedLine) blocks.push([absorbedLine]);
+
+  return blocks;
+}
+
+// blocks: string[][] (블록 하나 = 화살표 없이 붙어 나오는 줄 묶음). 블록 사이에만
+// "↓"를 끼워 원인 -> 과정 -> 결과 흐름이 눈에 보이게 한다.
+function withArrows(blocks) {
+  const lines = [];
+  blocks.forEach((block, i) => {
+    if (i > 0) lines.push("↓");
+    lines.push(...block);
+  });
+  return lines;
 }
 
 // AI가 판정한 평형 상태(Cold/Earth-like/Warm Stable)별 결과 문구 -
@@ -245,41 +322,25 @@ function describeImbalanceChange(before, after, label) {
  * 들어오면 그때 describeStableLabel로 넘어간다.
  */
 export function describeItemJudgment(item, before, after, label) {
-  const lines = [];
+  const intro = [`${item.emoji} "${item.name}"을 사용했습니다.`];
 
-  lines.push(`${item.emoji} "${item.name}"을 사용했습니다.`);
-  lines.push(SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다.");
+  // 원인 -> 과정 -> 결과 순서의 블록들. 각 블록은 그 자체로는 화살표 없이 붙어
+  // 나오고, 블록과 블록 사이에만 withArrows가 "↓"를 넣는다 - 그래야 "ΔE 값 +
+  // 방향 설명"처럼 한 덩어리로 읽혀야 하는 줄들이 화살표로 쪼개지지 않는다.
+  const blocks = [
+    [SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다."],
+    ...physicsChangeBlocks(before, after),
+  ];
 
-  const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
-  if (albedoLine) lines.push(albedoLine);
-
-  const greenhouseLine = changeLine(
-    before.greenhouseStrength,
-    after.greenhouseStrength,
-    "온실효과가 더 강해졌습니다.",
-    "온실효과가 약해졌습니다.",
+  blocks.push(deltaEnergyLines(after.deltaEnergy));
+  blocks.push(["AI가 최종 기후 상태를 분석합니다."]);
+  blocks.push(
+    label === "Energy Surplus" || label === "Energy Deficit"
+      ? describeImbalanceChange(before, after, label)
+      : describeStableLabel(label),
   );
-  if (greenhouseLine) lines.push(greenhouseLine);
 
-  const absorbedLine = changeLine(
-    before.absorbedRadiation,
-    after.absorbedRadiation,
-    "흡수 복사량이 증가했습니다.",
-    "흡수 복사량이 감소했습니다.",
-  );
-  if (absorbedLine) lines.push(absorbedLine);
-
-  const sign = after.deltaEnergy >= 0 ? "+" : "";
-  lines.push(`Delta Energy: ${sign}${after.deltaEnergy.toFixed(1)} W/m²`);
-  lines.push("AI가 최종 기후 상태를 분석합니다.");
-
-  if (label === "Energy Surplus" || label === "Energy Deficit") {
-    lines.push(...describeImbalanceChange(before, after, label));
-  } else {
-    lines.push(...describeStableLabel(label));
-  }
-
-  return lines;
+  return [...intro, ...withArrows(blocks)];
 }
 
 /**
@@ -288,22 +349,284 @@ export function describeItemJudgment(item, before, after, label) {
  * CO2 슬라이더 자체를 조정하므로 그 변화 방향만 먼저 보여준다.
  */
 export function describeFinalizeJudgment(before, after, label, { co2Increased } = {}) {
-  const lines = [];
+  const blocks = [];
 
   if (co2Increased != null) {
-    lines.push(SLIDER_CHANGE_LINES.co2(co2Increased ? 1 : -1));
+    blocks.push([SLIDER_CHANGE_LINES.co2(co2Increased ? 1 : -1)]);
   }
 
-  const greenhouseLine = changeLine(
-    before.greenhouseStrength,
-    after.greenhouseStrength,
-    "온실효과가 더 강해졌습니다.",
-    "온실효과가 약해졌습니다.",
-  );
-  if (greenhouseLine) lines.push(greenhouseLine);
+  const greenhouseLine = greenhouseChangeLine(before, after);
+  if (greenhouseLine) blocks.push([greenhouseLine]);
 
-  lines.push(`새로운 평형 온도: ${after.currentTemperature.toFixed(1)}K`);
-  lines.push(...describeStableLabel(label));
+  blocks.push([`현재 평균 온도가 예상 안정 온도 방향으로 이동해, 새 평균 온도 ${after.currentTemperature.toFixed(1)}K에 도달했습니다.`]);
+  blocks.push(describeStableLabel(label));
 
-  return lines;
+  return withArrows(blocks);
+}
+
+/**
+ * 리포트 페이지의 "행성 변화 타임라인" 각 단계(초기 -> 아이템 -> 최종)를 before/after
+ * Physics 비교로 설명한다. describeItemJudgment와 같은 원인->과정->결과 문장을
+ * 쓰지만, 어떤 아이템이었는지(item 객체)를 몰라도 physics 값 비교만으로 동작한다 -
+ * ReportPage의 timeline에는 각 단계의 physics 스냅샷만 남아 있기 때문이다.
+ */
+export function describeTransition(before, after, label) {
+  const blocks = physicsChangeBlocks(before, after);
+
+  blocks.push(deltaEnergyLines(after.deltaEnergy));
+
+  if (blocks.length === 1) {
+    // 변화가 전혀 없던 단계(예: 이미 평형이라 문제/아이템 없이 최종 확인만 반복한 경우).
+    return deltaEnergyLines(after.deltaEnergy);
+  }
+
+  if (label) blocks.push(describeStableLabel(label));
+
+  return withArrows(blocks);
+}
+
+export function previewItemEffect(item) {
+  switch (item.id) {
+    case "ice_restorer":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• 빙하 면적 증가",
+          "• 알베도 증가",
+          "• 태양 에너지 반사량 증가",
+        ],
+        chain: [
+          "빙하 증가",
+          "↓",
+          "알베도 증가",
+          "↓",
+          "흡수 에너지(ASR) 감소",
+          "↓",
+          "에너지 불균형(ΔE) 감소",
+          "↓",
+          "예상 안정 온도 감소",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "빙하는 햇빛을 잘 반사하는 밝은 표면입니다.",
+          "빙하가 많아질수록 태양 에너지 흡수량이 줄어 장기적으로 행성이 차가워집니다.",
+        ],
+      };
+
+    case "ice_melter":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• 빙하 비율 감소",
+          "• 알베도 감소",
+        ],
+        chain: [
+          "빙하 감소",
+          "↓",
+          "알베도 감소",
+          "↓",
+          "흡수 에너지(ASR) 증가",
+          "↓",
+          "에너지 불균형(ΔE) 증가",
+          "↓",
+          "예상 안정 온도 증가",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "빙하가 줄어들면 태양 에너지를 더 많이 흡수하여 행성이 따뜻해지는 방향으로 변화합니다.",
+        ],
+      };
+
+    case "cloud_seeder":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• 구름량 증가",
+          "• 알베도 증가",
+        ],
+        chain: [
+          "구름 증가",
+          "↓",
+          "알베도 증가",
+          "↓",
+          "흡수 에너지(ASR) 감소",
+          "↓",
+          "에너지 불균형(ΔE) 감소",
+          "↓",
+          "예상 안정 온도 감소",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "밝은 구름은 태양빛을 우주로 반사하여 지표가 흡수하는 에너지를 줄입니다.",
+        ],
+      };
+
+    case "cloud_clearer":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• 구름량 감소",
+          "• 알베도 감소",
+        ],
+        chain: [
+          "구름 감소",
+          "↓",
+          "알베도 감소",
+          "↓",
+          "흡수 에너지(ASR) 증가",
+          "↓",
+          "에너지 불균형(ΔE) 증가",
+          "↓",
+          "예상 안정 온도 증가",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "구름이 줄어들면 태양빛이 지표에 더 많이 도달하여 에너지 흡수가 증가합니다.",
+        ],
+      };
+
+    case "carbon_capture":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• CO₂ 농도 감소",
+          "• 온실효과 감소",
+          "• 우주 방출 에너지(OLR) 증가",
+        ],
+        chain: [
+          "CO₂ 감소",
+          "↓",
+          "온실효과 감소",
+          "↓",
+          "방출 에너지(OLR) 증가",
+          "↓",
+          "에너지 불균형(ΔE) 감소",
+          "↓",
+          "예상 안정 온도 감소",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "이산화탄소는 대표적인 온실기체입니다.",
+          "CO₂가 줄어들면 대기가 가두는 열이 감소하여 우주로 방출되는 열이 늘어납니다.",
+        ],
+      };
+
+    case "greenhouse_emitter":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• CO₂ 농도 증가",
+          "• 온실효과 증가",
+        ],
+        chain: [
+          "CO₂ 증가",
+          "↓",
+          "온실효과 증가",
+          "↓",
+          "방출 에너지(OLR) 감소",
+          "↓",
+          "에너지 불균형(ΔE) 증가",
+          "↓",
+          "예상 안정 온도 증가",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "온실기체가 많아질수록 지표의 열이 대기 중에 더 오래 머무르게 됩니다.",
+        ],
+      };
+
+    case "space_mirror":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• 반사율(알베도) 증가",
+        ],
+        chain: [
+          "반사율 증가",
+          "↓",
+          "흡수 에너지(ASR) 감소",
+          "↓",
+          "에너지 불균형(ΔE) 감소",
+          "↓",
+          "예상 안정 온도 감소",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "반사율이 높을수록 태양 에너지가 우주로 되돌아가 지표가 덜 가열됩니다.",
+        ],
+      };
+
+    case "density_regulator":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• 대기 두께 증가",
+          "• 온실효과 증가",
+        ],
+        chain: [
+          "대기 두께 증가",
+          "↓",
+          "온실효과 증가",
+          "↓",
+          "방출 에너지(OLR) 감소",
+          "↓",
+          "에너지 불균형(ΔE) 증가",
+          "↓",
+          "예상 안정 온도 증가",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "대기가 두꺼워질수록 열을 가두는 효과가 커집니다.",
+        ],
+      };
+
+    case "atm_thinner":
+      return {
+        concept: [
+          "📖 어떤 물리량을 바꾸나요?",
+          "• 대기 두께 감소",
+          "• 온실효과 감소",
+        ],
+        chain: [
+          "대기 두께 감소",
+          "↓",
+          "온실효과 감소",
+          "↓",
+          "방출 에너지(OLR) 증가",
+          "↓",
+          "에너지 불균형(ΔE) 감소",
+          "↓",
+          "예상 안정 온도 감소",
+          "↓",
+          "현재 평균 온도가 새로운 안정 상태를 향해 이동",
+        ],
+        science: [
+          "💡 지구과학 개념",
+          "대기가 얇아지면 지표의 열이 우주로 더 쉽게 빠져나갑니다.",
+        ],
+      };
+
+    default:
+      return {
+        concept: [],
+        chain: [],
+        science: [],
+      };
+  }
 }

@@ -1,13 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import QuizModal from "./QuizModal";
 import ItemStage from "./ItemStage";
 import InfoPanel from "./InfoPanel";
 import PlanetUI from "../Planet-ui.jsx";
+import Term from "../common/Term.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
+import { deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
+import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
 
 // 정답/오답 피드백 메시지를 화면에 유지하는 시간(ms). 그 사이에 REPORT로
@@ -26,6 +29,9 @@ const STAGE_LABELS = {
 // 아이템 사용/2단계 확인 후 AI가 판정한 상태 - 일반 안내 문구보다 눈에 띄도록
 // 아이콘/색상을 구분해서 강조 표시한다. Energy Surplus/Deficit은 아이템을 잘못
 // 골라 오히려 에너지 불균형이 커진 경우다.
+// notice(아이템/최종 판정)와 feedback(정답/오답)이 같은 성공/실패 색상 규칙을 쓴다.
+const feedbackClassName = (ok) => `game-page__feedback ${ok ? "game-page__feedback--correct" : "game-page__feedback--wrong"}`;
+
 const STABLE_BADGES = {
   "Earth-like Stable": { icon: "🌍", text: "Earth-like Stable", className: "game-page__stable-badge--earth" },
   "Warm Stable": { icon: "🔥", text: "Warm Stable", className: "game-page__stable-badge--warm" },
@@ -40,12 +46,15 @@ function GamePage() {
   const values = useClimateStore((state) => state.values);
   const resetClimate = useClimateStore((state) => state.resetClimate);
   const visual = slidersToVisual(values);
-  const climateInputs = mapSlidersToClimateInputs(values);
+  // 1초마다 도는 elapsedSeconds 틱에도 GamePage가 리렌더되므로, values/physicsResult/
+  // inventory가 그대로인데 매번 다시 계산되지 않도록 메모이즈한다.
+  const climateInputs = useMemo(() => mapSlidersToClimateInputs(values), [values]);
 
   const currentStage = useGameStore((state) => state.currentStage);
   const currentProblem = useGameStore((state) => state.currentProblem);
   const visibleItems = useGameStore((state) => state.visibleItems);
   const inventory = useGameStore((state) => state.inventory);
+  const quizLog = useGameStore((state) => state.quizLog);
   const wrongCount = useGameStore((state) => state.wrongCount);
   const finalAttempts = useGameStore((state) => state.finalAttempts);
   const physicsResult = useGameStore((state) => state.physicsResult);
@@ -68,7 +77,16 @@ function GamePage() {
   // physicsResult는 useGameStore가 특정 시점(생성/아이템/최종 확인/타이머 틱)에만
   // 채우는 스냅샷이라 CREATOR 단계나 /game 새로고침 직후에는 null일 수 있다 - 아래
   // 파생값들은 그때마다 다시 계산되고, physicsResult가 없으면 그냥 표시를 건너뛴다.
-  const equilibriumTemperature = physicsResult ? equilibriumTemperatureOf(physicsResult) : null;
+  const equilibriumTemperature = useMemo(
+    () => (physicsResult ? equilibriumTemperatureOf(physicsResult) : null),
+    [physicsResult],
+  );
+
+  // "🧊 빙하 해빙제" 같은 이름이 여러 번 쓰이면 나열하지 않고 x횟수로 묶어 보여준다.
+  const inventoryCounts = useMemo(
+    () => [...inventory.reduce((counts, name) => counts.set(name, (counts.get(name) ?? 0) + 1), new Map())],
+    [inventory],
+  );
 
   const [feedback, setFeedback] = useState(null); // "correct" | "wrong" | null
 
@@ -107,28 +125,63 @@ function GamePage() {
 
   return (
     <div className="game-page">
+      {/* 스크롤 시 화면 우측 상단에 고정 표시될 플로팅 타이머 & 알림 창 */}
+      {CLIMATE_TICK_ENABLED && (
+        <div className="game-page__floating-timer">
+          <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>
+          {climateEvent && (
+            <div className="game-page__event-toast">
+              {climateEvent}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="game-page__main">
         <div className="game-page__stats-bar">
-          <div className="game-page__stats-row">
-            {CLIMATE_VARIABLES.map(({ key, label }) => (
-              <span key={key}>
-                {label}: {key === "co2" ? `${co2Ppm(values.co2)} ppm` : `${values[key]}%`}
-              </span>
-            ))}
-          </div>
           {physicsResult && (
             <>
-              <div className="game-page__stats-row game-page__stats-row--physics">
-                <span>현재 온도: {physicsResult.currentTemperature.toFixed(1)} K</span>
-                <span>평형 온도: {equilibriumTemperature.toFixed(1)} K</span>
-                <span>ΔE: {physicsResult.deltaEnergy.toFixed(2)} W/m²</span>
-                <span>흡수(ASR): {physicsResult.absorbedRadiation.toFixed(2)}</span>
-                <span>방출(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
-                <span>알베도: {physicsResult.albedo.toFixed(2)}</span>
-                <span>온실효과: {physicsResult.greenhouseStrength.toFixed(2)}</span>
-                {CLIMATE_TICK_ENABLED && <span>⏱️ 경과 시간: {elapsedSeconds}초</span>}
+              {/* 가장 먼저 봐야 할 정보 3개만 카드로 - 나머지는 아래 "상세 물리 정보"에 접어둔다. */}
+              <div className="game-page__key-cards">
+                <div className="game-page__key-card">
+                  <span className="game-page__key-card-label">
+                    🟢 <Term concept={CLIMATE_CONCEPTS.currentTemperature}>현재 평균 온도</Term>
+                  </span>
+                  <span className="game-page__key-card-value">{physicsResult.currentTemperature.toFixed(1)} K</span>
+                </div>
+                <div className="game-page__key-card">
+                  <span className="game-page__key-card-label">
+                    🎯 <Term concept={CLIMATE_CONCEPTS.equilibriumTemperature}>예상 안정 온도</Term>
+                  </span>
+                  <span className="game-page__key-card-value">{equilibriumTemperature.toFixed(1)} K</span>
+                </div>
+                <div className="game-page__key-card">
+                  <span className="game-page__key-card-label">
+                    ⚡ <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형(ΔE)</Term>
+                  </span>
+                  <span className="game-page__key-card-value">{formatSigned(physicsResult.deltaEnergy)} W/m²</span>
+                </div>
               </div>
-              {climateEvent && <p className="game-page__stats-note">{climateEvent}</p>}
+
+                <div className="game-page__stats-row">
+                {CLIMATE_VARIABLES.map(({ key, label }) => (
+                  <span key={key}>
+                    {label}: {key === "co2" ? `${co2Ppm(values.co2)} ppm` : `${values[key]}%`}
+                  </span>
+                ))}
+                </div>
+
+                <div className="game-page__stats-row game-page__stats-row--physics">
+                  <span>흡수 에너지(ASR): {physicsResult.absorbedRadiation.toFixed(2)}</span>
+                  <span>방출 에너지(OLR): {physicsResult.outgoingRadiation.toFixed(2)}</span>
+                  <span>
+                    <Term concept={CLIMATE_CONCEPTS.albedo}>알베도</Term>: {physicsResult.albedo.toFixed(2)}
+                  </span>
+                  <span>
+                    <Term concept={CLIMATE_CONCEPTS.greenhouseEffect}>온실효과</Term>:{" "}
+                    {physicsResult.greenhouseStrength.toFixed(2)}
+                  </span>
+              </div>
             </>
           )}
         </div>
@@ -161,24 +214,24 @@ function GamePage() {
           )}
 
           {notice && (
-            <div
-              className={`game-page__feedback ${
-                notice.ok ? "game-page__feedback--correct" : "game-page__feedback--wrong"
-              }`}
-            >
+            <div className={feedbackClassName(notice.ok)}>
               {notice.lines.map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
             </div>
           )}
 
-          {feedback === "correct" && <p className="game-page__feedback game-page__feedback--correct">✅ 정답입니다!</p>}
-          {feedback === "wrong" && (
-            <p className="game-page__feedback game-page__feedback--wrong">❌ 오답입니다. 다시 시도하세요.</p>
+          {/* 정답 / 오답 피드백 영역 */}
+          {feedback && (
+            <div className={feedbackClassName(feedback === "correct")}>
+              <p>{feedback === "correct" ? "✅ 정답입니다!" : "❌ 오답입니다. 다시 시도하세요."}</p>
+            </div>
           )}
 
           {(currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) &&
-            currentProblem && <QuizModal problem={currentProblem} onSubmit={handleAnswer} />}
+            currentProblem && (
+              <QuizModal problem={currentProblem} onSubmit={handleAnswer} number={quizLog.length + 1} />
+            )}
         </div>
       </div>
 
@@ -207,7 +260,20 @@ function GamePage() {
               ))}
             </p>
           )}
-          <p> 사용 아이템: {inventory.length ? inventory.join(", ") : "없음"}</p>
+          <div className="game-page__used-items-container">
+            <p className="game-page__used-items-label">사용 아이템:</p>
+            {inventoryCounts.length > 0 ? (
+              <ul className="game-page__used-items-list">
+                {inventoryCounts.map(([name, count]) => (
+                  <li key={name} className="game-page__used-item-row" title={`${name} x${count}`}>
+                    {name} x{count}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="game-page__used-items-empty">없음</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

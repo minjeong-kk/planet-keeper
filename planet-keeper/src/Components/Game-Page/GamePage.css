@@ -1,72 +1,4 @@
-.game-page {
-  display: flex;
-  gap: 20px;
-  padding: 20px;
-  flex: 1;
-  /* 페이지 높이를 뷰포트에 고정해두고, 넘치는 내용은 페이지 전체가 아니라
-     아래 arena/side가 각자(overflow-y:auto) 스크롤하게 한다. */
-  height: 100svh;
-  min-height: 0;
-  box-sizing: border-box;
-}
 
-.game-page__main {
-  flex: 3;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 0;
-}
-
-.game-page__stats-bar {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: var(--shadow);
-}
-
-.game-page__stats-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
-}
-
-.game-page__stats-row--physics {
-  padding-top: 8px;
-  border-top: 1px solid var(--border);
-}
-
-.game-page__stats-note {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text);
-}
-
-.game-page__arena {
-  flex: 1;
-  min-height: 0;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-  padding: 24px;
-  overflow-y: auto;
-  box-shadow: var(--shadow);
-}
-
-.game-page__planet-placeholder {
-  width: 320px;
-  height: 320px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-}
 
 .game-page__modal {
   width: 100%;
@@ -76,8 +8,24 @@
   text-align: left;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   box-shadow: var(--shadow);
+  box-sizing: border-box;
+}
+
+.game-page__modal h3 {
+  margin: 0;
+  text-align: left; /* "아이템 선택" 제목은 좌상단 유지 */
+}
+
+.game-page__quiz-retry-badge {
+  align-self: flex-start;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: #ffe0d6;
+  color: #8a2c0d;
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .game-page__modal button {
@@ -100,61 +48,6 @@
   gap: 4px;
 }
 
-.game-page__stage-label {
-  width: 100%;
-  margin: 0;
-  font-size: 1rem;
-  color: var(--text);
-}
-
-.game-page__feedback {
-  width: 100%;
-  font-weight: 600;
-}
-
-.game-page__feedback--correct {
-  color: #2e7d32;
-}
-
-.game-page__feedback--wrong {
-  color: #c62828;
-}
-
-/* 아이템 사용 후 평형 도달 결과(Earth-like/Warm/Cold Stable) 강조 배지 */
-.game-page__stable-badge {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 14px 18px;
-  border-radius: 12px;
-  font-size: 1.15rem;
-  font-weight: 700;
-  box-shadow: var(--shadow);
-}
-
-.game-page__stable-badge-icon {
-  font-size: 1.6rem;
-}
-
-.game-page__stable-badge--earth {
-  background: linear-gradient(135deg, #d6f5e3, #a8e6cf);
-  color: #1b5e3a;
-  border: 2px solid #4caf7d;
-}
-
-.game-page__stable-badge--warm {
-  background: linear-gradient(135deg, #ffe0d6, #ffb199);
-  color: #8a2c0d;
-  border: 2px solid #ff7043;
-}
-
-.game-page__stable-badge--cold {
-  background: linear-gradient(135deg, #dbeeff, #a9d6ff);
-  color: #0d3f6e;
-  border: 2px solid #4fa3e3;
-}
-
 /* 2단계 안정화 진행 체크(빨간 체크) - 채워질수록 붉게, 아직이면 회색 */
 .game-page__final-check {
   font-size: 1.2rem;
@@ -166,56 +59,741 @@
   color: #d32f2f;
 }
 
-/* 오른쪽: 긴 네모(바깥) 안에 작은 네모 2개(안쪽) */
-.game-page__side {
-  flex: 1;
-  min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: var(--shadow);
-}
-
-.game-page__side-box {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  text-align: left;
-  flex: 1;
-}
-
 .game-page__info-panel {
   flex: 3;
-  overflow-y: auto;
 }
 
-.game-page__info-panel h3 {
-  margin: 0 0 8px;
+.info-panel__section {
+  margin-bottom: 14px;
 }
 
-.game-page__info-panel section {
-  margin-bottom: 12px;
+.info-panel__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 8px;
 }
 
-.game-page__info-panel p {
-  margin: 2px 0;
-}
-
+/* Planet Summary 내 서브 리스트 정돈 */
 .game-page__summary-block {
-  margin-bottom: 10px;
+  background: var(--bg-card, rgba(0, 0, 0, 0.02));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
 }
 
 .game-page__summary-title {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--primary, #65a30d);
+  margin-bottom: 4px;
+}
+
+.game-page__summary-list {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 0.83rem;
+  color: var(--text-p);
+  line-height: 1.45;
+}
+
+/* ML Prediction 카드 형태 디자인 */
+.info-panel__ml-card {
+  background: var(--bg-card, rgba(101, 163, 13, 0.05));
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.info-panel__ml-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+}
+
+.info-panel__badge {
+  background: var(--primary-light, #ecfccb);
+  color: var(--primary-dark, #3f6212);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.8rem;
   font-weight: 600;
+}
+
+.info-panel__divider {
+  border: none;
+  border-top: 1px dashed var(--border);
+  margin: 14px 0;
+}
+
+/* 하단 해석 가이드 상자 */
+.info-panel__guide-box {
+  background: rgba(101, 163, 13, 0.05);
+  border: 1px solid rgba(101, 163, 13, 0.2);
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .game-page__info-panel hr {
   border: none;
   border-top: 1px solid var(--border);
   margin: 12px 0;
+}
+
+/* 아이템 선택 카드 */
+.item-card-grid {
+  width: 100%;
+  list-style: none;
+  margin: 0 auto;
+  padding: 0;
+  
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center; /* 핵심: 카드가 몇 개든 가로 중앙 정렬 */
+  align-items: center;
+  gap: 16px;
+}
+
+.item-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 12px 12px;
+  font-size: 0.95rem;
+
+  
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between; /* 내부 요소들을 위/아래 균등 배치 */
+  
+  width: 180px;
+  height: 175px; /* 모든 아이템 카드의 높이를 일정하게 고정 */
+  flex-shrink: 0;
+  text-align: center;
+  box-shadow: var(--shadow);
+  box-sizing: border-box;
+}
+
+.item-card__info-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+.item-card__emoji {
+  font-size: 1.8rem;
+}
+
+.item-card__name {
+  margin: 0;
+  font-weight: 600;
+}
+
+.item-card__effect {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+}
+
+.item-card__use-btn {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px;
+}
+
+/* 아이템 정보 모달(원인->결과 미리보기) */
+.item-info-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.item-info-modal {
+  background: var(--bg);
+  color: var(--text-h);
+  padding: 28px;
+  border-radius: 12px;
+  max-width: 420px;
+  width: 90%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+
+.item-info-modal button {
+  align-self: flex-end;
+}
+
+.game-page__used-items-empty {
+  font-size: 0.83rem;
+  color: #888;
+  margin: 0;
+}
+
+/* 경고 문구 토스트 팝업 */
+.game-page__event-toast {
+  background: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fca5a5;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+  animation: toastPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  white-space: nowrap;
+}
+
+.game-quiz-card__choice-number {
+  font-weight: 700;
+  color: #0284c7;
+  font-size: 0.95rem;
+  min-width: 18px;
+}
+
+.game-page {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  flex: 1;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.game-page__main {
+  flex: 2.4;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 0;
+}
+
+.game-page__stats-bar {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+}
+
+.game-page__stats-row {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border, #e2e8f0);
+  font-size: 0.88rem;
+  color: var(--text-p, #475569);
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 8px;
+  padding: 8px 12px;
+  line-height: 1.5;
+}
+
+.game-page__stats-row--physics {
+  margin-top: 6px;
+  padding-top: 6px;
+}
+
+.game-page__stats-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text, #334155);
+}
+
+.game-page__arena {
+  flex: 1;
+  min-height: 0;
+  border-radius: 12px;
+  border: 1px solid var(--border, #e2e8f0);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  overflow-y: auto;
+  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+}
+
+.game-page__planet-placeholder {
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* 퀴즈 카드/피드백 박스와 같은 900px 폭으로 맞춰서, 카드 위 안내 문구만
+   화면 끝까지 넓게 퍼져 보이지 않게 한다. */
+.game-page__stage-label {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  font-size: 1rem;
+  color: var(--text, #334155);
+}
+
+/* =========================================
+   행성 변화 과정/피드백 컴팩트 스타일 (세로 길이 대폭 축소)
+   ========================================= */
+.game-page__feedback {
+  width: 100%;
+  max-width: 680px;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 0.88rem;
+  line-height: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  text-align: center;
+  box-sizing: border-box;
+  font-weight: 600;
+}
+
+.game-page__feedback p {
+  margin: 1px 0;
+}
+
+.game-page__feedback--correct {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  color: #15803d;
+}
+
+.game-page__feedback--wrong {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+}
+
+.game-page__stable-badge {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  box-sizing: border-box;
+
+  box-shadow: var(--shadow);
+}
+
+.game-page__stable-badge-icon {
+  font-size: 1.2rem;
+}
+
+.game-page__stable-badge--earth {
+  background: #f0fdf4;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+
+.game-page__stable-badge--warm {
+  background: #fff7ed;
+  color: #c2410c;
+  border: 1px solid #ffedd5;
+}
+
+.game-page__stable-badge--cold {
+  background: #f0f9ff;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+}
+
+/* =========================================
+   개선된 문제 카드 (가로로 길고 세로로 슬림한 컴팩트 형태)
+   ========================================= */
+.game-quiz-card {
+  width: 100%;
+  max-width: 900px;
+  background: var(--bg, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.game-quiz-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 24px;
+}
+
+.game-quiz-card__tags {
+  display: flex;
+  gap: 8px;
+}
+
+.game-quiz-card__retry-badge {
+  background: #fee2e2;
+  color: #991b1b;
+  border: 1px solid #fca5a5;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.game-quiz-card__hint-btn {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+  margin-left: auto;
+}
+
+.game-quiz-card__hint-btn:hover {
+  background: #e2e8f0;
+  transform: scale(1.08);
+}
+
+/* 문제 제목 및 번호 표시 */
+.game-quiz-card__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #0f172a;
+  line-height: 1.4;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.game-quiz-card__title-num {
+  color: #0284c7;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+/* 선택지 목록 (컴팩트 세로 높이) */
+.game-quiz-card__choices {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.game-quiz-card__choice-item {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 6px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+  background: var(--bg, #ffffff);
+}
+
+.game-quiz-card__choice-item:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.game-quiz-card__choice-item--selected {
+  border-color: #0284c7;
+  background: #f0f9ff;
+}
+
+.game-quiz-card__choice-label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.game-quiz-card__choice-label input[type="radio"] {
+  cursor: pointer;
+  accent-color: #0284c7;
+}
+
+.game-quiz-card__choice-text {
+  font-size: 0.9rem;
+  color: #334155;
+  line-height: 1.35;
+}
+
+.game-quiz-card__submit-btn {
+  align-self: flex-end;
+  padding: 6px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+/* =========================================
+   💡 전구 해설 모달
+   ========================================= */
+.game-quiz-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(3px);
+}
+
+.game-quiz-modal {
+  background: #ffffff;
+  border-radius: 14px;
+  width: 90%;
+  max-width: 480px;
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+  text-align: left;
+}
+
+.game-quiz-modal__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-quiz-modal__header h4 {
+  margin: 0;
+  font-size: 1.05rem;
+  color: #0f172a;
+}
+
+.game-quiz-modal__icon {
+  font-size: 1.1rem;
+}
+
+.game-quiz-modal__question {
+  margin: 0;
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: #334155;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.game-quiz-modal__content {
+  background: #f8fafc;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border-left: 3px solid #0284c7;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: #334155;
+}
+
+.game-quiz-modal__content p {
+  margin: 0;
+}
+
+.game-quiz-modal__concepts h5 {
+  margin: 0 0 4px 0;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.game-quiz-modal__concepts ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: #0284c7;
+  font-weight: 600;
+}
+
+.game-quiz-modal__close-btn {
+  align-self: flex-end;
+  padding: 6px 16px;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.game-quiz-modal__close-btn:hover {
+  background: #f1f5f9;
+}
+
+/* 우측 사이드 영역 */
+.game-page__side {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+}
+
+.game-page__side-box {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: left;
+  flex: 1;
+}
+
+/* 주요 카드 3개 */
+.game-page__key-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.game-page__key-card {
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.game-page__key-card-label {
+  font-size: 0.85rem;
+  color: var(--text, #334155);
+}
+
+.game-page__key-card-value {
+  font-size: 1.3rem;
+  font-weight: 700;
+}
+
+/* 고정 타이머 */
+.game-page__floating-timer {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 10px;
+  box-shadow: var(--shadow, 0 2px 8px rgba(0, 0, 0, 0.05));
+
+  backdrop-filter: blur(8px);
+  transition: all 0.2s ease;
+}
+
+.game-page__floating-timer .game-page__stats-note {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-h, #0f172a);
+  font-size: 0.9rem;
+}
+
+.game-page__used-items-container {
+  margin-top: 10px;
+  border-top: 1px dashed var(--border, #e2e8f0);
+  padding-top: 8px;
+}
+
+.game-page__used-items-label {
+  font-weight: 600;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+
+  color: var(--text-h);
+}
+
+.game-page__used-items-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.game-page__used-item-row {
+  font-size: 0.83rem;
+  color: var(--text-p, #475569);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: rgba(0, 0, 0, 0.02);
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border, #e2e8f0);
+}
+
+/* 다크 모드에서의 토스트 팝업 색상 */
+@media (prefers-color-scheme: dark) {
+  .game-page__event-toast {
+    background: #450a0a;
+    color: #fca5a5;
+    border-color: #991b1b;
+  }
+}
+
+/* 살짝 확대되며 올라오는 통통 튀는 애니메이션 */
+@keyframes toastPop {
+  0% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
 @media (max-width: 900px) {
