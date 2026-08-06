@@ -36,6 +36,26 @@ const KOREAN_BY_STATE = Object.fromEntries(PLANET_STATES.map(({ state, korean })
 
 const fmt = (value, digits = 2) => (value == null ? "-" : value.toFixed(digits));
 
+// 리포트 안의 각 섹션(타임라인/문제풀이/아이템/개념정리)을 독립적으로 접고 펼 수 있게
+// 감싸는 래퍼 - 요약 배너는 항상 보여야 하는 결과라 여기 포함하지 않는다.
+function CollapsibleSection({ title, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="report-page__section">
+      <button
+        type="button"
+        className="report-page__section-toggle"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="report-page__section-toggle-icon">{open ? "▼" : "▶"}</span>
+        <h3>{title}</h3>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 function ReportPage() {
   const navigate = useNavigate();
   const resetClimate = useClimateStore((state) => state.resetClimate);
@@ -189,8 +209,7 @@ function ReportPage() {
       <hr className="report-page__divider" />
 
       {/* 행성 변화 타임라인: 가로 2열 컴팩트 카드 그리드 방식 */}
-      <div className="report-page__section">
-        <h3>행성 변화 타임라인</h3>
+      <CollapsibleSection title="행성 변화 타임라인">
         {timelineGroups.length ? (
           <div className="report-page__timeline-grid">
             {timelineGroups.map((group, i) => (
@@ -227,13 +246,12 @@ function ReportPage() {
         ) : (
           <p>기록된 변화가 없습니다.</p>
         )}
-      </div>
+      </CollapsibleSection>
 
       <hr className="report-page__divider" />
 
       {/* 문제 풀이 결과 */}
-      <div className="report-page__section">
-        <h3>문제 풀이 결과</h3>
+      <CollapsibleSection title="문제 풀이 결과">
         <p className="report-page__subtext">
           맞은 문제 <strong>{correctGroups.length}</strong>개 / 틀린 문제 <strong>{wrongGroups.length}</strong>개 — 문제를 클릭하면 해설을 볼 수 있습니다.
         </p>
@@ -257,7 +275,7 @@ function ReportPage() {
         ) : (
           <p>푼 문제가 없습니다.</p>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* 고급화된 문제 해설 모달 */}
       {selectedGroup && (
@@ -321,16 +339,14 @@ function ReportPage() {
       <hr className="report-page__divider" />
 
       {/* 사용한 아이템 */}
-      <div className="report-page__section">
-        <h3>사용한 아이템</h3>
+      <CollapsibleSection title="사용한 아이템">
         <p>{uniqueInventory.length ? uniqueInventory.join(", ") : "없음"}</p>
-      </div>
+      </CollapsibleSection>
 
       <hr className="report-page__divider" />
 
       {/* 교과 개념 정리 - 지구과학Ⅰ 수준으로 핵심 개념만 짧게 다시 정리한다. */}
-      <div className="report-page__section">
-        <h3>핵심 개념 정리</h3>
+      <CollapsibleSection title="핵심 개념 정리">
         <div className="report-page__concept-grid">
           {Object.values(CLIMATE_CONCEPTS).map((concept) => (
             <div key={concept.term} className="report-page__concept-card">
@@ -339,7 +355,7 @@ function ReportPage() {
             </div>
           ))}
         </div>
-      </div>
+      </CollapsibleSection>
 
       <div className="report-page__actions">
         <button className="btn-primary" onClick={handleReplay}>

@@ -25,6 +25,29 @@
   gap: 12px;
 }
 
+/* 섹션 제목을 감싸는 접기/펼치기 버튼 - 버튼 기본 스타일(테두리/배경)을 지우고
+   일반 h3 제목처럼 보이게 한다. */
+.report-page__section-toggle {
+  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+}
+
+.report-page__section-toggle h3 {
+  margin: 0;
+}
+
+.report-page__section-toggle-icon {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
 /* 상단 최종 결과 배너 카드 */
 .report-page__summary-card {
   border-radius: 12px;
