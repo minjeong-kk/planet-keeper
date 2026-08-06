@@ -324,6 +324,60 @@
   color: var(--text);
 }
 
+/* 이상기후 경고 + 대응용 미니 슬라이더 */
+.game-page__climate-alert {
+  width: 300px;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: var(--warm-bg);
+  border: 1px solid var(--warm-border);
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(8px);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.game-page__climate-alert-message {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--warm);
+}
+
+.game-page__climate-alert-timer {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.game-page__climate-alert-slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.game-page__climate-alert-slider-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text);
+  min-width: 48px;
+}
+
+.game-page__climate-alert-slider {
+  flex: 1;
+  accent-color: var(--warm);
+}
+
+.game-page__climate-alert-slider-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text);
+  min-width: 32px;
+  text-align: right;
+}
+
 /* =========================================
    행성 변화 과정/피드백 컴팩트 스타일 (세로 길이 대폭 축소)
    ========================================= */
@@ -675,12 +729,20 @@
   font-weight: 700;
 }
 
-/* 고정 타이머 */
-.game-page__floating-timer {
+/* 화면 우측 상단에 고정되는 타이머 + 이상기후 경고 패널 묶음 - 경고 패널이
+   뜨면 타이머 바로 아래에 이어붙는다. */
+.game-page__floating-stack {
   position: fixed;
   top: 20px;
   right: 24px;
   z-index: 999;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.game-page__floating-timer {
   display: flex;
   flex-direction: column;
   align-items: flex-end;

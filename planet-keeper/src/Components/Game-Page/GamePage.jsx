@@ -62,6 +62,8 @@ function GamePage() {
   const isComputing = useGameStore((state) => state.isComputing);
   const notice = useGameStore((state) => state.notice);
   const climateEvent = useGameStore((state) => state.climateEvent);
+  const pendingClimateEvent = useGameStore((state) => state.pendingClimateEvent);
+  const setClimateValue = useClimateStore((state) => state.setValue);
   const solveProblem = useGameStore((state) => state.solveProblem);
   const useItem = useGameStore((state) => state.useItem);
   const tickSecond = useGameStore((state) => state.tickSecond);
@@ -125,13 +127,45 @@ function GamePage() {
 
   return (
     <div className="game-page">
-      {/* 스크롤 시 화면 우측 상단에 고정 표시될 플로팅 타이머 & 알림 창 */}
+      {/* 스크롤 시 화면 우측 상단에 고정 표시될 플로팅 타이머 & 알림 창 + 이상기후 경고 패널 */}
       {CLIMATE_TICK_ENABLED && (
-        <div className="game-page__floating-timer">
-          <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>
-          {climateEvent && (
-            <div className="game-page__event-toast">
-              {climateEvent}
+        <div className="game-page__floating-stack">
+          <div className="game-page__floating-timer">
+            <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>
+            {/* pending 중엔 아래 경고 패널에 이미 같은 문구가 있으니 중복 표시하지 않는다. */}
+            {climateEvent && !pendingClimateEvent && (
+              <div className="game-page__event-toast">
+                {climateEvent}
+              </div>
+            )}
+          </div>
+
+          {/* 이상기후 경고 - 응답 시간 안에 슬라이더 중 하나(또는 여러 개)를 막는
+              방향으로 움직이면 물리엔진 재계산으로 판정한다. 손대지 않으면
+              useGameStore.resolveClimateEvent가 만료 시점에 경고에 걸린 방향
+              그대로 적용한다(기존 자동 악화와 동일한 fallback). 아이템 대신
+              행성 만들기 때와 같은 5개 슬라이더를 전부 보여줘서, 꼭 경고가 지목한
+              변수가 아니라도 원하는 방향으로 대응할 수 있게 한다. */}
+          {pendingClimateEvent && (
+            <div className="game-page__climate-alert">
+              <p className="game-page__climate-alert-message">{pendingClimateEvent.warning}</p>
+              <p className="game-page__climate-alert-timer">
+                ⏳ {Math.max(0, pendingClimateEvent.expiresAt - elapsedSeconds)}초 안에 막아보세요
+              </p>
+              {CLIMATE_VARIABLES.map(({ key, label }) => (
+                <div key={key} className="game-page__climate-alert-slider-row">
+                  <span className="game-page__climate-alert-slider-label">{label}</span>
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={values[key]}
+                    onChange={(e) => setClimateValue(key, Number(e.target.value))}
+                    className="game-page__climate-alert-slider"
+                  />
+                  <span className="game-page__climate-alert-slider-value">{values[key]}%</span>
+                </div>
+              ))}
             </div>
           )}
         </div>

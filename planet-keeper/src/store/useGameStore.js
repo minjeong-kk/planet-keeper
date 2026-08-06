@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
-import useClimateStore from "./useClimateStore.js";
+import useClimateStore, { CLIMATE_VARIABLES } from "./useClimateStore.js";
 import {
   computeClimateV2,
   mapSlidersToClimateInputs,
@@ -57,21 +57,32 @@ export const MAX_FINAL_ATTEMPTS = 3;
 // 매 틱 지금 물리 상태(ΔE 부호)를 보고 어느 방향으로 악화시킬지 먼저 정한 뒤,
 // 그 방향에 맞는 후보 중 하나를 무작위로 고른다 - "지금 에너지가 과다/부족하니까
 // 이 현상이 일어난다"가 항상 실제 ΔE와 맞아떨어지게 하려는 것이다(ML은 최종
-// 상태 판정만 하고, 방치 중 악화 방향은 물리 상태가 정한다). 스텝 크기는
-// CLIMATE_TICK_INTERVAL_SECONDS 주기와 맞물려 방치 시 체감될 정도로 잡았다.
+// 상태 판정만 하고, 방치 중 악화 방향은 물리 상태가 정한다). warning은 경고
+// 단계(triggerClimateEvent)에서, message는 응답 시간이 끝나 실제로 적용될 때
+// (resolveClimateEvent가 플레이어 대응이 없었을 때의 fallback으로) 보여준다.
 const WARMING_EVENTS = [
-  { key: "co2", delta: 1, message: "🌡️ CO₂가 배출되고 있습니다." },
-  { key: "iceThickness", delta: -1, message: "🧊 빙하가 녹고 있습니다." },
-  { key: "cloud", delta: -1, message: "☁️ 구름이 옅어지고 있습니다." },
+  { key: "co2", delta: 1, warning: "🌡️ CO₂가 배출되려 합니다!", message: "🌡️ CO₂가 배출되었습니다." },
+  { key: "iceThickness", delta: -1, warning: "🧊 빙하가 녹으려 합니다!", message: "🧊 빙하가 녹았습니다." },
+  { key: "cloud", delta: -1, warning: "☁️ 구름이 옅어지려 합니다!", message: "☁️ 구름이 옅어졌습니다." },
 ];
 const COOLING_EVENTS = [
-  { key: "iceThickness", delta: 1, message: "🧊 빙하가 늘어나고 있습니다." },
-  { key: "co2", delta: -1, message: "🌡️ CO₂가 줄어들고 있습니다." },
+  { key: "iceThickness", delta: 1, warning: "🧊 빙하가 늘어나려 합니다!", message: "🧊 빙하가 늘어났습니다." },
+  { key: "co2", delta: -1, warning: "🌡️ CO₂가 줄어들려 합니다!", message: "🌡️ CO₂가 줄어들었습니다." },
 ];
 
-// 몇 초마다 고정된 이상기후 이벤트를 한 번씩 적용할지. elapsedSeconds(1초마다
-// 증가하는 총 경과 시간)가 이 배수가 될 때마다 GamePage가 applyClimateEvent를 부른다.
-export const CLIMATE_TICK_INTERVAL_SECONDS = 3;
+// 이상기후 경고 사이 간격(초) - 매번 이 범위에서 무작위로 다음 시각을 정한다
+// (정확히 고정 주기로 오면 예측 가능해지므로 약간의 무작위성을 둔다). tickSecond가
+// elapsedSeconds(1초마다 증가하는 총 경과 시간)가 nextClimateEventAt을 넘을 때마다
+// triggerClimateEvent를 부른다(이미 응답 대기 중인 경고가 있으면 새로 뽑지 않는다).
+const CLIMATE_EVENT_INTERVAL_RANGE = [15, 25];
+function pickClimateEventInterval() {
+  const [min, max] = CLIMATE_EVENT_INTERVAL_RANGE;
+  return min + Math.floor(Math.random() * (max - min + 1));
+}
+// 경고가 뜬 뒤 플레이어가 슬라이더(행성 만들기와 같은 5개 전부를 보여준다)로
+// 대응할 수 있는 시간(초). 이 안에 손대지 않으면 resolveClimateEvent가 경고에
+// 걸린 그대로(기존 자동 악화와 동일하게) 적용한다.
+export const CLIMATE_EVENT_RESPONSE_SECONDS = 5;
 
 const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
 
@@ -215,6 +226,15 @@ const useGameStore = create(
   // 방치 타이머가 마지막으로 일으킨 이상기후 이벤트 문구 - notice(아이템/최종 확인
   // 판정)와는 별개다. 판정 문구를 덮어쓰지 않도록 GamePage가 다른 자리에 표시한다.
   climateEvent: null,
+  // 응답 대기 중인 이상기후 경고 - { key, delta, warning, message, startValues,
+  // expiresAt } | null. 뜬 직후에는 슬라이더를 바꾸지 않고 이 필드만 채워서
+  // GamePage가 슬라이더 5개 + 카운트다운을 보여주게 한다. resolveClimateEvent가
+  // expiresAt(elapsedSeconds 기준)에 도달하면 실제로 값을 적용한다.
+  pendingClimateEvent: null,
+  // 다음 이상기후 경고를 몇 초째에 다시 검토할지(elapsedSeconds 기준) - tickSecond가
+  // 이 시각을 넘을 때마다 triggerClimateEvent를 부른다. 매번 새 무작위 간격으로
+  // 다시 잡힌다(pickClimateEventInterval).
+  nextClimateEventAt: pickClimateEventInterval(),
   // 타이머가 돈 총 경과 시간(초) - GamePage가 1초마다 +1 하고, REPORT로 넘어가면
   // 더 이상 증가하지 않아 그 값 그대로 ReportPage에서 "총 걸린 시간"으로 보여준다.
   elapsedSeconds: 0,
@@ -243,35 +263,91 @@ const useGameStore = create(
   },
 
   // 지금 ΔE 부호를 보고 악화 방향(온난화/냉각)을 정한 뒤, 그 방향 후보 중 하나를
-  // 무작위로 골라 적용한다. 이미 평형(|ΔE|≤ENERGY_BALANCE_EPSILON)이면 악화시킬
-  // 방향이 없으므로 아무것도 하지 않는다. 조성이 바뀌면 평형온도(equilibriumTemperatureOf)
-  // 자체가 움직이고, advanceTemperature가 그 새 평형 방향으로 currentTemperature를
-  // 조금씩 옮긴다. ML 재판정은 아이템 사용/최종 확인 같은 실제 행동 시점에만
-  // 하므로 여기서는 안 한다.
-  applyClimateEvent: () => {
-    const { physicsResult } = get();
-    if (!physicsResult) return;
+  // 무작위로 골라 경고만 띄운다(아직 슬라이더는 바꾸지 않음). 이미 펜딩 경고가
+  // 떠 있으면(응답 시간이 아직 안 끝났으면) 겹쳐서 새로 뽑지 않는다. 이미 평형
+  // (|ΔE|≤ENERGY_BALANCE_EPSILON)이면 악화시킬 방향이 없으므로 아무것도 하지 않는다.
+  triggerClimateEvent: () => {
+    const { physicsResult, pendingClimateEvent, elapsedSeconds } = get();
+    if (!physicsResult || pendingClimateEvent) return;
+    // 이번에 실제로 경고가 뜨는지와 무관하게 다음 검토 시각을 항상 다시 잡는다 -
+    // 안 그러면 이미 평형이라 pool이 없는 동안 매초 다시 시도하게 된다.
+    set({ nextClimateEventAt: elapsedSeconds + pickClimateEventInterval() });
+
     const { deltaEnergy } = physicsResult;
     const pool =
       deltaEnergy > ENERGY_BALANCE_EPSILON ? WARMING_EVENTS : deltaEnergy < -ENERGY_BALANCE_EPSILON ? COOLING_EVENTS : null;
     if (!pool) return;
 
     const event = pickRandom(pool);
+    const { values } = useClimateStore.getState();
+    set({
+      pendingClimateEvent: {
+        ...event,
+        startValues: { ...values },
+        expiresAt: elapsedSeconds + CLIMATE_EVENT_RESPONSE_SECONDS,
+      },
+      climateEvent: event.warning,
+    });
+  },
+
+  // pendingClimateEvent의 응답 시간이 끝나면 tickSecond가 부른다. 플레이어가 미니
+  // 슬라이더를 이미 움직여 뒀으면(useClimateStore.setValue로 실시간 반영됨) 그
+  // 값 그대로 재계산하고, 손대지 않았으면 경고에 걸린 원래 방향으로 강제
+  // 적용한다(기존 자동 악화와 동일한 fallback). 조성이 바뀌면 평형온도가 움직이고
+  // advanceTemperature가 그 방향으로 currentTemperature를 조금씩 옮긴다. ML
+  // 재판정은 아이템 사용/최종 확인 같은 실제 행동 시점에만 하므로 여기서는 안
+  // 한다. 성공/실패 어느 쪽이든 pushTimeline을 불러 리포트 타임라인에 남긴다 -
+  // 예전 applyClimateEvent는 이걸 전혀 남기지 않아 방치 중 변화가 타임라인에서
+  // 통째로 빠져 있었다.
+  resolveClimateEvent: () => {
+    const { pendingClimateEvent, physicsResult: before } = get();
+    if (!pendingClimateEvent || !before) return;
+
+    const { key, delta, startValues, message } = pendingClimateEvent;
     const { values, setValue, advanceTemperature } = useClimateStore.getState();
-    setValue(event.key, nextSliderValues(values, event)[event.key]);
+    // 경고가 지목한 슬라이더가 아니어도(행성 만들기 때와 같은 5개 전부를 보여준다)
+    // 뭐라도 움직였으면 "대응했다"로 본다 - 성공 여부는 아래 물리엔진 재계산이
+    // |ΔE| 변화로 판정한다.
+    const playerActed = CLIMATE_VARIABLES.some((v) => values[v.key] !== startValues[v.key]);
+
+    if (!playerActed) {
+      setValue(key, nextSliderValues(values, { key, delta })[key]);
+    }
+
     advanceTemperature();
     const { values: nextValues, currentTemperature } = useClimateStore.getState();
     const physics = computeClimateV2({ ...mapSlidersToClimateInputs(nextValues), currentTemperature });
-    set({ physicsResult: physics, climateEvent: event.message });
+
+    const worsened = Math.abs(physics.deltaEnergy) > Math.abs(before.deltaEnergy) + ITEM_EFFECT_EPSILON;
+    const improved = Math.abs(physics.deltaEnergy) < Math.abs(before.deltaEnergy) - ITEM_EFFECT_EPSILON;
+    const resultMessage = !playerActed
+      ? message
+      : improved
+        ? `✅ 반대로 대응해서 위기를 막았습니다!`
+        : worsened
+          ? `⚠️ 반대 방향으로 대응했지만 오히려 악화됐습니다.`
+          : `🤝 대응했지만 위기를 상쇄하는 데 그쳤습니다.`;
+
+    get().pushTimeline("이상기후", resultMessage, physics, null);
+    set({ physicsResult: physics, climateEvent: resultMessage, pendingClimateEvent: null });
   },
 
-  // GamePage가 1초마다 부르는 심장박동 - 경과 시간을 늘리고, CLIMATE_TICK_INTERVAL_SECONDS
-  // 배수가 될 때마다 고정 이상기후를 한 번 적용한다.
+  // GamePage가 1초마다 부르는 심장박동 - 경과 시간을 늘리고, 펜딩 경고의 응답
+  // 시간이 끝났으면 resolveClimateEvent로 마무리하고, 아니면(펜딩 경고가 없을
+  // 때만) nextClimateEventAt을 넘겼을 때 새 경고를 검토한다.
   tickSecond: () => {
     const elapsedSeconds = get().elapsedSeconds + 1;
     set({ elapsedSeconds });
-    if (elapsedSeconds % CLIMATE_TICK_INTERVAL_SECONDS === 0) {
-      get().applyClimateEvent();
+
+    const { pendingClimateEvent, nextClimateEventAt } = get();
+    if (pendingClimateEvent) {
+      if (elapsedSeconds >= pendingClimateEvent.expiresAt) {
+        get().resolveClimateEvent();
+      }
+      return;
+    }
+    if (elapsedSeconds >= nextClimateEventAt) {
+      get().triggerClimateEvent();
     }
   },
 
@@ -401,50 +477,53 @@ const useGameStore = create(
   // 채우는 시도에서는 무한 루프를 막기 위해 정확히 평형이 되도록 강제 조정),
   // 다음 2단계 문제로 이어간다.
   finalizeGame: async () => {
-    const { mlResult, physicsResult, finalAttempts } = get();
+    const { physicsResult, finalAttempts } = get();
     const nextAttempt = finalAttempts + 1;
     const forceStable = nextAttempt >= MAX_FINAL_ATTEMPTS;
-    const alreadyStable = mlResult?.label === EARTH_LIKE_STABLE_LABEL;
-
-    if (alreadyStable) {
-      get().pushTimeline("최종", `최종 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`, physicsResult, mlResult);
-      set({
-        finalAttempts: nextAttempt,
-        notice: { ok: true, lines: ["🌍 이미 지구형 평형 상태입니다.", `안정화 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`] },
-      });
-      if (forceStable) {
-        get().goReport("planet_stabilized");
-        return;
-      }
-      set({ currentStage: GAME_STAGES.FINAL, currentProblem: get().pickNextProblem(STAGE4_QUESTIONS) });
-      return;
-    }
 
     set({ isComputing: true });
     try {
-      const { values, setValue } = useClimateStore.getState();
-      const prevCo2Slider = values.co2;
+      // mlResult는 캐시다 - resolveClimateEvent(이상기후)는 매번 ML을 다시 돌리지
+      // 않으려고 physicsResult(진짜 ΔE)만 갱신하고 mlResult는 그대로 둔다. 그래서
+      // "예전에 한 번 Earth-like Stable을 찍었다"는 사실만 보고 alreadyStable을
+      // 판정하면, 그 이후 방치 중 이상기후로 ΔE가 한참 벗어났는데도 옛 라벨을
+      // 그대로 우려먹어 성공 처리해버리는 버그가 있었다. 지름길을 타기 전에
+      // 항상 지금 physicsResult로 ML을 다시 돌려서 진짜로 안정 상태인지 확인한다.
+      const climateInputs = mapSlidersToClimateInputs(useClimateStore.getState().values);
+      const freshMl = await predictClimateState(climateInputs, physicsResult);
+      const alreadyStable = freshMl.label === EARTH_LIKE_STABLE_LABEL;
 
-      if (forceStable) {
-        const climateInputs = mapSlidersToClimateInputs(values);
-        const co2Ppm = co2PpmForTargetTemperature(climateInputs, physicsResult.absorbedRadiation, REFERENCE_TEMP_K);
-        setValue("co2", co2PpmToSlider(co2Ppm));
+      if (alreadyStable) {
+        get().pushTimeline("최종", `최종 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`, physicsResult, freshMl);
+        set({
+          mlResult: freshMl,
+          finalAttempts: nextAttempt,
+          notice: { ok: true, lines: ["🌍 이미 지구형 평형 상태입니다.", `안정화 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`] },
+        });
       } else {
-        const direction = mlResult.label === "Warm Stable" ? -1 : 1;
-        setValue("co2", Math.min(100, Math.max(0, values.co2 + direction * FINAL_CO2_STEP)));
-      }
+        const { values, setValue } = useClimateStore.getState();
+        const prevCo2Slider = values.co2;
 
-      const newCo2Slider = useClimateStore.getState().values.co2;
-      const co2Increased = newCo2Slider === prevCo2Slider ? null : newCo2Slider > prevCo2Slider;
-      const { physics, ml } = await computeSettledResult();
-      const lines = describeFinalizeJudgment(physicsResult, physics, ml.label, { co2Increased });
-      get().pushTimeline("최종", `최종 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`, physics, ml);
-      set({
-        physicsResult: physics,
-        mlResult: ml,
-        finalAttempts: nextAttempt,
-        notice: { ok: ml.label === EARTH_LIKE_STABLE_LABEL, lines },
-      });
+        if (forceStable) {
+          const co2Ppm = co2PpmForTargetTemperature(climateInputs, physicsResult.absorbedRadiation, REFERENCE_TEMP_K);
+          setValue("co2", co2PpmToSlider(co2Ppm));
+        } else {
+          const direction = freshMl.label === "Warm Stable" ? -1 : 1;
+          setValue("co2", Math.min(100, Math.max(0, values.co2 + direction * FINAL_CO2_STEP)));
+        }
+
+        const newCo2Slider = useClimateStore.getState().values.co2;
+        const co2Increased = newCo2Slider === prevCo2Slider ? null : newCo2Slider > prevCo2Slider;
+        const { physics, ml } = await computeSettledResult();
+        const lines = describeFinalizeJudgment(physicsResult, physics, ml.label, { co2Increased });
+        get().pushTimeline("최종", `최종 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`, physics, ml);
+        set({
+          physicsResult: physics,
+          mlResult: ml,
+          finalAttempts: nextAttempt,
+          notice: { ok: ml.label === EARTH_LIKE_STABLE_LABEL, lines },
+        });
+      }
     } catch (err) {
       console.error("[useGameStore] 최종 확인 재계산 실패:", err);
     } finally {
@@ -479,6 +558,8 @@ const useGameStore = create(
       isComputing: false,
       notice: null,
       climateEvent: null,
+      pendingClimateEvent: null,
+      nextClimateEventAt: pickClimateEventInterval(),
       elapsedSeconds: 0,
       gameOverReason: null,
     }),

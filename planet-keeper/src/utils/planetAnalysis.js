@@ -4,7 +4,13 @@
 // 라벨별로 문장을 하드코딩하지 않고, CO2/알베도/대기두께가 실제로 기준보다
 // 높은지 낮은지에 따라 매번 다시 생성된다.
 
-import { CO2_BASELINE_PPM, BASELINE_ALBEDO, BASELINE_ATM_THICKNESS, energyStateOf } from "./physicsEngine.js";
+import {
+  CO2_BASELINE_PPM,
+  BASELINE_ALBEDO,
+  BASELINE_ATM_THICKNESS,
+  ENERGY_BALANCE_EPSILON,
+  energyStateOf,
+} from "./physicsEngine.js";
 
 const COMPARE_TOLERANCE = 0.05; // 기준값 대비 ±5% 이내는 "정상"으로 본다
 
@@ -74,12 +80,19 @@ export function formatSigned(value, digits = 1) {
 // ΔE는 숫자만 보여주지 않는다 - 항상 "무엇이 더 많은지 / 어느 방향으로 가는지"를
 // 같은 자리에서 설명한다(describeItemJudgment/describeTransition/energyProblemLines가 공유).
 export function deltaEnergyLines(deltaEnergy) {
+  // |ΔE|가 이미 평형 허용범위(ENERGY_BALANCE_EPSILON, Stable 판정과 같은 기준) 안이면
+  // "점점 따뜻해지는/차가워지는 방향"이라고 말하지 않는다 - 예를 들어 ΔE=+2.9처럼
+  // 거의 0인데도 "계속 뜨거워지는 중"으로 들려서, 뒤이어 나오는 성공 문구와 뜻이
+  // 충돌하는 것처럼 보인다.
+  const nearBalance = Math.abs(deltaEnergy) <= ENERGY_BALANCE_EPSILON;
   const warming = deltaEnergy > 0;
   return [
     `에너지 불균형(ΔE): ${formatSigned(deltaEnergy)} W/m²`,
-    warming
-      ? "흡수하는 에너지가 방출하는 에너지보다 많습니다. 행성은 점점 따뜻해지는 방향입니다."
-      : "방출하는 에너지가 흡수하는 에너지보다 많습니다. 행성은 점점 차가워지는 방향입니다.",
+    nearBalance
+      ? "흡수하는 에너지와 방출하는 에너지가 거의 균형을 이루었습니다. 행성은 에너지 평형에 가까운 상태입니다."
+      : warming
+        ? "흡수하는 에너지가 방출하는 에너지보다 많습니다. 행성은 점점 따뜻해지는 방향입니다."
+        : "방출하는 에너지가 흡수하는 에너지보다 많습니다. 행성은 점점 차가워지는 방향입니다.",
   ];
 }
 
@@ -236,26 +249,45 @@ function physicsChangeBlocks(before, after) {
   const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
   if (albedoLine) blocks.push([albedoLine]);
 
-  const greenhouseLine = greenhouseChangeLine(before, after);
+  // 구름은 albedoOf/greenhouseStrengthOf 둘 다에 들어가는 유일한 변수라 알베도와
+  // 온실효과가 "같이" 바뀔 수 있다 - 하지만 이건 구름이라는 같은 원인의 서로
+  // 독립된 두 결과일 뿐, 알베도가 바뀌어서 온실효과가 바뀌는 인과관계가 아니다.
+  // withArrows는 블록을 무조건 순서대로 이어서 "알베도 증가 → 온실효과 증가"처럼
+  // 마치 하나가 다른 하나를 일으킨 것으로 읽히게 만들므로, 알베도가 이미 바뀌었다면
+  // 온실효과/OLR 줄은 아예 보여주지 않고 알베도→ASR→ΔE 흐름만 남긴다.
+  const greenhouseLine = albedoLine ? null : greenhouseChangeLine(before, after);
   if (greenhouseLine) blocks.push([greenhouseLine]);
 
   // 온실효과 변화가 "우주로 방출되는 에너지"에 어떻게 이어지는지 명시적으로 보여준다 -
   // 학생이 "아이템이 ΔE를 직접 조절한다"고 오해하지 않도록, ΔE는 항상 ASR/OLR
-  // 변화의 결과라는 인과 사슬을 끊지 않는다.
-  const outgoingLine = changeLine(
-    before.outgoingRadiation,
-    after.outgoingRadiation,
-    "우주로 방출되는 에너지(OLR)가 증가했습니다.",
-    "우주로 방출되는 에너지(OLR)가 감소했습니다.",
-  );
+  // 변화의 결과라는 인과 사슬을 끊지 않는다. 단, OLR(outgoingRadiation)은
+  // 온실효과뿐 아니라 온도(T⁴)에도 좌우된다 - 조성(온실효과)은 안 바뀌었는데
+  // ΔE 때문에 온도만 한 걸음 움직여도 OLR 숫자가 흔들릴 수 있다. 온실효과가
+  // 실제로 안 바뀌었다면(greenhouseLine 없음) 그 숫자 변화는 온도 때문일 뿐 이
+  // 아이템/전환이 직접 일으킨 게 아니므로 보여주지 않는다 - 안 그러면 순수
+  // 알베도 계열 아이템(빙하/구름/바다)에서도 "OLR이 증가했다"는 잘못된 인과가
+  // 딸려 나온다.
+  const outgoingLine = greenhouseLine
+    ? changeLine(
+        before.outgoingRadiation,
+        after.outgoingRadiation,
+        "우주로 방출되는 에너지(OLR)가 증가했습니다.",
+        "우주로 방출되는 에너지(OLR)가 감소했습니다.",
+      )
+    : null;
   if (outgoingLine) blocks.push([outgoingLine]);
 
-  const absorbedLine = changeLine(
-    before.absorbedRadiation,
-    after.absorbedRadiation,
-    "흡수하는 에너지(ASR)가 증가했습니다.",
-    "흡수하는 에너지(ASR)가 감소했습니다.",
-  );
+  // ASR(absorbedRadiation = SOLAR_CONSTANT * (1 - albedo))은 알베도에만 좌우되고
+  // 온도와는 무관하다 - albedoLine이 없으면 ASR도 원래 그대로다(안전하게 한 번
+  // 더 gate).
+  const absorbedLine = albedoLine
+    ? changeLine(
+        before.absorbedRadiation,
+        after.absorbedRadiation,
+        "흡수하는 에너지(ASR)가 증가했습니다.",
+        "흡수하는 에너지(ASR)가 감소했습니다.",
+      )
+    : null;
   if (absorbedLine) blocks.push([absorbedLine]);
 
   return blocks;
