@@ -1,4 +1,4 @@
-/* Start Page — 좌: 타이틀 + 메뉴 2개 + CTA / 우: 기상이 + 말풍선.
+/* Start Page — 좌: 기상이 + 말풍선 / 우: 타이틀 + 메뉴 2개 + CTA.
    톤: 디지털 SF 미니멀. 팝업도 같은 매트 다크 네이비 + 사이언 홀로그램 엣지.
    페이지 배경 자체는 칠하지 않고(배경 작업 예정), 장식 레이어만 은은하게 깐다. */
 .start-page {
@@ -7,13 +7,22 @@
   --glass-border: rgba(255, 255, 255, 0.12);
   --ink: #eef2fa;
   --ink-dim: #a9b6cd;
-  /* 배경이 밝든 어둡든 타이틀/부제목이 묻히지 않게 하는 어두운 외곽 그림자
-     (형광 블러 없이 대비만 확보한다) */
-  --text-contrast: 0 2px 10px rgba(4, 9, 20, 0.85);
+  /* 페이지 배경 위에 그대로 놓이는 글자색(타이틀/부제목). 글로우·그림자 없이
+     단색만 쓰므로, 나중에 배경이 어두워지면 이 세 값만 밝은 쪽으로 바꾸면 된다. */
+  --on-page: #131c2f;
+  --on-page-sub: #2b3547; /* 부제목 - 타이틀보다 살짝 옅게 */
+  --on-page-accent: #256b7e;
+  /* 말풍선: 꼬리 SVG와 이음새가 보이지 않게 본체와 같은 '단색'을 공유한다.
+     너무 어두우면 화면에서 검은 덩어리로 보이므로 중간 명도의 남색을 쓴다
+     (본문 글자 --ink 와의 대비는 약 7.5:1로 충분하다). */
+  --bubble-bg: #3a4a70;
+  --bubble-edge: rgba(150, 230, 255, 0.42);
 
   position: relative;
   isolation: isolate;
   display: flex;
+  /* 마스코트(.start-page__stage)가 좌측, 타이틀/메뉴/CTA(.start-page__side)가 우측 */
+  flex-direction: row-reverse;
   align-items: center;
   gap: 40px;
   padding: 36px 52px;
@@ -101,7 +110,7 @@
   animation: start-page-orbit 78s linear infinite;
 }
 
-/* ══ 좌측 ══════════════════════════════════════════════════════ */
+/* ══ 우측: 타이틀 + 메뉴 + CTA ═════════════════════════════════ */
 .start-page__side {
   flex: 0 0 470px;
   display: flex;
@@ -109,52 +118,44 @@
   gap: 34px;
 }
 
+/* 타이틀 묶음만 가운데 정렬(오른쪽 정렬이 아니라, 우측 칼럼 안에서 중앙) */
 .start-page__intro {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 12px;
+  text-align: center;
 }
 
 .start-page__eyebrow {
   font-family: var(--mono);
   font-size: 0.74rem;
   letter-spacing: 0.24em;
-  color: var(--neon);
+  color: var(--on-page-accent);
 }
 
-/* 타이틀: 형광 블러 없이 그라디언트 + 어두운 외곽 그림자로만 대비를 잡는다.
-   (background-clip 미지원 환경에서는 아래 단색 color 가 그대로 쓰인다) */
+/* 타이틀/부제목은 단색 글자만 쓴다 - 그라디언트·글로우·그림자 없음. */
 .start-page__title {
   margin: 0;
   font-size: 4rem;
   font-weight: 800;
   line-height: 0.96;
   letter-spacing: 0.03em;
-  color: #ffffff;
-  text-shadow: 0 0 1px rgba(5, 10, 22, 0.9), 0 2px 12px rgba(4, 9, 20, 0.85);
-}
-
-@supports (-webkit-background-clip: text) or (background-clip: text) {
-  .start-page__title {
-    background: linear-gradient(180deg, #ffffff 0%, #dff4ff 52%, #8fdcf7 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-  }
+  color: var(--on-page);
 }
 
 .start-page__tagline {
   margin: 0;
   font-size: 1.02rem;
+  font-weight: 600;
   line-height: 1.55;
-  color: var(--ink-dim);
-  text-shadow: var(--text-contrast);
+  color: var(--on-page-sub);
   word-break: keep-all;
 }
 
 .start-page__tagline strong {
   font-weight: 700;
-  color: var(--ink);
+  color: var(--on-page);
 }
 
 /* ── 메뉴 버튼 2개 ──────────────────────────────────────────── */
@@ -282,7 +283,7 @@
   transform: translateX(5px);
 }
 
-/* ══ 우측: 기상이 + 말풍선 ═════════════════════════════════════ */
+/* ══ 좌측: 기상이 + 말풍선 ═════════════════════════════════════ */
 .start-page__stage {
   flex: 1;
   min-width: 0;
@@ -290,51 +291,76 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 0;
 }
 
-/* ── 말풍선(호흡하듯 미세하게 움직인다) ────────────────────── */
+/* ── 말풍선(호흡하듯 미세하게 움직인다) ──────────────────────
+   본체는 CSS(둥근 사각형 + 단색), 꼬리만 고정 크기 SVG. 폭은 문장 길이에 맞춰
+   줄어들고(max-content), 여백은 사방 글자 1~1.2배로 균일하게 준다. 아래 여백은
+   꼬리가 바깥(absolute)에 있으므로 본체 기준으로는 위/옆과 같다. */
 .start-page__bubble {
   position: relative;
-  max-width: 360px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 20px 24px;
-  border: 1px solid rgba(88, 224, 255, 0.3);
-  border-radius: 22px 22px 22px 6px;
-  background: var(--glass);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+  width: max-content;
+  /* nowrap 으로 묶은 가장 긴 구절("너무 뜨겁지도 차갑지도 않게")이 한 줄에 들어가는 폭 */
+  max-width: 292px;
+  margin-bottom: 30px; /* 꼬리(30px)가 마스코트와 겹치지 않게 확보 */
+  padding: 20px 22px;
+  border: 1px solid var(--bubble-edge);
+  border-radius: 20px;
+  background: var(--bubble-bg);
+  box-shadow: 0 10px 24px rgba(16, 24, 44, 0.24);
   animation: start-page-breathe 4.4s ease-in-out infinite;
 }
 
-/* 말풍선 꼬리(마스코트 쪽으로 향한다) */
-.start-page__bubble::after {
-  content: "";
+/* 꼬리: viewBox y=2 가 본체 아래 테두리 선이라 top 을 2px 끌어올려 맞춘다. */
+.start-page__bubble-tail {
   position: absolute;
-  bottom: -9px;
-  left: 28px;
-  width: 16px;
-  height: 16px;
-  transform: rotate(45deg);
-  border-right: 1px solid rgba(88, 224, 255, 0.3);
-  border-bottom: 1px solid rgba(88, 224, 255, 0.3);
-  background: rgba(18, 24, 40, 0.92);
+  top: calc(100% - 2px);
+  left: calc(50% - 56px);
+  width: 44px;
+  height: 34px;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.start-page__bubble-tail-fill {
+  fill: var(--bubble-bg);
+}
+
+.start-page__bubble-tail-edge {
+  fill: none;
+  stroke: var(--bubble-edge);
+  stroke-width: 1;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
 }
 
 .start-page__bubble-text {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  text-align: center;
+}
+
+.start-page__bubble-text p {
   margin: 0;
-  font-size: 1rem;
-  line-height: 1.65;
+  font-size: 0.95rem;
+  line-height: 1.62;
   color: var(--ink);
+  /* 단어/음절 중간이 아니라 어절 경계에서만 줄이 바뀌게 한다. */
   word-break: keep-all;
+  text-wrap: pretty;
 }
 
 .start-page__bubble-text strong {
   font-weight: 700;
   color: var(--neon);
+}
+
+/* 갈라지면 어색한 구절을 한 줄에 묶는 유틸(예: "아직 아무도 못 맞췄어") */
+.start-page__nowrap {
+  white-space: nowrap;
 }
 
 /* ── 마스코트(둥둥 떠다닌다) ───────────────────────────────── */

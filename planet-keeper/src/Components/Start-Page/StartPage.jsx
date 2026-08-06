@@ -31,7 +31,7 @@ function StartPage() {
         <span className="start-page__orbit start-page__orbit--inner" />
       </div>
 
-      {/* 좌측: 타이틀 + 메뉴 버튼 2개 + 시작 CTA */}
+      {/* 우측: 타이틀 + 메뉴 버튼 2개 + 시작 CTA */}
       <div className="start-page__side">
         <div className="start-page__intro">
           <span className="start-page__eyebrow">CLIMATE SIMULATION · ENERGY BALANCE</span>
@@ -40,10 +40,12 @@ function StartPage() {
             <br />
             KEEPER
           </h1>
+          {/* 쉼표 뒤에서 항상 줄을 나눈다. 앞 구절은 한 줄에 묶고, 뒷 구절은
+              좁은 화면에서만 어절 경계에서 한 번 더 넘어가게 열어 둔다. */}
           <p className="start-page__tagline">
-            지구의 온도는 우연이 아니다.
+            <span className="start-page__nowrap">기후의 법칙을 배우고,</span>
             <br />
-            <strong>빙하부터 CO₂까지, 행성의 체온을 직접 설계하라.</strong>
+            하나뿐인 행성의 운명을 조율하라.
           </p>
         </div>
 
