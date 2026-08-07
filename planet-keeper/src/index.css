@@ -4,13 +4,52 @@
   --bg: #fff;
   --border: #e2e8e0;
   --code-bg: #f3f6f2;
-  /* 라이트 모드: 화사한 연두 (Lime Green) */
-  --accent: #65a30d;
-  --accent-bg: rgba(101, 163, 13, 0.1);
-  --accent-border: rgba(101, 163, 13, 0.4);
+  /* 라이트 모드: 차분한 블루-그린 (Teal) */
+  --accent: #0d9488;
+  --accent-bg: rgba(13, 148, 136, 0.1);
+  --accent-border: rgba(13, 148, 136, 0.4);
   --social-bg: rgba(243, 246, 242, 0.5);
   --shadow:
     rgba(0, 0, 0, 0.08) 0 10px 15px -3px, rgba(0, 0, 0, 0.04) 0 4px 6px -2px;
+
+  /* 보조 텍스트(라벨/캡션 등, --text보다 한 단계 옅음) */
+  --text-muted: #64748b;
+  /* 모달 뒤 배경을 어둡게 덮는 오버레이 - 라이트/다크 공통으로 같은 톤을 쓴다 */
+  --overlay: rgba(15, 23, 42, 0.55);
+
+  /* 정보/강조(파란색) - 문제 카드, Cold Stable 배지 등 */
+  --info: #0284c7;
+  --info-bg: #f0f9ff;
+  --info-border: #bae6fd;
+
+  /* 성공(초록) - 정답, Earth-like Stable 등 */
+  --success: #15803d;
+  --success-bg: #f0fdf4;
+  --success-border: #bbf7d0;
+
+  /* 실패/위험(빨강) - 오답, 목숨 소진, 에너지 과다 등 */
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --danger-border: #fecaca;
+
+  /* 경고(주황) - Warm Stable, 재도전 문제 등 */
+  --warm: #c2410c;
+  --warm-bg: #fff7ed;
+  --warm-border: #ffedd5;
+
+  /* 시작 페이지(StartPage)의 다크 SF 패널 톤 - 다른 페이지도 같은 느낌을 쓸 때
+     이 토큰들을 재사용한다. 라이트/다크 시스템 설정과 무관하게 항상 같은
+     값이다(스타 패드가 늘 어두운 패널인 것과 동일). StartPage.css 자체는
+     createPortal 팝업 스코프 문제로 이 값들을 로컬에도 따로 갖고 있다 -
+     여기서 지우지 않는다(다른 페이지에서 쓰려고 전역에 "추가"만 한 것).*/
+  --neon: #2dd4bf;
+  --holo: #5eead4;
+  --panel: linear-gradient(160deg, #17213a 0%, #0e1524 100%);
+  --panel-border: rgba(94, 234, 212, 0.18);
+  --panel-line: rgba(94, 234, 212, 0.13);
+  --panel-inset: rgba(6, 11, 20, 0.55);
+  --panel-ink: #e9f0fb;
+  --panel-ink-dim: #9fb2cf;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -38,13 +77,32 @@
     --bg: #121913; /* 답답하지 않은 깊은 딥 그린 톤 배경 */
     --border: #233325;
     --code-bg: #1a261c;
-    /* 다크 모드: 시원하고 선명한 에메랄드/브라이트 초록 */
-    --accent: #4ade80;
-    --accent-bg: rgba(74, 222, 128, 0.15);
-    --accent-border: rgba(74, 222, 128, 0.4);
+    /* 다크 모드: 시원한 블루-그린 (Teal), --neon과 같은 계열로 통일 */
+    --accent: #2dd4bf;
+    --accent-bg: rgba(45, 212, 191, 0.13);
+    --accent-border: rgba(45, 212, 191, 0.34);
     --social-bg: rgba(35, 51, 37, 0.5);
     --shadow:
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+
+    --text-muted: #8a9a88;
+    --overlay: rgba(0, 0, 0, 0.6);
+
+    --info: #38bdf8;
+    --info-bg: rgba(56, 189, 248, 0.15);
+    --info-border: rgba(56, 189, 248, 0.4);
+
+    --success: #4ade80;
+    --success-bg: rgba(74, 222, 128, 0.15);
+    --success-border: rgba(74, 222, 128, 0.4);
+
+    --danger: #f87171;
+    --danger-bg: rgba(248, 113, 113, 0.15);
+    --danger-border: rgba(248, 113, 113, 0.4);
+
+    --warm: #fb923c;
+    --warm-bg: rgba(251, 146, 60, 0.15);
+    --warm-border: rgba(251, 146, 60, 0.4);
   }
 
   #social .button-icon {

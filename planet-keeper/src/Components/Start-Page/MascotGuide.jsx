@@ -14,7 +14,7 @@ function GisangiFallback() {
   return (
     <svg viewBox="0 0 160 160" role="img" aria-label="기상이 캐릭터" focusable="false">
       <circle cx="112" cy="52" r="18" fill="#ffd166" opacity="0.9" />
-      <g fill="#eaf6ff" stroke="rgba(88, 224, 255, 0.55)" strokeWidth="2">
+      <g fill="#eaf6ff" stroke="rgba(45, 212, 191, 0.55)" strokeWidth="2">
         <circle cx="58" cy="88" r="26" />
         <circle cx="92" cy="82" r="30" />
         <circle cx="118" cy="98" r="21" />

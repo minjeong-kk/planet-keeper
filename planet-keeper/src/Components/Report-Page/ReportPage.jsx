@@ -3,9 +3,16 @@ import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
-import { describeTransition, deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
+import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
+import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
+
+// 타임라인 항목의 label("☁️ 인공 구름 생성기" 등, useGameStore.useItem이 `${item.emoji}
+// ${item.name}`로 저장)을 아이템 key로 되돌린다 - "아이템" 단계만 이 형식과 일치하고,
+// "행성 생성"/"⚠️ ..."/"최종 확인 N/3" 같은 다른 단계 label은 매칭되지 않아 undefined를
+// 돌려준다(원인을 하나로 특정할 수 없는 단계에 잘못 아이템 설명을 붙이지 않기 위함).
+const ITEM_KEY_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${item.name}`, item.key]));
 
 // 퀴즈 데이터의 concepts 태그(예: "피드백", "에너지 평형")를 용어집 항목에 연결한다.
 // 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
@@ -36,6 +43,26 @@ const KOREAN_BY_STATE = Object.fromEntries(PLANET_STATES.map(({ state, korean })
 
 const fmt = (value, digits = 2) => (value == null ? "-" : value.toFixed(digits));
 
+// 리포트 안의 각 섹션(타임라인/문제풀이/아이템/개념정리)을 독립적으로 접고 펼 수 있게
+// 감싸는 래퍼 - 요약 배너는 항상 보여야 하는 결과라 여기 포함하지 않는다.
+function CollapsibleSection({ title, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="report-page__section">
+      <button
+        type="button"
+        className="report-page__section-toggle"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+      >
+        <span className="report-page__section-toggle-icon">{open ? "▼" : "▶"}</span>
+        <h3>{title}</h3>
+      </button>
+      {open && children}
+    </div>
+  );
+}
+
 function ReportPage() {
   const navigate = useNavigate();
   const resetClimate = useClimateStore((state) => state.resetClimate);
@@ -53,10 +80,17 @@ function ReportPage() {
     statusClass: "",
   };
 
-  // timeline 마지막 = 최종 상태. 정상 플레이라면 항상 최소 1개는 있지만
-  // (nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
+  // timeline[0]=행성 생성 시점, 마지막=최종 상태. 정상 플레이라면 항상 최소 1개는
+  // 있지만(nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
+  const initial = timeline[0] ?? null;
   const final = timeline[timeline.length - 1] ?? null;
   const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
+
+  // "핵심 개념 정리"에서 9개 전부가 아니라 이번 판에 실제로 나타난 개념만 고른다.
+  const relevantKeys = useMemo(
+    () => relevantConceptKeys({ initial, final, timeline, gameOverReason }),
+    [initial, final, timeline, gameOverReason],
+  );
 
   // 연속으로 동일한 상태나 행동이 중복 기록된 타임라인 제거
   const uniqueTimeline = useMemo(() => {
@@ -80,7 +114,7 @@ function ReportPage() {
     uniqueTimeline.forEach((entry, i) => {
       const prev = i > 0 ? uniqueTimeline[i - 1] : null;
       const explanation = prev
-        ? describeTransition(prev.physics, entry.physics, entry.ml?.label)
+        ? describeTransition(prev.physics, entry.physics, entry.ml?.label, ITEM_KEY_BY_LABEL.get(entry.label))
         : deltaEnergyLines(entry.physics.deltaEnergy);
       const signature = `${entry.stage}::${explanation.join("|").replace(/[-+]?\d+(\.\d+)?/g, "#")}`;
       const existing = bySignature.get(signature);
@@ -189,8 +223,7 @@ function ReportPage() {
       <hr className="report-page__divider" />
 
       {/* 행성 변화 타임라인: 가로 2열 컴팩트 카드 그리드 방식 */}
-      <div className="report-page__section">
-        <h3>행성 변화 타임라인</h3>
+      <CollapsibleSection title="행성 변화 타임라인">
         {timelineGroups.length ? (
           <div className="report-page__timeline-grid">
             {timelineGroups.map((group, i) => (
@@ -217,7 +250,9 @@ function ReportPage() {
                   {group.entries.map((e, idx) => (
                     <span key={idx} className="report-page__metric-badge">
                       🌡️ {e.physics.currentTemperature.toFixed(1)}K · ΔE {formatSigned(e.physics.deltaEnergy)} ·{" "}
-                      {e.ml?.label ?? "-"}
+                      <span className={`report-page__metric-badge-label report-page__metric-badge-label--${labelTone(e.ml?.label)}`}>
+                        {e.ml?.label ?? "-"}
+                      </span>
                     </span>
                   ))}
                 </div>
@@ -227,13 +262,12 @@ function ReportPage() {
         ) : (
           <p>기록된 변화가 없습니다.</p>
         )}
-      </div>
+      </CollapsibleSection>
 
       <hr className="report-page__divider" />
 
       {/* 문제 풀이 결과 */}
-      <div className="report-page__section">
-        <h3>문제 풀이 결과</h3>
+      <CollapsibleSection title="문제 풀이 결과">
         <p className="report-page__subtext">
           맞은 문제 <strong>{correctGroups.length}</strong>개 / 틀린 문제 <strong>{wrongGroups.length}</strong>개 — 문제를 클릭하면 해설을 볼 수 있습니다.
         </p>
@@ -257,7 +291,7 @@ function ReportPage() {
         ) : (
           <p>푼 문제가 없습니다.</p>
         )}
-      </div>
+      </CollapsibleSection>
 
       {/* 고급화된 문제 해설 모달 */}
       {selectedGroup && (
@@ -321,25 +355,26 @@ function ReportPage() {
       <hr className="report-page__divider" />
 
       {/* 사용한 아이템 */}
-      <div className="report-page__section">
-        <h3>사용한 아이템</h3>
+      <CollapsibleSection title="사용한 아이템">
         <p>{uniqueInventory.length ? uniqueInventory.join(", ") : "없음"}</p>
-      </div>
+      </CollapsibleSection>
 
       <hr className="report-page__divider" />
 
       {/* 교과 개념 정리 - 지구과학Ⅰ 수준으로 핵심 개념만 짧게 다시 정리한다. */}
-      <div className="report-page__section">
-        <h3>핵심 개념 정리</h3>
+      <CollapsibleSection title="핵심 개념 정리">
+        <p className="report-page__subtext">이번 플레이에서 실제로 나타난 개념만 골랐습니다.</p>
         <div className="report-page__concept-grid">
-          {Object.values(CLIMATE_CONCEPTS).map((concept) => (
-            <div key={concept.term} className="report-page__concept-card">
-              <p className="report-page__concept-card-term">{concept.term}</p>
-              <p>{concept.detail}</p>
-            </div>
-          ))}
+          {Object.entries(CLIMATE_CONCEPTS)
+            .filter(([key]) => relevantKeys.has(key))
+            .map(([key, concept]) => (
+              <div key={key} className="report-page__concept-card">
+                <p className="report-page__concept-card-term">{concept.term}</p>
+                <p>{concept.detail}</p>
+              </div>
+            ))}
         </div>
-      </div>
+      </CollapsibleSection>
 
       <div className="report-page__actions">
         <button className="btn-primary" onClick={handleReplay}>

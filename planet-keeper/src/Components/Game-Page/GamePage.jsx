@@ -9,13 +9,18 @@ import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore"
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
-import { deltaEnergyLines, formatSigned } from "../../utils/planetAnalysis.js";
+import { deltaEnergyLines, formatSigned, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
 
 // 정답/오답 피드백 메시지를 화면에 유지하는 시간(ms). 그 사이에 REPORT로
 // 넘어가더라도 이 시간만큼은 메시지를 보여준 뒤 페이지를 이동한다.
 const FEEDBACK_DISPLAY_MS = 2000;
+
+// 이상기후 경고 슬라이더의 조절 폭(±). 행성 만들기 때와 같은 0~100 풀
+// 레인지를 그대로 쓰면 몇 초 안에 미세하게 조정하기엔 한 번 드래그로 너무
+// 크게 움직인다 - 경고가 뜬 시점 값(startValues) 기준 좁은 구간만 허용한다.
+const CLIMATE_ALERT_SLIDER_RANGE = 15;
 
 // 코드는 그대로 두고 실행만 끈다 - 다시 끌 땐 이 플래그만 false로.
 const CLIMATE_TICK_ENABLED = true;
@@ -62,6 +67,8 @@ function GamePage() {
   const isComputing = useGameStore((state) => state.isComputing);
   const notice = useGameStore((state) => state.notice);
   const climateEvent = useGameStore((state) => state.climateEvent);
+  const pendingClimateEvent = useGameStore((state) => state.pendingClimateEvent);
+  const setClimateValue = useClimateStore((state) => state.setValue);
   const solveProblem = useGameStore((state) => state.solveProblem);
   const useItem = useGameStore((state) => state.useItem);
   const tickSecond = useGameStore((state) => state.tickSecond);
@@ -125,13 +132,54 @@ function GamePage() {
 
   return (
     <div className="game-page">
-      {/* 스크롤 시 화면 우측 상단에 고정 표시될 플로팅 타이머 & 알림 창 */}
+      {/* 스크롤 시 화면 우측 상단에 고정 표시될 플로팅 타이머 & 알림 창 + 이상기후 경고 패널 */}
       {CLIMATE_TICK_ENABLED && (
-        <div className="game-page__floating-timer">
-          <p className="game-page__stats-note">⏱️ 경과 시간: {elapsedSeconds}초</p>
-          {climateEvent && (
-            <div className="game-page__event-toast">
-              {climateEvent}
+        <div className="game-page__floating-stack">
+          <div className="game-page__floating-timer">
+            <span className="game-page__floating-timer-label">⏱️ 경과 시간</span>
+            <p className="game-page__stats-note">{elapsedSeconds}초</p>
+            <span className={`info-panel__badge info-panel__badge--${labelTone(mlResult?.label)}`}>
+              {mlResult ? mlResult.label : "대기 중..."}
+            </span>
+            {/* pending 중엔 아래 경고 패널에 이미 같은 문구가 있으니 중복 표시하지 않는다. */}
+            {climateEvent && !pendingClimateEvent && (
+              <div className="game-page__event-toast">
+                {climateEvent}
+              </div>
+            )}
+          </div>
+
+          {/* 이상기후 경고 - 응답 시간 안에 슬라이더 중 하나(또는 여러 개)를 막는
+              방향으로 움직이면 물리엔진 재계산으로 판정한다. 손대지 않으면
+              useGameStore.resolveClimateEvent가 만료 시점에 경고에 걸린 방향
+              그대로 적용한다(기존 자동 악화와 동일한 fallback). 아이템 대신
+              행성 만들기 때와 같은 5개 슬라이더를 전부 보여줘서, 꼭 경고가 지목한
+              변수가 아니라도 원하는 방향으로 대응할 수 있게 한다. */}
+          {pendingClimateEvent && (
+            <div className="game-page__climate-alert">
+              <p className="game-page__climate-alert-message">{pendingClimateEvent.warning}</p>
+              <p className="game-page__climate-alert-timer">
+                ⏳ {Math.max(0, pendingClimateEvent.expiresAt - elapsedSeconds)}초 안에 막아보세요
+              </p>
+              {CLIMATE_VARIABLES.map(({ key, label }) => {
+                const startValue = pendingClimateEvent.startValues[key];
+                const min = Math.max(0, startValue - CLIMATE_ALERT_SLIDER_RANGE);
+                const max = Math.min(100, startValue + CLIMATE_ALERT_SLIDER_RANGE);
+                return (
+                  <div key={key} className="game-page__climate-alert-slider-row">
+                    <span className="game-page__climate-alert-slider-label">{label}</span>
+                    <input
+                      type="range"
+                      min={min}
+                      max={max}
+                      value={values[key]}
+                      onChange={(e) => setClimateValue(key, Number(e.target.value))}
+                      className="game-page__climate-alert-slider"
+                    />
+                    <span className="game-page__climate-alert-slider-value">{values[key]}%</span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -202,7 +250,9 @@ function GamePage() {
             </div>
           )}
 
-          {currentStage === GAME_STAGES.ITEM && !isComputing && <ItemStage items={visibleItems} onSelect={useItem} />}
+          {currentStage === GAME_STAGES.ITEM && !isComputing && (
+            <ItemStage items={visibleItems} onSelect={useItem} disabled={!!pendingClimateEvent} />
+          )}
 
           {isComputing && <p>AI가 행성 상태를 판정하는 중...</p>}
 
@@ -230,7 +280,12 @@ function GamePage() {
 
           {(currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL) &&
             currentProblem && (
-              <QuizModal problem={currentProblem} onSubmit={handleAnswer} number={quizLog.length + 1} />
+              <QuizModal
+                problem={currentProblem}
+                onSubmit={handleAnswer}
+                number={quizLog.length + 1}
+                disabled={!!pendingClimateEvent}
+              />
             )}
         </div>
       </div>
