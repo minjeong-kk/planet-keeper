@@ -1,4 +1,4 @@
-import useGameStore, { itemDeltaEnergyChange } from "../../store/useGameStore.js";
+import useGameStore, { itemDeltaEnergyChange, ITEM_EFFECT_EPSILON } from "../../store/useGameStore.js";
 import useClimateStore from "../../store/useClimateStore.js";
 import { previewItemEffect, formatSigned } from "../../utils/planetAnalysis.js";
 
@@ -16,7 +16,14 @@ function ItemInfoModal({ item, onClose }) {
   const before = physicsResult?.deltaEnergy;
   const change = physicsResult ? itemDeltaEnergyChange(item, values, currentTemperature) : null;
   const after = before != null && change != null ? before + change : null;
-  const trend = change == null || Math.abs(change) < 0.01 ? "거의 변하지 않을" : change < 0 ? "줄어들" : "늘어날";
+  // "효과 없음" 기준은 게임 로직(pickVisibleItems/useItem)이 쓰는 것과 같아야 한다.
+  // 여기만 다른 값을 쓰면 모달은 "변한다"고 했는데 엔진은 "효과 없음"으로 판정한다.
+  const trend =
+    change == null || Math.abs(change) < ITEM_EFFECT_EPSILON
+      ? "거의 변하지 않을"
+      : change < 0
+        ? "줄어들"
+        : "늘어날";
 
   return (
     <div className="item-info-modal-overlay" onClick={onClose}>

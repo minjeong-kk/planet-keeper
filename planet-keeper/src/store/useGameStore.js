@@ -104,7 +104,8 @@ const ITEM_CHOICES_SHOWN = 4;
 // greenhouseStrength clamp(0.8) 상한에 걸린 경우 등, 슬라이더를 움직여도 실제로는
 // 아무 것도 안 바뀌는 경우가 있다(부동소수 오차 여유도 겸한다).
 // ΔE 단위(W/m²)라 SOLAR_CONSTANT 스케일을 따라간다 - 0.01은 S=100 기준으로 잡은 값이다.
-const ITEM_EFFECT_EPSILON = 0.01 * ENERGY_SCALE;
+// ItemInfoModal("지금 사용하면" 미리보기)도 같은 기준을 써야 판정이 어긋나지 않는다.
+export const ITEM_EFFECT_EPSILON = 0.01 * ENERGY_SCALE;
 
 // 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
 // 차이). 정적 태그가 아니라 매번 물리엔진으로 직접 계산한다 - 정적 태그만 보면
@@ -590,6 +591,18 @@ const useGameStore = create(
     }),
     {
       name: "planet-keeper-game",
+      // SOLAR_CONSTANT를 100 -> 297.88로 바꾸면서 ΔE 스케일이 2.9788배가 됐다.
+      // physicsResult/timeline에는 저장 시점 스케일의 ΔE가 그대로 들어 있어서,
+      // 옛 저장본을 그대로 복원하면 새 판정 기준(epsilon 14.894)과 뒤섞인다 -
+      // 예전 "+14.5"(= 지금 +43.2에 해당)가 평형 범위 안으로 잘못 읽혀서
+      // 이상기후가 안 뜨거나, 아이템 후보 선정이 방향을 잃거나, 최종 확인이
+      // 공짜로 통과되는 문제가 생긴다.
+      //
+      // 진행 중인 판의 ΔE를 일일이 환산하는 것보다 새로 시작하는 편이 안전하고,
+      // 게임 한 판이 짧아 손실도 작다. 빈 객체를 반환하면 초기 상태와 병합되어
+      // 사실상 초기화된다. 앞으로 저장 구조를 바꿀 때도 version을 올리면 된다.
+      version: 1,
+      migrate: () => ({}),
       // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -
       // 저장해두면 새로고침 시 항상 "계산하는 중..."에서 멈춘 것처럼 보인다.
       partialize: ({ isComputing: _isComputing, ...rest }) => rest,

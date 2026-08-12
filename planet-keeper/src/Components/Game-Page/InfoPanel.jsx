@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 import { analyzePlanetState, deltaEnergyLines, labelTone } from "../../utils/planetAnalysis.js";
-import { equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
+import { ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
 
 // 오른쪽 정보 패널. physicsResult/mlResult는 useGameStore가 매 단계(초기 생성,
 // 아이템 사용) 실제 Physics Engine으로 채워준다 - 아직 아무것도 계산 전이면 null.
@@ -33,10 +33,14 @@ function InfoPanel({ physicsResult, mlResult, co2Ppm, atmThickness }) {
               <p className="game-page__stats-note">
                 💡 {deltaEnergyLines(physicsResult.deltaEnergy)?.[1]}
               </p>
+              {/* 판정 기준을 |ΔE| ≤ epsilon 으로 통일한다. 예전에는 "평형온도와의
+                  온도차 0.5K 이내"라는 별도 기준을 썼는데, epsilon은 온도로 환산하면
+                  약 5.4K라 10배 이상 엄격했다. 그래서 상태 배지가 Stable이고 ΔE 카드가
+                  초록인데 이 문장만 "아직 도달하지 않았다"고 말하는 모순이 있었다. */}
               <p className="game-page__stats-note">
                 📍 현재 평균 온도는 예상 안정 온도를 향해 이동합니다.{" "}
                 <strong>
-                  {Math.abs(physicsResult.currentTemperature - equilibriumTemperatureOf(physicsResult)) < 0.5
+                  {Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON
                     ? "현재 안정 상태에 도달했습니다."
                     : "아직 안정 상태에 도달하지 않았습니다."}
                 </strong>
