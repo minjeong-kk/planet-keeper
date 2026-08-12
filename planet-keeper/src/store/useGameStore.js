@@ -14,6 +14,7 @@ import {
   PLANET_STATES,
   REFERENCE_TEMP_K,
   ENERGY_BALANCE_EPSILON,
+  ENERGY_SCALE,
 } from "../utils/physicsEngine.js";
 import { describeItemJudgment, describeFinalizeJudgment } from "../utils/planetAnalysis.js";
 
@@ -102,7 +103,8 @@ const ITEM_CHOICES_SHOWN = 4;
 // 이보다 작은 ΔE 변화는 "효과 없음"으로 본다 - co2/atmThickness가 이미
 // greenhouseStrength clamp(0.8) 상한에 걸린 경우 등, 슬라이더를 움직여도 실제로는
 // 아무 것도 안 바뀌는 경우가 있다(부동소수 오차 여유도 겸한다).
-const ITEM_EFFECT_EPSILON = 0.01;
+// ΔE 단위(W/m²)라 SOLAR_CONSTANT 스케일을 따라간다 - 0.01은 S=100 기준으로 잡은 값이다.
+const ITEM_EFFECT_EPSILON = 0.01 * ENERGY_SCALE;
 
 // 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
 // 차이). 정적 태그가 아니라 매번 물리엔진으로 직접 계산한다 - 정적 태그만 보면

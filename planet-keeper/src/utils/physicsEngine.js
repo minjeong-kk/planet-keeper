@@ -39,21 +39,27 @@
  * 기준 수치 (PLAN.md)
  * ------------------------------------------------------------------
  *
- * - TOA 하향단파복사속 기준 상수 S = 100
+ * - TOA 하향단파복사속 기준 상수 S = 297.88 W/m² (KIM 실측)
  * - CO₂ 기준 농도 = 432 ppm
  * - 기준 온도 = 288 K
  */
 
 // 라벨 임계값은 실측 데이터에서 도출된 생성 파일에서 읽는다.
 // (data-pipeline/Analysis/derive_thresholds.py → src/data/climateThresholds.js)
-import {
-  EPSILON_ENERGY_BALANCE,
-  COLD_STABLE_MAX_K,
-  EARTH_LIKE_MAX_K,
-} from "../data/climateThresholds.js"
+import { COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K } from "../data/climateThresholds.js"
 
 // ── 과학적 기준 상수 (PLAN.md) ──────────────────────────────────
-export const SOLAR_CONSTANT = 100 // TOA 하향단파복사속 기준
+// TOA 하향단파복사. KIM 전지구 필드 평균 실측값(physics_reference.csv의 dswrtoa
+// = 297.8821 W/m²)을 소수 둘째 자리로 반올림해서 쓴다.
+//
+// 계획서는 이 값을 100으로 두고 시작했고, 아래 ΔE 기반 상수들(평형 허용오차,
+// 온도 틱)은 전부 그 스케일에서 보정된 값이다. S를 실측값으로 바꾸면 ΔE 전체가
+// ENERGY_SCALE 배로 커지므로, 그 상수들도 같은 배율로 환산해야 판정이 유지된다.
+// 숫자를 손으로 다시 적지 않고 SOLAR_CONSTANT에서 유도하는 이유가 이것이다 —
+// 하나만 고치고 나머지를 빠뜨리면 에러 없이 조용히 판정 기준선만 어긋난다.
+export const SOLAR_CONSTANT = 297.88 // TOA 하향단파복사속 기준 (KIM 실측)
+// ΔE 단위(W/m²)로 표현된 임계값을 가진 다른 모듈들도 이 배율을 써서 환산한다.
+export const ENERGY_SCALE = SOLAR_CONSTANT / 100 // 계획서 기준 스케일(S=100) 대비 배율
 export const CO2_BASELINE_PPM = 432 // 기상청 안면도 실측 기준 배경 농도
 export const REFERENCE_TEMP_K = 288 // 지구 평균 지표 기온(≈15°C) — 보정 목표값
 
@@ -221,8 +227,15 @@ export function co2PpmToSlider(co2Ppm) {
   return clamp(((co2Ppm / CO2_BASELINE_PPM - 0.3) / 2.7) * 100, 0, 100)
 }
 
-// 에너지 평형 판정 허용오차. derive_thresholds.py가 생성한 파일에서 읽는다.
-export const ENERGY_BALANCE_EPSILON = EPSILON_ENERGY_BALANCE
+// 에너지 평형 판정 허용오차 - |ΔE| 가 이 값 이하면 "평형"으로 본다.
+//
+// 관측량이 아니라 설계 허용오차다(예전에는 derive_thresholds.py가 관측 임계값과
+// 함께 내보냈지만, 관측에서 나오는 값이 아니라 여기 두는 것이 맞다. Python 쪽에
+// 스케일 배율을 복제해 두면 한쪽만 바뀌었을 때 잡아낼 방법도 없다).
+//
+// 5.0은 S=100 스케일에서 "평형온도로부터 약 4.6 K 이내"에 해당하는 값이었고,
+// ENERGY_SCALE을 곱해 지금 스케일에서도 같은 온도 폭을 유지한다.
+export const ENERGY_BALANCE_EPSILON = 5.0 * ENERGY_SCALE
 
 export function energyStateOf(deltaEnergy) {
   if (deltaEnergy > ENERGY_BALANCE_EPSILON) return "Energy Surplus"
@@ -265,7 +278,10 @@ export function equilibriumTemperatureOf(physics) {
 // ΔE > 0(흡수 과다)이면 온도가 오르고, 오르면 OLR(∝T⁴)이 커져 ΔE가 줄어든다.
 // 즉 평형온도로 단조 수렴하며 평형 근처에서는 ΔE가 작아져 자동으로 멈춘다.
 // 한 틱 이동량에 상한을 둬서 극단적인 ΔE에서도 평형을 지나치지 않게 한다.
-export const TEMPERATURE_STEP_PER_ENERGY = 0.05
+// 0.05는 S=100 스케일에서 보정된 값이다. ΔE가 ENERGY_SCALE 배로 커졌으므로
+// 같은 배율로 나눠야 한 틱에 움직이는 온도가 그대로 유지된다.
+export const TEMPERATURE_STEP_PER_ENERGY = 0.05 / ENERGY_SCALE
+// 이쪽은 K 단위라 ΔE 스케일과 무관하다 - 환산하지 않는다.
 export const MAX_TEMPERATURE_STEP_K = 3
 
 /** 현재 온도에서 한 틱만큼 ΔE 방향으로 이동한 다음 온도(K). */

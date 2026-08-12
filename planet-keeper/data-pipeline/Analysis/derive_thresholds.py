@@ -17,9 +17,10 @@
 
     지구형 안정 범위 = 288.15K ± (관측 t2m IQR / 2)
 
-에너지 평형 허용오차(epsilon)는 관측량이 아니라 설계 허용오차이므로 상수로 둔다.
-물리엔진 기준 상태에서 dΔE/dT ≈ 4·ASR_base/T_ref ≈ 1.08 (단위: ΔE per K)이므로
-epsilon 5.0 은 "평형온도에서 약 4.6K 이내"에 해당한다.
+에너지 평형 허용오차(epsilon)는 여기서 내보내지 않는다. 관측량이 아니라 설계
+허용오차이고, 값이 SOLAR_CONSTANT 스케일에 비례하기 때문이다. 이 스크립트가
+스케일 배율을 따로 들고 있으면 physicsEngine.js와 어긋나도 잡아낼 방법이 없어서,
+physicsEngine.js가 SOLAR_CONSTANT에서 직접 유도하도록 옮겼다.
 
 출력
 ----
@@ -54,9 +55,6 @@ logger = logging.getLogger(__name__)
 # 계획서 3쪽 "지구 기준 세팅값" — 현대 지구 평균 기온 15°C.
 EARTH_REFERENCE_TEMP_K = 288.15
 
-# 에너지 평형 판정 허용오차(설계값, 관측량 아님). 위 docstring의 근거 참고.
-EPSILON_ENERGY_BALANCE = 5.0
-
 OBSERVED_DATASET = config.DATASETS_DIR / "observed_kim_dataset.csv"
 JSON_FOR_PYTHON = config.DATASETS_DIR / "climate_thresholds.json"
 JS_FOR_FRONTEND = (
@@ -69,7 +67,6 @@ def derive(observed_t2m: pd.Series) -> dict:
     half_width = (q75 - q25) / 2
 
     return {
-        "epsilon_energy_balance": EPSILON_ENERGY_BALANCE,
         "cold_stable_max_k": round(EARTH_REFERENCE_TEMP_K - half_width, 2),
         "earth_like_max_k": round(EARTH_REFERENCE_TEMP_K + half_width, 2),
         "derivation": {
@@ -111,9 +108,10 @@ def write_js_module(path, payload: dict) -> None:
         f"//       IQR {d['observed_iqr_k'][0]}~{d['observed_iqr_k'][1]} K\n"
         f"//       {d['note']}\n"
         "//\n"
-        "// climate_thresholds.json 과 같은 값이다(도출 근거는 그 파일의 derivation 필드).\n\n"
-        "export const EPSILON_ENERGY_BALANCE = "
-        f"{payload['epsilon_energy_balance']}\n"
+        "// climate_thresholds.json 과 같은 값이다(도출 근거는 그 파일의 derivation 필드).\n"
+        "//\n"
+        "// 에너지 평형 허용오차(epsilon)는 여기 없다 - 관측값이 아니라 설계값이라\n"
+        "// physicsEngine.js가 SOLAR_CONSTANT에서 직접 유도한다.\n\n"
         f"export const COLD_STABLE_MAX_K = {payload['cold_stable_max_k']}\n"
         f"export const EARTH_LIKE_MAX_K = {payload['earth_like_max_k']}\n"
         f"export const EARTH_REFERENCE_TEMP_K = {d['earth_reference_temp_k']}\n",
@@ -135,8 +133,7 @@ def main() -> None:
     logger.info(
         f"관측 {thresholds['derivation']['n_observations']}개 지점 → "
         f"지구형 안정 범위 {thresholds['cold_stable_max_k']} ~ "
-        f"{thresholds['earth_like_max_k']} K "
-        f"(epsilon {thresholds['epsilon_energy_balance']})"
+        f"{thresholds['earth_like_max_k']} K"
     )
 
     write_json(JSON_FOR_PYTHON, thresholds)
