@@ -1,5 +1,5 @@
 // Physics 결과를 "원인 → 문제 → 해결 방향"으로 해석하는 모듈.
-// ML(predictClimateState)은 지금 상태(label)만 판정하고, 그 상태를 왜 그렇게
+// 상태 판정(planetStateOf)은 지금 상태(label)만 정하고, 그 상태를 왜 그렇게
 // 됐는지 설명하는 건 여기서 physicsResult 실제 값을 기준값과 비교해서 만든다 -
 // 라벨별로 문장을 하드코딩하지 않고, CO2/알베도/대기두께가 실제로 기준보다
 // 높은지 낮은지에 따라 매번 다시 생성된다.
@@ -126,7 +126,7 @@ export function analyzePlanetState({ physicsResult, mlResult, co2Ppm, atmThickne
           title: "현재 상태",
           lines: [
             "에너지가 거의 균형 상태입니다.",
-            "실제로 안정적인지는 최종 확인(Final) 단계에서 AI가 판정합니다.",
+            "실제로 안정적인지는 최종 확인(Final) 단계에서 물리엔진이 판정합니다.",
           ],
          },
         {
@@ -228,7 +228,7 @@ export function shortSliderChangeLabel(key, delta) {
   return `${label} ${delta > 0 ? "증가" : "감소"}`;
 }
 
-// ML/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(ML Prediction 배지)와
+// planetStateOf/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(상태 판정 배지)와
 // ReportPage(타임라인 라벨 칩)가 같은 상태를 같은 색으로 보여주도록 공유한다.
 // 라벨이 없으면(아직 판정 전) "neutral"로 - 실제 상태처럼 색이 칠해지면 안 된다.
 const LABEL_TONE = {
@@ -371,7 +371,7 @@ function withArrows(blocks) {
   return lines;
 }
 
-// AI가 판정한 평형 상태(Cold/Earth-like/Warm Stable)별 결과 문구 -
+// 물리엔진이 판정한 평형 상태(Cold/Earth-like/Warm Stable)별 결과 문구 -
 // describeItemJudgment와 describeFinalizeJudgment가 공유한다. 둘 다 매번 새로
 // notice를 만들 때 이걸 호출해야 mlResult가 바뀔 때마다 문구도 같이 갱신된다 -
 // 아니면 예전에 뜬 문구가 최신 상태와 안 맞게 그대로 남는다. Energy Surplus/
@@ -432,7 +432,7 @@ export function describeItemJudgment(item, before, after, label) {
   ];
 
   blocks.push(deltaEnergyLines(after.deltaEnergy));
-  blocks.push(["AI가 최종 기후 상태를 분석합니다."]);
+  blocks.push(["물리엔진이 최종 기후 상태를 분석합니다."]);
   blocks.push(
     label === "Energy Surplus" || label === "Energy Deficit"
       ? describeImbalanceChange(before, after, label)
@@ -715,7 +715,7 @@ export function previewItemEffect(item) {
   }
 }
 
-// energyStateOf/label_rules.py 기준 "에너지가 평형인" 세 상태 - 도달했다면 복사평형
+// energyStateOf 기준 "에너지가 평형인" 세 상태 - 도달했다면 복사평형
 // 개념이 실제로 이번 판에 나타났다는 뜻이다.
 const RADIATIVE_EQUILIBRIUM_LABELS = new Set(["Cold Stable", "Earth-like Stable", "Warm Stable"]);
 

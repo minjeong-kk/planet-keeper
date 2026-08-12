@@ -31,7 +31,7 @@ const STAGE_LABELS = {
   [GAME_STAGES.FINAL]: "2단계 문제",
 };
 
-// 아이템 사용/2단계 확인 후 AI가 판정한 상태 - 일반 안내 문구보다 눈에 띄도록
+// 아이템 사용/2단계 확인 후 물리엔진이 판정한 상태 - 일반 안내 문구보다 눈에 띄도록
 // 아이콘/색상을 구분해서 강조 표시한다. Energy Surplus/Deficit은 아이템을 잘못
 // 골라 오히려 에너지 불균형이 커진 경우다.
 // notice(아이템/최종 판정)와 feedback(정답/오답)이 같은 성공/실패 색상 규칙을 쓴다.
@@ -254,7 +254,7 @@ function GamePage() {
             <ItemStage items={visibleItems} onSelect={useItem} disabled={!!pendingClimateEvent} />
           )}
 
-          {isComputing && <p>AI가 행성 상태를 판정하는 중...</p>}
+          {isComputing && <p>행성 상태를 계산하는 중...</p>}
 
           {notice && STABLE_BADGES[mlResult?.label] && (
             <div className={`game-page__stable-badge ${STABLE_BADGES[mlResult.label].className}`}>

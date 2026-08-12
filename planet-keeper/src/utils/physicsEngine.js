@@ -2,8 +2,7 @@
  * physicsEngine.js — 기후 물리 엔진 (순수 함수)
  *
  * React state / UI / Three.js에 전혀 의존하지 않는 순수 계산 모듈이다.
- * 동일한 함수를 브라우저(게임)와 머신러닝 데이터 생성 스크립트에서 그대로
- * import하여 재사용한다.
+ * 게임의 물리 계산과 상태 판정(planetStateOf)이 모두 여기서 나온다.
  *
  *   import { computeClimateV2, mapSlidersToClimateInputs } from ".../utils/physicsEngine"
  *
@@ -47,7 +46,6 @@
 
 // 라벨 임계값은 실측 데이터에서 도출된 생성 파일에서 읽는다.
 // (data-pipeline/ML-Scripts/derive_thresholds.py → src/data/climateThresholds.js)
-// label_rules.py도 같은 도출 결과를 읽으므로 Python/JS가 어긋날 수 없다.
 import {
   EPSILON_ENERGY_BALANCE,
   COLD_STABLE_MAX_K,
@@ -196,7 +194,7 @@ export const BASELINE_ATM_THICKNESS = BASELINE_STATE.atmThickness // 1 (지구 �
 
 // equilibriumTemperatureOf는 이 파일 아래(온도 동역학 섹션)에 정의돼 있다 -
 // 병합 전 이쪽 브랜치가 만든 버전은 clamp/가드가 없어서, 그걸 포함하는
-// 최신(ML 파이프라인) 버전으로 통합했다. 이름/시그니처는 그대로라 아래
+// clamp가 있는 버전으로 통합했다. 이름/시그니처는 그대로라 아래
 // co2PpmForTargetTemperature나 useGameStore.js 쪽 호출부는 안 바뀐다.
 
 /**
@@ -223,8 +221,7 @@ export function co2PpmToSlider(co2Ppm) {
   return clamp(((co2Ppm / CO2_BASELINE_PPM - 0.3) / 2.7) * 100, 0, 100)
 }
 
-// 에너지 평형 판정 허용오차. label_rules.py와 같은 값을 쓰는 것이 구조적으로
-// 보장된다 - 둘 다 derive_thresholds.py가 생성한 파일에서 읽기 때문이다.
+// 에너지 평형 판정 허용오차. derive_thresholds.py가 생성한 파일에서 읽는다.
 export const ENERGY_BALANCE_EPSILON = EPSILON_ENERGY_BALANCE
 
 export function energyStateOf(deltaEnergy) {
@@ -235,8 +232,8 @@ export function energyStateOf(deltaEnergy) {
 
 // ── 온도 동역학 ────────────────────────────────────────────────────
 // computeClimateV2는 주어진 온도에서 수지만 평가하고 온도를 바꾸지 않는다.
-// 온도를 실제로 움직이는 규칙은 게임 로직의 것이지만, ML 데이터 생성 스크립트도
-// 같은 규칙을 써야 하므로 순수 함수로 여기 모아 둔다.
+// 온도를 실제로 움직이는 규칙은 게임 로직의 것이지만, 여러 호출부가 같은 규칙을
+// 써야 하므로 순수 함수로 여기 모아 둔다.
 
 // 온도가 물리적으로 의미 있는 범위를 벗어나 발산하지 않도록 하는 상하한.
 export const TEMPERATURE_FLOOR_K = 150
@@ -285,11 +282,14 @@ export function stepTemperature(currentTemperature, deltaEnergy) {
   )
 }
 
-// ── 행성 상태 5분류 (label_rules.py와 같은 규칙) ─────────────────────
+// ── 행성 상태 5분류 ────────────────────────────────────────────────
 // ΔE로 평형/불평형을 먼저 가르고, 평형이면 온도로 저온/지구형/고온을 가른다.
 // 클래스 번호는 저온 → 고온 순서다.
-// 온도 구간은 실측 데이터에서 도출된 값이며(derive_thresholds.py),
-// label_rules.py와 같은 생성 파일을 읽으므로 한쪽만 바뀌어 어긋날 수 없다.
+// 온도 구간은 실측 데이터에서 도출된 값이다(derive_thresholds.py).
+//
+// 예전에는 이 판정을 학습된 ONNX 모델이 대신했지만, 라벨이 ΔE·온도만으로 완전히
+// 결정되는 구조라 모델은 물리 규칙의 근사(정확도 0.9694)에 지나지 않았다.
+// 지금은 게임이 이 함수를 직접 호출해 정확값을 쓴다.
 export { COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K }
 
 export const PLANET_STATES = [
@@ -300,7 +300,7 @@ export const PLANET_STATES = [
   { state: 4, label: "Energy Surplus", korean: "고온 불평형" },
 ]
 
-/** ΔE와 현재 온도로부터 행성 상태(0~4)를 판정한다. label_rules.assign_label과 동일. */
+/** ΔE와 현재 온도로부터 행성 상태(0~4)를 판정한다. */
 export function planetStateOf(deltaEnergy, temperatureK) {
   if (deltaEnergy < -ENERGY_BALANCE_EPSILON) return 0
   if (deltaEnergy > ENERGY_BALANCE_EPSILON) return 4

@@ -1,8 +1,8 @@
 """실측 데이터로 '현대 지구형 안정 평형' 표준 범위(라벨 임계값)를 도출한다.
 
 개발계획서 (2)의 "기상청·천리안 실측 데이터로 '현대 지구형 안정 평형' 표준 범위를
-정의하고" 에 해당하는 단계다. 이전에는 label_rules.py에 280K/295K가 "예시값"으로
-하드코딩되어 있었고, 실측 데이터는 라벨 결정에 전혀 쓰이지 않았다.
+정의하고" 에 해당하는 단계다. 이전에는 280K/295K가 "예시값"으로 하드코딩되어 있었고,
+실측 데이터는 상태 판정에 전혀 쓰이지 않았다.
 
 도출 방식
 ---------
@@ -23,16 +23,18 @@ epsilon 5.0 은 "평형온도에서 약 4.6K 이내"에 해당한다.
 
 출력
 ----
-같은 값을 두 형식으로 쓴다 - 이렇게 해야 Python(label_rules.py)과
-JS(physicsEngine.js)가 같은 값을 쓰는 것이 구조적으로 보장된다.
-예전에는 두 파일에 상수를 따로 적어 두고 주석으로만 "같은 값"이라고 해 두었다.
+같은 값을 두 형식으로 쓴다.
 
-  - data-pipeline/Datasets/climate_thresholds.json  (label_rules.py가 읽음)
-  - src/data/climateThresholds.js                   (physicsEngine.js가 import)
+  - data-pipeline/Datasets/climate_thresholds.json  (도출 근거 기록용 - derivation 필드에
+                                                     표본 수·관측 범위·IQR이 남는다)
+  - src/data/climateThresholds.js                   (physicsEngine.js가 import - 실제 소비처)
 
 프론트 쪽을 JSON이 아니라 생성된 JS 모듈로 두는 이유: JSON import는 Node에서
-import attributes(`with { type: "json" }`)를 요구하는데, 이 파일은 브라우저(Vite)와
-Node(run_physics_engine.mjs 경유) 양쪽에서 로드되므로 JS 모듈이 가장 안전하다.
+import attributes(`with { type: "json" }`)를 요구해서, 브라우저(Vite)와 Node 양쪽에서
+로드하려면 JS 모듈이 가장 안전하다.
+
+이 스크립트가 두 파일의 유일한 생성자다 - 값이 어긋날 수 없는 구조이므로 별도의
+동기화 검사가 필요 없다(예전 verify_sync.py의 임계값 검사가 하던 역할).
 
 사용법:
     python3 derive_thresholds.py
@@ -109,7 +111,7 @@ def write_js_module(path, payload: dict) -> None:
         f"//       IQR {d['observed_iqr_k'][0]}~{d['observed_iqr_k'][1]} K\n"
         f"//       {d['note']}\n"
         "//\n"
-        "// label_rules.py가 읽는 climate_thresholds.json 과 같은 값이다.\n\n"
+        "// climate_thresholds.json 과 같은 값이다(도출 근거는 그 파일의 derivation 필드).\n\n"
         "export const EPSILON_ENERGY_BALANCE = "
         f"{payload['epsilon_energy_balance']}\n"
         f"export const COLD_STABLE_MAX_K = {payload['cold_stable_max_k']}\n"

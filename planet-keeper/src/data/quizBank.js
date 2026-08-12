@@ -1,7 +1,7 @@
 // 기후 퀴즈 문제 은행. QuizModal이 기대하는 모양({id, title, choices, answer})에 맞춤.
 // STAGE1(1단계) = 아이템 사용 전(열수지 계산 위주), STAGE2(2단계) = 아이템 사용 후(개념/기상학 위주).
 // 계산 문제의 공식·상수는 전부 src/utils/physicsEngine.js(albedoOf/greenhouseStrengthOf/
-// CO2_BASELINE_PPM)와 data-pipeline/ML-Scripts/label_rules.py(EPSILON_ENERGY_BALANCE,
+// CO2_BASELINE_PPM)와 src/data/climateThresholds.js(EPSILON_ENERGY_BALANCE,
 // COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K)에서 실제 쓰는 값을 그대로 가져왔다.
 //
 // 아이템은 문제별 고정 정답이 없다 - useGameStore.js의 useItem()이 실제로 적용한 뒤

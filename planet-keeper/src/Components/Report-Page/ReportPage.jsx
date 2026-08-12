@@ -200,9 +200,9 @@ function ReportPage() {
             </span>
           </div>
           <div className="report-page__metric-box">
-            <span className="report-page__metric-label">ML 분류 (확신도)</span>
+            <span className="report-page__metric-label">에너지 수지 판정</span>
             <span className="report-page__metric-value">
-              {final?.ml ? `${final.ml.label} ${final.ml.confidence != null ? `(${Math.round(final.ml.confidence * 100)}%)` : ""}` : "-"}
+              {final?.ml ? final.ml.label : "-"}
             </span>
           </div>
           <div className="report-page__metric-box">

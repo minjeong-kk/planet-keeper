@@ -80,7 +80,7 @@
   line-height: 1.45;
 }
 
-/* ML Prediction 카드 형태 디자인 */
+/* 행성 상태 판정 카드 형태 디자인 */
 .info-panel__ml-card {
   background: var(--code-bg);
   border: 1px solid var(--border);
