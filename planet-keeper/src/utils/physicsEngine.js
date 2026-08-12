@@ -41,12 +41,16 @@
  *
  * - TOA 하향단파복사속 기준 상수 S = 297.88 W/m² (KIM 실측)
  * - CO₂ 기준 농도 = 429.53 ppm (기상청 관측소 3곳 2024년 실측 평균)
- * - 기준 온도 = 288 K
+ * - 기준 온도 = 288.15 K (15°C, 판정 밴드의 중심과 같은 값)
  */
 
 // 라벨 임계값은 실측 데이터에서 도출된 생성 파일에서 읽는다.
 // (data-pipeline/Analysis/derive_thresholds.py → src/data/climateThresholds.js)
-import { COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K } from "../data/climateThresholds.js"
+import {
+  COLD_STABLE_MAX_K,
+  EARTH_LIKE_MAX_K,
+  EARTH_REFERENCE_TEMP_K,
+} from "../data/climateThresholds.js"
 
 // ── 과학적 기준 상수 (PLAN.md) ──────────────────────────────────
 // TOA 하향단파복사. KIM 전지구 필드 평균 실측값(physics_reference.csv의 dswrtoa
@@ -68,7 +72,14 @@ export const ENERGY_SCALE = SOLAR_CONSTANT / 100 // 계획서 기준 스케일(S
 // 응답) 양쪽에 들어가고 서로 나눠지므로 약분된다 - 즉 값이 바뀌어도 같은 슬라이더
 // 위치에서 온실효과·ΔE·판정은 그대로다. 화면에 표시되는 ppm 숫자만 달라진다.
 export const CO2_BASELINE_PPM = 429.53
-export const REFERENCE_TEMP_K = 288 // 지구 평균 지표 기온(≈15°C) — 보정 목표값
+// 지구 평균 지표 기온(15°C = 288.15 K) — 유효 σ 보정의 목표값이다.
+//
+// 숫자를 여기 적지 않고 climateThresholds.js에서 가져오는 이유: 판정 밴드
+// (COLD_STABLE_MAX_K ~ EARTH_LIKE_MAX_K)가 derive_thresholds.py에서 이 값을
+// 중심으로 ±(관측 IQR/2) 하게 계산된다. 엔진이 평형을 맞추는 온도와 밴드의
+// 중심이 다르면 "평형인데 지구형이 아닌" 구간이 생기므로 같은 값을 써야 한다.
+// 예전에는 여기 288, 저기 288.15로 0.15 K 어긋나 있었다.
+export const REFERENCE_TEMP_K = EARTH_REFERENCE_TEMP_K
 
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x))
 
@@ -105,7 +116,7 @@ function greenhouseStrengthOf({ co2Ppm, atmThickness, cloudRatio }) {
   return clamp(0.3 + co2Term + atmTerm + cloudTerm, 0, 0.8)
 }
 
-// 지구 기준 상태(288 K)에서 ASR ≈ OLR(deltaEnergy ≈ 0)가 되도록
+// 지구 기준 상태(288.15 K)에서 ASR ≈ OLR(deltaEnergy ≈ 0)가 되도록
 // 유효 σ(EFFECTIVE_SIGMA)를 보정한다.
 const BASELINE_STATE = {
   glacierRatio: 0.1,
@@ -201,7 +212,7 @@ export function mapSlidersToClimateInputs(sliders = {}) {
 }
 
 // 알베도/대기두께 "기준(중립)" 값 - Planet Summary 원인 분석(현재 값 vs 기준값 비교)에 쓴다.
-// BASELINE_STATE(288K에서 deltaEnergy≈0이 되도록 보정한 조성)의 알베도를 그대로 쓴다.
+// BASELINE_STATE(288.15K에서 deltaEnergy≈0이 되도록 보정한 조성)의 알베도를 그대로 쓴다.
 export const BASELINE_ALBEDO = albedoOf(BASELINE_STATE)
 export const BASELINE_ATM_THICKNESS = BASELINE_STATE.atmThickness // 1 (지구 기준)
 
