@@ -40,7 +40,7 @@
  * ------------------------------------------------------------------
  *
  * - TOA 하향단파복사속 기준 상수 S = 297.88 W/m² (KIM 실측)
- * - CO₂ 기준 농도 = 432 ppm
+ * - CO₂ 기준 농도 = 429.53 ppm (기상청 관측소 3곳 2024년 실측 평균)
  * - 기준 온도 = 288 K
  */
 
@@ -60,7 +60,14 @@ import { COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K } from "../data/climateThresholds.j
 export const SOLAR_CONSTANT = 297.88 // TOA 하향단파복사속 기준 (KIM 실측)
 // ΔE 단위(W/m²)로 표현된 임계값을 가진 다른 모듈들도 이 배율을 써서 환산한다.
 export const ENERGY_SCALE = SOLAR_CONSTANT / 100 // 계획서 기준 스케일(S=100) 대비 배율
-export const CO2_BASELINE_PPM = 432 // 기상청 안면도 실측 기준 배경 농도
+// 기상청 관측소 3곳(울릉도·독도 428.29 / 안면도 431.02 / 고산 429.29)의 2024년
+// 월별 실측 36개를 평균한 값(physics_reference.csv의 co2). 계획서는 432로 두고
+// 시작했는데 그건 어느 관측소 값과도 맞지 않아서 실측 평균으로 교체했다.
+//
+// 이 상수는 sliderToCO2Ppm(슬라이더→ppm)과 greenhouseStrengthOf의 co2Term(ppm→로그
+// 응답) 양쪽에 들어가고 서로 나눠지므로 약분된다 - 즉 값이 바뀌어도 같은 슬라이더
+// 위치에서 온실효과·ΔE·판정은 그대로다. 화면에 표시되는 ppm 숫자만 달라진다.
+export const CO2_BASELINE_PPM = 429.53
 export const REFERENCE_TEMP_K = 288 // 지구 평균 지표 기온(≈15°C) — 보정 목표값
 
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x))

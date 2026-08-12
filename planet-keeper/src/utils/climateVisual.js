@@ -5,7 +5,9 @@ import { sliderToCO2Ppm } from "./physicsEngine.js";
 
 const s01 = (v) => Math.min(1, Math.max(0, (v ?? 0) / 100)); // 0~100 → 0~1
 
-// CO₂ 슬라이더(%) → 실제 ppm (physicsEngine 매핑과 동일: 432 * (0.3 ~ 3.0))
+// CO₂ 슬라이더(%) → 실제 ppm. 변환식은 physicsEngine의 sliderToCO2Ppm 하나만
+// 쓴다(CO2_BASELINE_PPM * (0.3 ~ 3.0)) - 여기 숫자를 복제해 두면 기준 농도가
+// 바뀔 때 표시값만 조용히 어긋난다.
 export const co2Ppm = (v) => Math.round(sliderToCO2Ppm(v));
 
 /** 슬라이더 값 → PlanetUI 의 물리 요소별 3D props */
