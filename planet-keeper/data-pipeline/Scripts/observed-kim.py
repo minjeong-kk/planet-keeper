@@ -1,10 +1,10 @@
 # 머신러닝 학습용 데이터 수치 모델 (GK2A 샘플 위경도와 매칭)
 #
-# ml-gk2a.py를 먼저 실행해서 ml_gk2a_dataset.csv(위경도 포함)를 만든 뒤 이 스크립트를 실행한다.
+# observed-gk2a.py를 먼저 실행해서 observed_gk2a_dataset.csv(위경도 포함)를 만든 뒤 이 스크립트를 실행한다.
 # 같은 위경도, 같은 tmfc로 KIM 값을 조회해서 GK2A 샘플과 1:1로 매칭한다.
 #
-# 날짜별로 나눠 여러 날에 걸쳐 실행하는 구조라, ml_gk2a_dataset.csv에 새로 추가된
-# 행(아직 ml_dataset.csv에 없는 만큼)만 이어서 처리한다.
+# 날짜별로 나눠 여러 날에 걸쳐 실행하는 구조라, observed_gk2a_dataset.csv에 새로 추가된
+# 행(아직 observed_kim_dataset.csv에 없는 만큼)만 이어서 처리한다.
 
 import csv
 import os
@@ -26,8 +26,8 @@ VARIABLES = [
 
 DATASETS_DIR = "../Datasets"
 os.makedirs(DATASETS_DIR, exist_ok=True)
-GK2A_SAMPLE_FILE = os.path.join(DATASETS_DIR, "ml_gk2a_dataset.csv")
-OUTPUT_FILE = os.path.join(DATASETS_DIR, "ml_dataset.csv")
+GK2A_SAMPLE_FILE = os.path.join(DATASETS_DIR, "observed_gk2a_dataset.csv")
+OUTPUT_FILE = os.path.join(DATASETS_DIR, "observed_kim_dataset.csv")
 
 
 def fetch_point(var_name, tmfc, lat, lon):
@@ -96,7 +96,7 @@ total = len(new_samples)
 
 
 if total == 0:
-    print("새로 매칭할 샘플이 없습니다 (ml_gk2a_dataset.csv에 새 행을 추가한 뒤 다시 실행하세요).")
+    print("새로 매칭할 샘플이 없습니다 (observed_gk2a_dataset.csv에 새 행을 추가한 뒤 다시 실행하세요).")
 else:
     fieldnames = ["tmfc", "lat", "lon"] + VARIABLES + extra_columns
 

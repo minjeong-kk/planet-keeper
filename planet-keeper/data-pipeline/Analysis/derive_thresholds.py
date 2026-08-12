@@ -8,7 +8,7 @@
 ---------
 관측 t2m의 '폭'만 쓰고 '중심'은 계획서 기준값을 쓴다.
 
-  - ml_dataset.csv의 t2m 평균은 지구 평균(288.15K)보다 따뜻하게 치우쳐 있다.
+  - observed_kim_dataset.csv의 t2m 평균은 지구 평균(288.15K)보다 따뜻하게 치우쳐 있다.
     KMA API 조회 기간과 GK2A 관측 영역 제약으로 여름철·저위도 표본이 많기 때문이며,
     README '알려진 한계' 2번과 6번에 이미 기록된 편향이다.
   - 따라서 관측 '평균'을 지구형 중심으로 쓰면 안 된다. 대신 관측이 신뢰성 있게
@@ -57,7 +57,7 @@ EARTH_REFERENCE_TEMP_K = 288.15
 # 에너지 평형 판정 허용오차(설계값, 관측량 아님). 위 docstring의 근거 참고.
 EPSILON_ENERGY_BALANCE = 5.0
 
-OBSERVED_DATASET = config.DATASETS_DIR / "ml_dataset.csv"
+OBSERVED_DATASET = config.DATASETS_DIR / "observed_kim_dataset.csv"
 JSON_FOR_PYTHON = config.DATASETS_DIR / "climate_thresholds.json"
 JS_FOR_FRONTEND = (
     config.DATA_PIPELINE_DIR.parent / "src" / "data" / "climateThresholds.js"
@@ -103,7 +103,7 @@ def write_js_module(path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "// ⚠️ 자동 생성 파일 — 직접 수정하지 마세요.\n"
-        "// data-pipeline/ML-Scripts/derive_thresholds.py 를 실행하면 다시 생성됩니다.\n"
+        "// data-pipeline/Analysis/derive_thresholds.py 를 실행하면 다시 생성됩니다.\n"
         "//\n"
         f"// 근거: {d['source']} 관측 {d['n_observations']}개 지점\n"
         f"//       관측 t2m {d['observed_t2m_min_k']}~{d['observed_t2m_max_k']} K "
@@ -128,7 +128,7 @@ def main() -> None:
 
     df = pd.read_csv(OBSERVED_DATASET)
     if "t2m" not in df.columns:
-        raise ValueError("ml_dataset.csv에 t2m 컬럼이 없습니다.")
+        raise ValueError(f"{OBSERVED_DATASET.name}에 t2m 컬럼이 없습니다.")
 
     thresholds = derive(df["t2m"].dropna())
 

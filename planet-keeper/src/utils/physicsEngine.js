@@ -45,7 +45,7 @@
  */
 
 // 라벨 임계값은 실측 데이터에서 도출된 생성 파일에서 읽는다.
-// (data-pipeline/ML-Scripts/derive_thresholds.py → src/data/climateThresholds.js)
+// (data-pipeline/Analysis/derive_thresholds.py → src/data/climateThresholds.js)
 import {
   EPSILON_ENERGY_BALANCE,
   COLD_STABLE_MAX_K,

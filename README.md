@@ -21,14 +21,14 @@ pip install -r requirements.txt
 ```bash
 # 1. 실측 수집 (API 키 필요, .env 참고)
 cd data-pipeline/Scripts
-python3 ml-gk2a.py             # 천리안 산출물 + 좌표 앵커 → ml_gk2a_dataset.csv
-python3 ml-kim.py              # 같은 좌표의 KIM t2m/psl → ml_dataset.csv
+python3 observed-gk2a.py       # 천리안 산출물 + 좌표 앵커 → observed_gk2a_dataset.csv
+python3 observed-kim.py        # 같은 좌표의 KIM t2m/psl → observed_kim_dataset.csv
 python3 physics-kim.py         # KIM 전지구 필드 평균 → physics_kim_dataset.csv
 python3 physics-gk2a.py        # 천리안 SWRAD 평균 → physics_gk2a_dataset.csv
 python3 physics-merge.py       # 위 결과 + CO2 병합 → physics_reference.csv
 
 # 2. 임계값 도출
-cd ../ML-Scripts
+cd ../Analysis
 python3 derive_thresholds.py   # 실측 t2m 분포 → climate_thresholds.json
                                #                + src/data/climateThresholds.js
 ```
@@ -39,7 +39,7 @@ python3 derive_thresholds.py   # 실측 t2m 분포 → climate_thresholds.json
 ## 실측 데이터가 쓰이는 경로
 
 ```
-ml_dataset.csv (KIM t2m, 1,498지점)
+observed_kim_dataset.csv (KIM t2m, 1,498지점)
         │
         └─ derive_thresholds.py ─→ COLD_STABLE_MAX_K / EARTH_LIKE_MAX_K
                                             │
@@ -53,16 +53,17 @@ ml_dataset.csv (KIM t2m, 1,498지점)
 
 | 파일 | 역할 |
 |------|------|
-| **Scripts/ml-gk2a.py** | 천리안(GK2A) 산출물을 받고, 정지궤도 투영으로 위경도를 계산해 표본 좌표를 만듦. |
-| **Scripts/ml-kim.py** | 위 좌표와 같은 지점·시각의 KIM 수치모델 `t2m`/`psl`을 조회해 1:1 매칭. |
+| **Scripts/observed-gk2a.py** | 천리안(GK2A) 산출물을 받고, 정지궤도 투영으로 위경도를 계산해 표본 좌표를 만듦. |
+| **Scripts/observed-kim.py** | 위 좌표와 같은 지점·시각의 KIM 수치모델 `t2m`/`psl`을 조회해 1:1 매칭. |
 | **Scripts/physics-kim.py** | KIM 전지구 필드 평균(복사 5변수)을 월별로 수집. |
 | **Scripts/physics-gk2a.py** | 천리안 SWRAD(지면 흡수단파) 전지구 평균을 월별로 수집. |
 | **Scripts/physics-merge.py** | 위 둘과 CO₂ 실측을 합쳐 `physics_reference.csv` 생성. |
-| **ML-Scripts/config.py** | 데이터 파이프라인 공용 경로 상수. |
-| **ML-Scripts/derive_thresholds.py** | 실측 t2m 분포에서 판정 임계값을 도출해 `climate_thresholds.json`(기록용)과 `src/data/climateThresholds.js`(프론트가 import)에 저장. |
+| **Analysis/config.py** | 데이터 파이프라인 공용 경로 상수. |
+| **Analysis/derive_thresholds.py** | 실측 t2m 분포에서 판정 임계값을 도출해 `climate_thresholds.json`(기록용)과 `src/data/climateThresholds.js`(프론트가 import)에 저장. |
 
-> 폴더 이름 `ML-Scripts/`는 분류 모델을 제거하기 전의 이름입니다(7장 참고).
-> 파일명 `ml-*.py` / `ml_dataset.csv` 도 마찬가지로 과거형이며, 실제 내용은 실측 수집·임계값 도출입니다.
+> `Scripts/`는 API 수집(네트워크·인증 키 필요), `Analysis/`는 수집된 파일만으로 하는
+> 오프라인 도출입니다. 스크립트 이름과 출력 파일 이름이 짝을 이룹니다
+> (`observed-kim.py` → `observed_kim_dataset.csv`).
 
 ---
 
@@ -94,7 +95,7 @@ ml_dataset.csv (KIM t2m, 1,498지점)
 
 ## 2. 실측 데이터의 한계
 
-- `ml_dataset.csv`는 KMA API 조회 기간(최대 약 180일)의 제약을 받습니다.
+- `observed_kim_dataset.csv`는 KMA API 조회 기간(최대 약 180일)의 제약을 받습니다.
 - 모든 계절을 포함하지 못하며, 특정 기간의 실제 기상 특성을 반영합니다.
 - 표본 좌표가 천리안 관측 영역(동아시아·서태평양) 안에 있어 여름철·저위도로 치우쳐
   있습니다. 그래서 `derive_thresholds.py`는 관측 **평균**을 쓰지 않고 **분포의 폭(IQR)**

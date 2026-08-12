@@ -10,6 +10,6 @@ src/utils/physicsEngine.js 의 planetStateOf 가 정확값을 바로 계산한�
 
 from pathlib import Path
 
-ML_SCRIPTS_DIR = Path(__file__).resolve().parent
-DATA_PIPELINE_DIR = ML_SCRIPTS_DIR.parent
+ANALYSIS_DIR = Path(__file__).resolve().parent
+DATA_PIPELINE_DIR = ANALYSIS_DIR.parent
 DATASETS_DIR = DATA_PIPELINE_DIR / "Datasets"
