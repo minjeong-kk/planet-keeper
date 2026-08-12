@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
-import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
+import { PLANET_STATES, planetStateOf, ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
 import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
@@ -214,8 +214,12 @@ function ReportPage() {
         {final && (
           <p className="report-page__final-physics">
             🌡️ 최종 물리값: 온도 {fmt(final.physics.currentTemperature, 1)}K · ΔE{" "}
-            {formatSigned(final.physics.deltaEnergy, 2)} W/m² · 알베도 {fmt(final.physics.albedo)} · 온실효과{" "}
-            {fmt(final.physics.greenhouseStrength)}
+            {formatSigned(final.physics.deltaEnergy, 2)} W/m²
+            <span className="report-page__tolerance-note">
+              {" "}
+              (평형 기준 ±{ENERGY_BALANCE_EPSILON.toFixed(1)})
+            </span>{" "}
+            · 알베도 {fmt(final.physics.albedo)} · 온실효과 {fmt(final.physics.greenhouseStrength)}
           </p>
         )}
       </div>

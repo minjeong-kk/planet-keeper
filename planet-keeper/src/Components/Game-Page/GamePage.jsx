@@ -8,7 +8,11 @@ import Term from "../common/Term.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
-import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
+import {
+  mapSlidersToClimateInputs,
+  equilibriumTemperatureOf,
+  ENERGY_BALANCE_EPSILON,
+} from "../../utils/physicsEngine.js";
 import { formatSigned, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
@@ -207,7 +211,20 @@ function GamePage() {
                   <span className="game-page__key-card-label">
                     ⚡ <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형(ΔE)</Term>
                   </span>
-                  <span className="game-page__key-card-value">{formatSigned(physicsResult.deltaEnergy)} W/m²</span>
+                  {/* 숫자만 보면 이게 평형에 가까운지 알 수 없어서 판정 기준선을 같이 보여준다.
+                      허용범위 안이면 값 자체를 초록으로 바꿔 한눈에 구분되게 한다. */}
+                  <span
+                    className={`game-page__key-card-value${
+                      Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON
+                        ? " game-page__key-card-value--balanced"
+                        : ""
+                    }`}
+                  >
+                    {formatSigned(physicsResult.deltaEnergy)} W/m²
+                  </span>
+                  <span className="game-page__key-card-note">
+                    평형 기준 ±{ENERGY_BALANCE_EPSILON.toFixed(1)} W/m²
+                  </span>
                 </div>
               </div>
 

@@ -305,6 +305,13 @@
   margin: 0;
   font-size: 0.9rem;
   color: var(--text);
+  word-break: keep-all;
+}
+
+/* ΔE 옆의 평형 판정 기준선. 본문보다 흐리게 둬서 값 자체를 가리지 않게 한다. */
+.report-page__tolerance-note {
+  color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* =========================================
