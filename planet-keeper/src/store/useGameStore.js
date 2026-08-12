@@ -590,7 +590,7 @@ const useGameStore = create(
       name: "planet-keeper-game",
       // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -
       // 저장해두면 새로고침 시 항상 "계산하는 중..."에서 멈춘 것처럼 보인다.
-      partialize: ({ isComputing, ...rest }) => rest,
+      partialize: ({ isComputing: _isComputing, ...rest }) => rest,
       // seenIds/correctIds는 Set이라 JSON.stringify/parse가 기본으로는 배열로
       // 날려버린다 - Set임을 표시해뒀다가 복원 시 되돌린다.
       storage: createJSONStorage(() => localStorage, {

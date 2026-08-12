@@ -9,7 +9,7 @@ import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore"
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
-import { deltaEnergyLines, formatSigned, labelTone } from "../../utils/planetAnalysis.js";
+import { formatSigned, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
 

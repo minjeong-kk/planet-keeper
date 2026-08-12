@@ -7,5 +7,5 @@ netCDF4
 pyproj
 python-dotenv
 
-# 임계값 도출 (ML-Scripts/derive_thresholds.py)
+# 임계값 도출 (Analysis/derive_thresholds.py)
 pandas==2.3.3
