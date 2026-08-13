@@ -1,3 +1,40 @@
+/* GamePage 우측 상단 플로팅 타이머와 같은 자리/스타일 - 슬라이더를 만지면 그
+   변수 설명이 뜬다. 이 페이지는 라이트/다크 토글과 무관하게 항상 다크 글래스
+   톤이라(.planet-create-page__controls 참고) 별도 다크모드 분기가 필요 없다. */
+.planet-create-page__guide {
+  position: fixed;
+  top: 20px;
+  right: 24px;
+  z-index: 999;
+  max-width: 300px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(160deg, rgba(28, 36, 58, 0.94), rgba(14, 18, 30, 0.94));
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  color: #f3f5fa;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
+}
+
+.planet-create-page__guide-eyebrow {
+  display: block;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--neon);
+  margin-bottom: 6px;
+}
+
+.planet-create-page__guide-text {
+  margin: 0;
+  font-size: 0.92rem;
+  font-weight: 500;
+  line-height: 1.65;
+  letter-spacing: -0.005em;
+}
+
 .planet-create-page {
   display: flex;
   align-items: center; /* 패널을 내용 높이로 수직 중앙 정렬 → 탭바 제거로 생긴 하단 공백 제거 */

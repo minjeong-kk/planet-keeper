@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
@@ -39,6 +39,22 @@ function couplingCapFor(key, values) {
   return Math.max(SLIDER_RANGE.min, Math.min(SLIDER_RANGE.max, 100 - values[coupledKey]));
 }
 
+// 슬라이더를 만졌을 때(포커스/드래그 시작) 옆에 띄우는 짧은 설명. 빙하/바다는
+// 왜 가능 범위가 서로 달라지는지(커플링)를, 나머지는 각 변수가 물리엔진에서
+// 실제로 어떤 역할을 하는지를 한 줄로 설명한다.
+const SLIDER_GUIDE = {
+  iceThickness:
+    "🧊 빙하와 바다는 합쳐서 100%를 넘을 수 없어요. 빙하를 늘리면 바다의 최대치가 줄어듭니다.",
+  ocean:
+    "🌊 바다와 빙하는 합쳐서 100%를 넘을 수 없어요. 바다를 늘리면 빙하의 최대치가 줄어듭니다.",
+  cloud:
+    "☁️ 구름은 태양빛을 반사해 식히면서도 열을 가둬 데웁니다. 알베도와 온실효과 모두에 영향을 줘요.",
+  atmThickness:
+    "💨 대기가 두꺼울수록 열을 더 오래 가둬 온실효과가 강해집니다.",
+  co2:
+    "🏭 CO₂가 늘수록 온실효과가 강해지지만, 늘어날수록 증가폭은 점점 줄어들어요.",
+};
+
 // 빙하/바다에만 쓰는 커스텀 슬라이더 - 트랙은 항상 0~100 스케일로 그리고(그래서
 // 두 슬라이더가 같은 칸 크기로 보인다), 실제로 손잡이가 갈 수 있는 값은
 // [min, cap]으로만 막는다. 나머지 세 슬라이더(대기두께/구름/CO2)는 서로 얽힐 일이
@@ -47,7 +63,7 @@ function couplingCapFor(key, values) {
 // pointermove마다 getBoundingClientRect를 다시 재는 건 레이아웃을 다시 읽는
 // 비용이 있어서, 드래그를 시작하는 순간(pointerdown) 한 번만 재고 ref에 담아
 // 드래그가 끝날 때까지 재사용한다(트랙 크기는 드래그 중 안 바뀌므로 안전하다).
-function Slider({ id, value, min, cap, onChange }) {
+function Slider({ id, value, min, cap, onChange, onGrab }) {
   const trackRef = useRef(null);
   const dragRectRef = useRef(null);
 
@@ -58,6 +74,7 @@ function Slider({ id, value, min, cap, onChange }) {
   };
 
   const handlePointerDown = (e) => {
+    onGrab?.();
     const rect = trackRef.current.getBoundingClientRect();
     dragRectRef.current = rect;
     trackRef.current.setPointerCapture(e.pointerId);
@@ -86,6 +103,7 @@ function Slider({ id, value, min, cap, onChange }) {
       aria-valuenow={value}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
+      onFocus={onGrab}
       onKeyDown={handleKeyDown}
     >
       <span
@@ -104,6 +122,11 @@ function PlanetCreatePage() {
   const setValue = useClimateStore((state) => state.setValue);
   const nextProblem = useGameStore((state) => state.nextProblem);
 
+  // 지금 만지고 있는(포커스/드래그 중인) 슬라이더 - 옆 설명 패널이 이걸 보고
+  // SLIDER_GUIDE에서 문구를 골라 보여준다. 손을 떼도 마지막 설명은 그대로 둔다
+  // (다음 슬라이더를 만질 때까지 사라지면 오히려 읽을 시간이 부족하다).
+  const [activeKey, setActiveKey] = useState(null);
+
   const visual = slidersToVisual(values);
 
   // Physics 결과는 store에 저장하지 않는다 - 슬라이더와 현재 온도만 있으면
@@ -116,6 +139,15 @@ function PlanetCreatePage() {
 
   return (
     <>
+      {/* GamePage 우측 상단 플로팅 타이머와 같은 자리/스타일 - 슬라이더를 만지면
+          그 변수 설명이 뜬다. */}
+      <div className="planet-create-page__guide">
+        <span className="planet-create-page__guide-eyebrow">GUIDE</span>
+        <p className="planet-create-page__guide-text">
+          {activeKey ? SLIDER_GUIDE[activeKey] : "슬라이더를 움직이면 여기에 설명이 표시됩니다."}
+        </p>
+      </div>
+
       <div className="planet-create-page">
         <div className="planet-create-page__planet">
           <div className="planet-create-page__planet-placeholder">
@@ -162,6 +194,7 @@ function PlanetCreatePage() {
                       min={SLIDER_RANGE.min}
                       cap={couplingCapFor(v.key, values)}
                       onChange={(next) => setValue(v.key, next)}
+                      onGrab={() => setActiveKey(v.key)}
                     />
                   ) : (
                     // 나머지는 서로 얽힐 일이 없어 네이티브 슬라이더 그대로 - 더 가볍고 매끄럽다.
@@ -176,6 +209,8 @@ function PlanetCreatePage() {
                         "--fill": `${((values[v.key] - SLIDER_RANGE.min) / (SLIDER_RANGE.max - SLIDER_RANGE.min)) * 100}%`,
                       }}
                       onChange={(e) => setValue(v.key, Number(e.target.value))}
+                      onFocus={() => setActiveKey(v.key)}
+                      onPointerDown={() => setActiveKey(v.key)}
                     />
                   )}
                 </div>

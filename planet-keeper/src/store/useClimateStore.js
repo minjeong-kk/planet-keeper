@@ -10,7 +10,7 @@ import {
 // PlanetCreatePage 슬라이더 + GamePage 표시가 공유하는 변수 목록.
 // Physics Engine(mapSlidersToClimateInputs)도 이 키 이름을 그대로 입력으로 쓴다.
 export const CLIMATE_VARIABLES = [
-  { key: "iceThickness", label: "빙하 두께" },
+  { key: "iceThickness", label: "빙하 면적" },
   { key: "ocean", label: "바다" },
   { key: "cloud", label: "구름 양" },
   { key: "atmThickness", label: "대기 두께" },
