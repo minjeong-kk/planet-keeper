@@ -356,3 +356,12 @@ All textures are bundled locally (not hot-linked) to avoid runtime/CORS dependen
   - 이용조건: **공공누리 제2유형 — 출처표시 + 상업적 이용금지**
   - 출처(공유마당): https://gongu.copyright.or.kr/gongu/wrt/wrt/view.do?wrtSn=227435
   - ⚠️ **비상업적 목적(교육·경진대회)에서만 사용할 수 있습니다.** 상업적 배포·수익화를 하게 되면 이 이미지를 빼거나 기상청의 별도 이용 허락을 받아야 합니다. (이미지 표시는 `src/Components/Start-Page/MascotGuide.jsx` 한 곳에서만 하며, 파일이 없으면 자체 제작 SVG 실루엣으로 자동 대체됩니다.)
+
+- **사하라 사막 지점 사진** (`public/assets/location-sahara.jpg`)
+  - 저작물명: "Eroded Beauty in the Sahara Desert" (원본 파일명 `iss061e098063_lrg.jpg`)
+  - 우주비행사 사진(Astronaut Photograph) ISS061-E-98063, 2019년 12월 25일 국제우주정거장에서 니콘 D5(800mm)로 촬영
+  - 제공: **NASA** (ISS Crew Earth Observations Facility / Earth Science and Remote Sensing Unit, Johnson Space Center)
+  - 라이선스: **Public Domain** (미국 정부 저작물)
+  - 출처: https://science.nasa.gov/earth/earth-observatory/eroded-beauty-in-the-sahara-desert-150604/
+  - 원본(5568×3712)을 프로젝트에서 960×640으로 리사이즈·재압축(용량 절감, 화질 손실 미미)해 로컬 번들
+  - 사용처: 행성 만들기 페이지의 "특정 지점 선택" — 사하라 사막 선택 시 미리보기(`src/data/climatePoints.js`)

@@ -295,6 +295,12 @@ export function co2PpmToSlider(co2Ppm) {
   return clamp(((co2Ppm / CO2_BASELINE_PPM - 0.3) / 2.7) * 100, 0, 100)
 }
 
+// mapSlidersToClimateInputs의 atmThickness(0.4~2.0) 역함수 - 지점 선택처럼 이미
+// 물리 단위로 된 값을 슬라이더 값(0~100)으로 되돌릴 때 쓴다.
+export function atmThicknessToSlider(atmThickness) {
+  return clamp(((atmThickness - 0.4) / 1.6) * 100, 0, 100)
+}
+
 // 에너지 평형 판정 허용오차 - |ΔE| 가 이 값 이하면 "평형"으로 본다.
 //
 // 관측량이 아니라 설계 허용오차다(예전에는 derive_thresholds.py가 관측 임계값과

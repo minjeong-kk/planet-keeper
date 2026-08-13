@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI from "../Planet-ui.jsx";
+import PlanetLocationPicker from "./PlanetLocationPicker.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
@@ -116,10 +117,33 @@ function Slider({ id, value, min, cap, onChange, onGrab }) {
   );
 }
 
+// 지점 선택 직후(슬라이더를 아직 안 만졌을 때) 3D 지구 대신 보여주는 자리.
+// imageUrl이 없는 지점(아직 라이선스 확인 전)은 회색 플레이스홀더 + 지점
+// 이름만 보여준다. imageUrl이 채워지면 이 컴포넌트가 자동으로 img를 그리고,
+// 호출부(PlanetCreatePage)는 안 건드려도 된다.
+function LocationPreview({ location }) {
+  if (location.imageUrl) {
+    return (
+      <img
+        className="planet-create-page__location-preview"
+        src={location.imageUrl}
+        alt={location.name}
+      />
+    );
+  }
+  return (
+    <div className="planet-create-page__location-preview planet-create-page__location-preview--placeholder">
+      <span>{location.name}</span>
+    </div>
+  );
+}
+
 function PlanetCreatePage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
   const setValue = useClimateStore((state) => state.setValue);
+  const selectedLocation = useClimateStore((state) => state.selectedLocation);
+  const isViewingLocationImage = useClimateStore((state) => state.isViewingLocationImage);
   const nextProblem = useGameStore((state) => state.nextProblem);
 
   // 지금 만지고 있는(포커스/드래그 중인) 슬라이더 - 옆 설명 패널이 이걸 보고
@@ -150,9 +174,18 @@ function PlanetCreatePage() {
 
       <div className="planet-create-page">
         <div className="planet-create-page__planet">
+          {/* 3D 지구(PlanetUI)는 항상 마운트해둔다 - 이미지 모드에서 언마운트했다가
+              슬라이더 조작 시 다시 마운트하면, 텍스처 로딩(Suspense)이 매번 새로
+              걸려서 "이미지 → 빈 화면 → 지구" 처럼 한 박자 빈다. 대신 이미지는 그
+              위에 겹쳐서 보여주고, 이미지 모드가 끝나면 그냥 덮개만 치운다 -
+              지구는 밑에서 계속 준비된 상태라 즉시 나타난다. */}
           <div className="planet-create-page__planet-placeholder">
             <PlanetUI {...visual} />
+            {isViewingLocationImage && selectedLocation && (
+              <LocationPreview location={selectedLocation} />
+            )}
           </div>
+          <PlanetLocationPicker />
         </div>
 
         <div className="planet-create-page__controls">

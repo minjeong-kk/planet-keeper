@@ -47,15 +47,40 @@
 .planet-create-page__planet {
   flex: 1;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 12px;
 }
 
 .planet-create-page__planet-placeholder {
+  position: relative; /* 지점 이미지가 이 안에서 절대 위치로 3D 지구 위에 겹쳐짐 */
   width: 320px;
   height: 320px;
   border-radius: 50%;
   overflow: hidden;
+}
+
+/* 지점 이미지(또는 회색 플레이스홀더) - 3D 지구를 언마운트하지 않고 그 위에
+   겹쳐서 덮는다(inset:0). PlanetCreatePage.jsx 주석 참고. */
+.planet-create-page__location-preview {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.planet-create-page__location-preview--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #2a3a5a;
+  color: #f3f5fa;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  padding: 16px;
 }
 
 /* ── 글래스모피즘 다크 컨트롤 패널 ── */

@@ -1,0 +1,96 @@
+.location-picker {
+  width: 100%;
+  max-width: 340px;
+  margin-top: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.location-picker__title {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #f3f5fa;
+}
+
+/* 등장방형(equirectangular) 투영과 같은 2:1 비율 - 격자선도 30도 간격(가로 12칸,
+   세로 6칸)이라 latLngToPercent의 계산과 시각적으로 맞는다.
+   배경은 실제 지구 사진(earth.jpg, 2048x1024=2:1)이다 - 3D 지구가 이미 쓰고
+   있는 파일(Solar System Scope, CC BY 4.0, README에 이미 출처 기록됨)을 그대로
+   재사용한 것이라 새 라이선스 확인이 필요 없다. 어둡게 깔린 그라디언트는 사진
+   위에서도 격자선·마커(🚩)가 잘 보이게 하기 위함이다. */
+.location-picker__map {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background-image:
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 8.3333%),
+    repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.16) 0 1px, transparent 1px 16.6667%),
+    linear-gradient(180deg, rgba(10, 22, 40, 0.45) 0%, rgba(6, 14, 26, 0.65) 100%),
+    url("/assets/earth.jpg");
+  background-size: auto, auto, auto, cover;
+  background-position: center;
+}
+
+.location-picker__marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  isolation: isolate;
+}
+
+/* 마커 버튼 자체는 호버/포커스 시에도 절대 움직이거나 커지지 않는다 */
+.location-picker__marker:hover,
+.location-picker__marker:focus,
+.location-picker__marker:focus-visible,
+.location-picker__marker:active {
+  transform: translate(-50%, -50%);
+}
+
+.location-picker__flag {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  font-size: 16px;
+  line-height: 1;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.6));
+  transform: translate(-50%, -100%);
+  transition: none; /* 혹시 어딘가에서 transition이 상속되어도 애니메이션 자체를 차단 */
+}
+
+/* 깃대 이모지도 호버/포커스 시 절대 크기·위치가 바뀌지 않는다 */
+.location-picker__flag:hover,
+.location-picker__marker:hover .location-picker__flag,
+.location-picker__marker:focus-visible .location-picker__flag {
+  transform: translate(-50%, -100%);
+  font-size: 16px;
+}
+
+.location-picker__tooltip {
+  position: absolute;
+  bottom: 130%;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  background: rgba(10, 14, 24, 0.92);
+  color: #fff;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border-radius: 6px;
+  pointer-events: none;
+}
+
+.location-picker__applied {
+  margin: 0;
+  font-size: 0.8rem;
+  color: #2dd4bf;
+}

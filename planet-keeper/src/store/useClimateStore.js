@@ -5,6 +5,8 @@ import {
   computeClimateV2,
   mapSlidersToClimateInputs,
   stepTemperature,
+  co2PpmToSlider,
+  atmThicknessToSlider,
 } from "../utils/physicsEngine.js";
 
 // PlanetCreatePage 슬라이더 + GamePage 표시가 공유하는 변수 목록.
@@ -38,6 +40,15 @@ const useClimateStore = create(
   values: { ...DEFAULT_VALUES },
   currentTemperature: REFERENCE_TEMP_K,
 
+  // "지점별 이미지 ↔ 3D 지구" 전환용. selectedLocation은 마지막으로 고른 지점
+  // (플레이스홀더에 이름/imageUrl을 보여주는 데 씀), isViewingLocationImage는
+  // 지금 이미지 모드인지. 슬라이더를 실제로 움직이면(setValue) false로 내려가고,
+  // 그 뒤 값을 지점 초기값으로 되돌려도 다시 true가 되지 않는다(세션 동안 유지) -
+  // selectedLocation 자체는 안 지운다(false일 땐 어차피 안 쓰이고, 다음에 값이
+  // 바뀔 때 굳이 또 체크할 이유가 없어서 그대로 둔다).
+  selectedLocation: null,
+  isViewingLocationImage: false,
+
   // 빙하+바다 비율의 합은 항상 100을 넘을 수 없다(physicsEngine.albedoOf가
   // landRatio = 1 - 빙하 - 바다로 전제). 한쪽을 밀어 올려 100을 넘기려 하면,
   // 반대쪽을 실시간으로 밀어낸다 - 스토어에서 처리해두면 어느 UI(행성 만들기
@@ -52,10 +63,49 @@ const useClimateStore = create(
           values[other] = 100 - values[key];
         }
       }
-      return { values };
+      // 값이 실제로 달라질 때만 이미지 모드를 끈다 - 클릭/포커스만으로는 안 꺼짐
+      // (같은 값을 다시 세팅하는 호출은 "조작"으로 안 침).
+      const changed = state.values[key] !== value;
+      return {
+        values,
+        ...(changed && state.isViewingLocationImage ? { isViewingLocationImage: false } : {}),
+      };
     }),
 
   setCurrentTemperature: (temp) => set({ currentTemperature: temp }),
+
+  // "특정 지점 선택"(PlanetLocationPicker) 전용 - 지점 하나의 값을 슬라이더에 한
+  // 번에 반영한다. point.values는 슬라이더 단위가 아니라 실제 물리 단위다(co2는
+  // ppm, atmThickness는 mapSlidersToClimateInputs가 쓰는 0.4~2.0 스케일) - 이
+  // 둘만 역함수(co2PpmToSlider/atmThicknessToSlider)로 슬라이더 스케일로 되돌리고,
+  // iceThickness/ocean/cloud는 원래부터 0~100 슬라이더 스케일과 같아 그대로 쓴다.
+  // "초기값"만 세팅할 뿐 잠그지 않으므로, 이후 setValue로 자유롭게 다시 조작할 수 있다.
+  //
+  // point.t2m(있으면)은 현재 온도도 그 지점의 실측 기온으로 같이 맞춘다 - 이래야
+  // "이 지점이 실제로 평형인지"를 조성뿐 아니라 실제 온도로도 판정할 수 있다.
+  // t2m이 없는 지점(레거시 목데이터)은 온도를 건드리지 않는다.
+  setValuesFromPoint: (point) =>
+    set((state) => {
+      const clamp = (v) => Math.min(100, Math.max(0, v));
+      let iceThickness = clamp(point.values.iceThickness);
+      let ocean = clamp(point.values.ocean);
+      // setValue와 같은 규칙(빙하+바다 ≤ 100)을 여기서도 지킨다.
+      if (iceThickness + ocean > 100) ocean = 100 - iceThickness;
+
+      return {
+        values: {
+          ...state.values,
+          iceThickness,
+          ocean,
+          cloud: clamp(point.values.cloud),
+          atmThickness: atmThicknessToSlider(point.values.atmThickness),
+          co2: co2PpmToSlider(point.values.co2),
+        },
+        ...(typeof point.t2m === "number" ? { currentTemperature: point.t2m } : {}),
+        selectedLocation: point,
+        isViewingLocationImage: true,
+      };
+    }),
 
   // 피드백 타이머 한 틱: 현재 조성에서의 ΔE 방향으로 온도를 한 걸음 움직인다.
   // ΔE > 0 이면 온도 상승, ΔE < 0 이면 하강 → 평형온도로 수렴한다.
@@ -76,6 +126,8 @@ const useClimateStore = create(
     set({
       values: { ...DEFAULT_VALUES },
       currentTemperature: REFERENCE_TEMP_K,
+      selectedLocation: null,
+      isViewingLocationImage: false,
     }),
     }),
     // 여기 저장되는 값(슬라이더 0~100, 온도 K)은 ΔE 스케일과 무관해서 그대로 둬도
