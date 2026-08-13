@@ -83,37 +83,84 @@ export const REFERENCE_TEMP_K = EARTH_REFERENCE_TEMP_K
 
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x))
 
+// 지표 구성별 반사율(문헌 통념값). 계수 자체가 "이 지표는 얼마나 밝은가"라는
+// 물리량이라, 값만 봐도 타당한지 판단할 수 있다.
+// 빙하 슬라이더 100%는 "행성이 눈·얼음으로 완전히 덮인 상태"이므로 신적설 쪽 값을
+// 쓴다(신적설 0.8~0.9 / 해빙 0.5~0.7 / 빙하빙 0.4~0.6). 스노우볼 지구의 알베도
+// 추정치도 0.6~0.8이라 그 상단에 해당한다.
+export const ALBEDO_ICE = 0.8
+export const ALBEDO_OCEAN = 0.08 // 해양 (0.06~0.10)
+export const ALBEDO_LAND = 0.2 // 육지 평균 (숲 0.15 ~ 사막 0.35)
+export const ALBEDO_CLOUD = 0.5 // 구름 — 개발계획서 (3)1의 값
+
 /**
  * 지표/대기 구성에 따른 행성 알베도(반사율, 0~1).
- * 빙하·구름은 반사율을 높이고, 바다는 어두워 반사율을 살짝 낮춘다.
  *
- * 구름 계수 0.5는 개발계획서 (3)1의 알베도 공식(구름량 × 0.5)에서 온 값이다.
- * 이전 구현은 0.3이었는데, 그러면 기준 조성(빙하 0.1 / 바다 0.7 / 구름 0.3)의
- * 행성 알베도가 0.22가 되어 계획서 데이터 표의 지구 평균 0.30과 어긋났다.
+ *   육지   = 1 − 빙하 − 바다                     (남는 면적)
+ *   지표면 = 각 지표의 면적 가중 평균
+ *   행성   = 지표면 × (1 − 구름) + 구름 × 0.5    (구름이 지표를 가림)
  *
- *   구름 0.3 → 지표면분 0.130 + 구름분 0.090 = 0.220
- *   구름 0.5 → 지표면분 0.130 + 구름분 0.150 = 0.280   ← 실제 지구 ≈0.30
+ * 예전에는 `0.12 + 0.45·빙하 + 0.5·구름 − 0.05·바다` 라는 덧셈식이었다.
+ * 계획서에서 온 값은 구름 계수 0.5 하나뿐이었고 나머지 세 계수는 출처가 없었는데,
+ * 극단 조성에서 실제와 크게 어긋났다.
  *
- * 지표면분(0.130)은 실제 지구와 이미 맞았고, 어긋난 항은 구름 기여 하나였다.
- * 실제 지구에서도 행성 알베도의 절반 이상이 구름 몫이다.
+ *   바다 100% → 0.22 (실제 해양 ≈0.1)    사막(육지 100%) → 0.145 (실제 ≈0.2~0.35)
+ *   구름 100% → 0.62 (지표가 안 보이는데도 지표분이 남아 있음)
+ *
+ * 원인은 구름을 "지표에 더하는" 항으로 둔 것이다. 구름은 지표를 가리므로 면적
+ * 가중으로 결합해야 하고, 그렇게 하면 구름 100%에서 정확히 구름 알베도 0.5가
+ * 나온다. 계획서의 0.5는 버리지 않고 "구름 자체의 반사율"로 그대로 쓴다.
+ *
+ * 빙하·바다 슬라이더는 서로 독립이라 합이 1을 넘을 수 있다. 그때는 육지가 0이 되고
+ * 두 지표의 비율로 정규화된다(예: 빙하 100 + 바다 100 → 반반 섞인 지표).
  */
 export function albedoOf({ glacierRatio, oceanRatio, cloudRatio }) {
+  const landRatio = Math.max(0, 1 - glacierRatio - oceanRatio)
+  const totalSurface = glacierRatio + oceanRatio + landRatio // 항상 ≥ 1
+  const surfaceAlbedo =
+    (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * ALBEDO_LAND) /
+    totalSurface
+
   return clamp(
-    0.12 + 0.45 * glacierRatio + 0.5 * cloudRatio - 0.05 * oceanRatio,
+    surfaceAlbedo * (1 - cloudRatio) + cloudRatio * ALBEDO_CLOUD,
     0.05,
     0.9,
   )
 }
 
+// 기준 조성에서의 온실효과 상수항.
+//
+// 실제 지구의 유효 온실효과는 OLR(≈240 W/m²)과 지표 복사(σ·288.15⁴ = 390.92 W/m²)에서
+//   g_earth = 1 − 240 / 390.92 = 0.386
+// 로 구해진다. 여기에 기준 조성의 구름 기여(0.1 × 0.3 = 0.03)가 더해지므로,
+// 상수항은 0.386 − 0.03 = 0.356 으로 둬야 기준 조성의 온실효과가 실제 지구와 같아진다.
+//
+// 예전에는 0.30이었는데 출처가 어디에도 없었다(계획서에도 없음). 기준 조성에서
+// 0.33이 나와 실제 지구 0.386과 어긋났다.
+const GREENHOUSE_BASE = 0.356
+
+// 온실효과 상한. g = 1 − ε 이고 금성이 g ≈ 0.99이므로 "폭주 직전"에 해당한다.
+// 예전 상한 0.8에서는 무작위 조성의 27%가 벽에 붙어, 그 구간에서 CO₂·대기두께
+// 아이템을 써도 clamp가 잘라내 화면상 아무 변화가 없었다(0.85에서는 21%).
+const GREENHOUSE_MAX = 0.85
+
+// 온실효과의 각 항. co2PpmForTargetTemperature(역함수)도 같은 식을 써야 하므로
+// 계수를 양쪽에 적지 않고 여기 한 번만 둔다 - 예전에는 복제돼 있어서, 상수를
+// 한쪽만 고쳤을 때 2단계 강제 안정화가 조용히 빗나갔다.
+const co2GreenhouseTerm = (co2Ppm) =>
+  0.25 * Math.log2(Math.max(co2Ppm, 1) / CO2_BASELINE_PPM)
+const atmGreenhouseTerm = (atmThickness) => 0.35 * (atmThickness - 1) // 1 = 지구 기준
+const cloudGreenhouseTerm = (cloudRatio) => 0.1 * cloudRatio
+
 /**
- * 온실효과 강도(0~0.8). 값이 클수록 지표 복사를 더 많이 되잡아 온난화된다.
+ * 온실효과 강도(0~GREENHOUSE_MAX). 값이 클수록 지표 복사를 더 많이 되잡아 온난화된다.
  * CO₂는 로그 응답(복사강제력 ∝ log), 대기 두께와 구름도 기여한다.
  */
 function greenhouseStrengthOf({ co2Ppm, atmThickness, cloudRatio }) {
-  const co2Term = 0.25 * Math.log2(Math.max(co2Ppm, 1) / CO2_BASELINE_PPM)
-  const atmTerm = 0.35 * (atmThickness - 1) // atmThickness=1 이 지구 기준
-  const cloudTerm = 0.1 * cloudRatio
-  return clamp(0.3 + co2Term + atmTerm + cloudTerm, 0, 0.8)
+  const co2Term = co2GreenhouseTerm(co2Ppm)
+  const atmTerm = atmGreenhouseTerm(atmThickness)
+  const cloudTerm = cloudGreenhouseTerm(cloudRatio)
+  return clamp(GREENHOUSE_BASE + co2Term + atmTerm + cloudTerm, 0, GREENHOUSE_MAX)
 }
 
 // 지구 기준 상태(288.15 K)에서 ASR ≈ OLR(deltaEnergy ≈ 0)가 되도록
@@ -231,11 +278,14 @@ export const BASELINE_ATM_THICKNESS = BASELINE_STATE.atmThickness // 1 (지구 �
  * OLR=ASR이 되도록 필요한 온실효과 강도를 구한 뒤 co2Term을 역산한다.
  */
 export function co2PpmForTargetTemperature({ atmThickness, cloudRatio }, absorbedRadiation, targetTempK) {
+  // greenhouseStrengthOf의 역함수다 - 상수와 각 항을 그쪽과 공유해서 어긋날 수 없게 한다.
   const desiredEmissivity = absorbedRadiation / (EFFECTIVE_SIGMA * Math.pow(targetTempK, 4))
-  const desiredGreenhouse = clamp(1 - desiredEmissivity, 0, 0.8)
-  const atmTerm = 0.35 * (atmThickness - 1)
-  const cloudTerm = 0.1 * cloudRatio
-  const co2Term = desiredGreenhouse - 0.3 - atmTerm - cloudTerm
+  const desiredGreenhouse = clamp(1 - desiredEmissivity, 0, GREENHOUSE_MAX)
+  const co2Term =
+    desiredGreenhouse -
+    GREENHOUSE_BASE -
+    atmGreenhouseTerm(atmThickness) -
+    cloudGreenhouseTerm(cloudRatio)
   const co2Ppm = CO2_BASELINE_PPM * Math.pow(2, co2Term / 0.25)
   return clamp(co2Ppm, CO2_BASELINE_PPM * 0.3, CO2_BASELINE_PPM * 3.0)
 }

@@ -12,7 +12,7 @@
 // epsilon(±5) 안에 못 들어가는 경우가 있었다.
 //
 // "이 아이템이 어느 ΔE 방향에 도움이 되는가"는 여기 정적 필드로 두지 않는다 -
-// co2/atmThickness는 둘 다 같은 greenhouseStrength clamp(0.8)를 거치므로, 한쪽이
+// co2/atmThickness는 둘 다 같은 greenhouseStrength 상한(GREENHOUSE_MAX)을 거치므로, 한쪽이
 // 이미 상한에 걸려 있으면 정적 태그와 달리 실제 효과가 0인 경우가 생긴다.
 // useGameStore.pickVisibleItems가 매번 물리엔진으로 직접 계산해서 판단한다.
 
