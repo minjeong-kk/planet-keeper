@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
-import { PLANET_STATES, planetStateOf } from "../../utils/physicsEngine.js";
+import { PLANET_STATES, planetStateOf, ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
 import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
@@ -26,11 +26,23 @@ const lookupConcept = (name) => CLIMATE_CONCEPTS[CONCEPT_ALIASES[name]] ?? CONCE
 
 // gameOverReason별 결과 배너. 성공 조건은 오직 "planet_stabilized"(Earth-like
 // Stable 도달) 하나뿐이다 - Warm/Cold Stable, Energy Surplus/Deficit는 클리어가 아니다.
+//
+// 배너와 아래 "최종 행성 상태" 지표는 둘 다 planetStateOf 결과를 근거로 하므로
+// 서로 어긋날 수 없다. 예전에는 최종 확인 3회를 채우면 실제 도달 여부와 무관하게
+// planet_stabilized로 끝나서, "지구형에 도달했다"는 배너 옆에 "저온 안정"이 표시되는
+// 자기모순이 있었다(useGameStore.finalizeGame 참고).
 const RESULT_BANNER_BY_REASON = {
   planet_stabilized: {
     title: "🎉 미션 성공 - 행성 평형 안정 도달",
     detail: "최종 확인 결과 행성이 지구형 안정(Earth-like Stable) 상태에 도달해 게임을 성공적으로 마쳤습니다.",
     statusClass: "report-page__banner--success",
+  },
+  not_stabilized: {
+    title: "⚠️ 미션 미완 - 지구형 범위 밖",
+    detail:
+      "최종 확인을 모두 마쳤지만 행성이 지구형 안정(Earth-like Stable) 범위에 들지 못했습니다. " +
+      "에너지는 평형에 가깝지만 온도가 범위를 벗어난 상태입니다.",
+    statusClass: "report-page__banner--partial",
   },
   life_over: {
     title: "💔 미션 실패 - 목숨 소진",
@@ -200,9 +212,9 @@ function ReportPage() {
             </span>
           </div>
           <div className="report-page__metric-box">
-            <span className="report-page__metric-label">ML 분류 (확신도)</span>
+            <span className="report-page__metric-label">에너지 수지 판정</span>
             <span className="report-page__metric-value">
-              {final?.ml ? `${final.ml.label} ${final.ml.confidence != null ? `(${Math.round(final.ml.confidence * 100)}%)` : ""}` : "-"}
+              {final?.ml ? final.ml.label : "-"}
             </span>
           </div>
           <div className="report-page__metric-box">
@@ -214,8 +226,12 @@ function ReportPage() {
         {final && (
           <p className="report-page__final-physics">
             🌡️ 최종 물리값: 온도 {fmt(final.physics.currentTemperature, 1)}K · ΔE{" "}
-            {formatSigned(final.physics.deltaEnergy, 2)} W/m² · 알베도 {fmt(final.physics.albedo)} · 온실효과{" "}
-            {fmt(final.physics.greenhouseStrength)}
+            {formatSigned(final.physics.deltaEnergy, 2)} W/m²
+            <span className="report-page__tolerance-note">
+              {" "}
+              (평형 기준 ±{ENERGY_BALANCE_EPSILON.toFixed(1)})
+            </span>{" "}
+            · 알베도 {fmt(final.physics.albedo)} · 온실효과 {fmt(final.physics.greenhouseStrength)}
           </p>
         )}
       </div>

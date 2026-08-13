@@ -8,8 +8,12 @@ import Term from "../common/Term.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore, { GAME_STAGES, MAX_WRONG_COUNT, MAX_FINAL_ATTEMPTS } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
-import { mapSlidersToClimateInputs, equilibriumTemperatureOf } from "../../utils/physicsEngine.js";
-import { deltaEnergyLines, formatSigned, labelTone } from "../../utils/planetAnalysis.js";
+import {
+  mapSlidersToClimateInputs,
+  equilibriumTemperatureOf,
+  ENERGY_BALANCE_EPSILON,
+} from "../../utils/physicsEngine.js";
+import { formatSigned, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import "./GamePage.css";
 
@@ -31,7 +35,7 @@ const STAGE_LABELS = {
   [GAME_STAGES.FINAL]: "2단계 문제",
 };
 
-// 아이템 사용/2단계 확인 후 AI가 판정한 상태 - 일반 안내 문구보다 눈에 띄도록
+// 아이템 사용/2단계 확인 후 물리엔진이 판정한 상태 - 일반 안내 문구보다 눈에 띄도록
 // 아이콘/색상을 구분해서 강조 표시한다. Energy Surplus/Deficit은 아이템을 잘못
 // 골라 오히려 에너지 불균형이 커진 경우다.
 // notice(아이템/최종 판정)와 feedback(정답/오답)이 같은 성공/실패 색상 규칙을 쓴다.
@@ -207,7 +211,20 @@ function GamePage() {
                   <span className="game-page__key-card-label">
                     ⚡ <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형(ΔE)</Term>
                   </span>
-                  <span className="game-page__key-card-value">{formatSigned(physicsResult.deltaEnergy)} W/m²</span>
+                  {/* 숫자만 보면 이게 평형에 가까운지 알 수 없어서 판정 기준선을 같이 보여준다.
+                      허용범위 안이면 값 자체를 초록으로 바꿔 한눈에 구분되게 한다. */}
+                  <span
+                    className={`game-page__key-card-value${
+                      Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON
+                        ? " game-page__key-card-value--balanced"
+                        : ""
+                    }`}
+                  >
+                    {formatSigned(physicsResult.deltaEnergy)} W/m²
+                  </span>
+                  <span className="game-page__key-card-note">
+                    평형 기준 ±{ENERGY_BALANCE_EPSILON.toFixed(1)} W/m²
+                  </span>
                 </div>
               </div>
 
@@ -254,7 +271,7 @@ function GamePage() {
             <ItemStage items={visibleItems} onSelect={useItem} disabled={!!pendingClimateEvent} />
           )}
 
-          {isComputing && <p>AI가 행성 상태를 판정하는 중...</p>}
+          {isComputing && <p>행성 상태를 계산하는 중...</p>}
 
           {notice && STABLE_BADGES[mlResult?.label] && (
             <div className={`game-page__stable-badge ${STABLE_BADGES[mlResult.label].className}`}>

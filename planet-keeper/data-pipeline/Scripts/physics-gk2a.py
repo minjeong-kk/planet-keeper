@@ -92,7 +92,7 @@ PRODUCT_VARIABLE = {
 
 def earth_disk_mask(ds, var_name):
     """지구 원반 안(밤이든 낮이든)인지, 원반 밖(우주 배경)인지 구분하는 마스크.
-    ml-gk2a.py의 grid_latlon()과 동일한 pyproj geos 투영을 재사용한다."""
+    observed-gk2a.py의 grid_latlon()과 동일한 pyproj geos 투영을 재사용한다."""
     proj = ds["gk2a_imager_projection"].attrs
 
     coff = proj["column_offset"]

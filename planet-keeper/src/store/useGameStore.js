@@ -10,16 +10,18 @@ import {
   stepTemperature,
   co2PpmForTargetTemperature,
   co2PpmToSlider,
+  planetStateOf,
+  PLANET_STATES,
   REFERENCE_TEMP_K,
   ENERGY_BALANCE_EPSILON,
+  ENERGY_SCALE,
 } from "../utils/physicsEngine.js";
-import { predictClimateState } from "../utils/climateClassifier.js";
 import { describeItemJudgment, describeFinalizeJudgment } from "../utils/planetAnalysis.js";
 
 // 게임 진행(문제/아이템/오답 횟수) 전용 store. 행성 슬라이더 값은 useClimateStore가
-// 들고 있고, 여기서는 아이템 사용 시 그 값을 바꾸고 물리엔진/ML을 재계산한다.
+// 들고 있고, 여기서는 아이템 사용 시 그 값을 바꾸고 물리엔진을 재계산한다.
 //
-// 전체 흐름: 행성 생성 -> Physics+ML(초기 판정 - 조성이 우연히 이미 Earth-like
+// 전체 흐름: 행성 생성 -> Physics(초기 판정 - 조성이 우연히 이미 Earth-like
 // Stable이면 1단계/아이템 없이 2단계로 직행) -> 1단계 문제 -> 아이템 사용(완전히
 // 평형까지 settle하지 않고 딱 한 걸음만 진행 - computeItemStepResult 참고. 맞는
 // 방향 아이템이면 ΔE가 조금씩 0에 가까워지고, 틀린 방향이면 ΔE가 커지고 평형온도가
@@ -42,7 +44,7 @@ export const GAME_STAGES = {
 
 export const MAX_WRONG_COUNT = 3;
 const EARTH_LIKE_STABLE_LABEL = "Earth-like Stable";
-// energyStateOf/label_rules.py 기준 "에너지가 평형(|ΔE|≤5)인" 세 상태 - 아이템
+// energyStateOf 기준 "에너지가 평형(|ΔE|≤epsilon)인" 세 상태 - 아이템
 // 적용 후 이 중 하나가 아니면(Energy Surplus/Deficit) 아이템이 틀린 방향이었다는 뜻이다.
 const STABLE_LABELS = new Set(["Cold Stable", EARTH_LIKE_STABLE_LABEL, "Warm Stable"]);
 
@@ -56,8 +58,7 @@ export const MAX_FINAL_ATTEMPTS = 3;
 
 // 매 틱 지금 물리 상태(ΔE 부호)를 보고 어느 방향으로 악화시킬지 먼저 정한 뒤,
 // 그 방향에 맞는 후보 중 하나를 무작위로 고른다 - "지금 에너지가 과다/부족하니까
-// 이 현상이 일어난다"가 항상 실제 ΔE와 맞아떨어지게 하려는 것이다(ML은 최종
-// 상태 판정만 하고, 방치 중 악화 방향은 물리 상태가 정한다). warning은 경고
+// 이 현상이 일어난다"가 항상 실제 ΔE와 맞아떨어지게 하려는 것이다. warning은 경고
 // 단계(triggerClimateEvent)에서, message는 응답 시간이 끝나 실제로 적용될 때
 // (resolveClimateEvent가 플레이어 대응이 없었을 때의 fallback으로) 보여준다.
 const WARMING_EVENTS = [
@@ -100,9 +101,11 @@ function shuffled(list) {
 const ITEM_CHOICES_SHOWN = 4;
 
 // 이보다 작은 ΔE 변화는 "효과 없음"으로 본다 - co2/atmThickness가 이미
-// greenhouseStrength clamp(0.8) 상한에 걸린 경우 등, 슬라이더를 움직여도 실제로는
+// greenhouseStrength 상한(GREENHOUSE_MAX)에 걸린 경우 등, 슬라이더를 움직여도 실제로는
 // 아무 것도 안 바뀌는 경우가 있다(부동소수 오차 여유도 겸한다).
-const ITEM_EFFECT_EPSILON = 0.01;
+// ΔE 단위(W/m²)라 SOLAR_CONSTANT 스케일을 따라간다 - 0.01은 S=100 기준으로 잡은 값이다.
+// ItemInfoModal("지금 사용하면" 미리보기)도 같은 기준을 써야 판정이 어긋나지 않는다.
+export const ITEM_EFFECT_EPSILON = 0.01 * ENERGY_SCALE;
 
 // 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
 // 차이). 정적 태그가 아니라 매번 물리엔진으로 직접 계산한다 - 정적 태그만 보면
@@ -139,14 +142,21 @@ function pickVisibleItems(deltaEnergy, values, currentTemperature) {
   return shuffled([guaranteed, ...rest]);
 }
 
+// 행성 상태(0~4) 판정. 예전에는 학습된 ONNX 모델(climateClassifier.js)이 했지만,
+// 라벨은 ΔE와 온도만으로 완전히 결정되므로 모델은 물리 규칙의 근사(정확도 0.9694)에
+// 지나지 않았다. 물리엔진의 planetStateOf를 직접 쓰면 근사가 아니라 정확값이 나온다.
+function classifyPlanetState(physics) {
+  const state = planetStateOf(physics.deltaEnergy, physics.currentTemperature);
+  return { state, label: PLANET_STATES[state].label };
+}
+
 // 행성 생성 직후의 있는 그대로의 스냅샷: 온도를 건드리지 않고 지금 조성이
-// 에너지 과다/부족 상태인지를 Physics+AI로 보여준다(대개 Energy Surplus/Deficit).
-async function computeSnapshotResult() {
+// 에너지 과다/부족 상태인지를 보여준다(대개 Energy Surplus/Deficit).
+function computeSnapshotResult() {
   const { values, currentTemperature } = useClimateStore.getState();
   const climateInputs = mapSlidersToClimateInputs(values);
   const physics = computeClimateV2({ ...climateInputs, currentTemperature });
-  const ml = await predictClimateState(climateInputs, physics);
-  return { physics, ml };
+  return { physics, ml: classifyPlanetState(physics) };
 }
 
 // 조성이 실제로 평형에 도달하면 어떻게 되는지를 바로 계산한다(finalizeGame이
@@ -155,7 +165,7 @@ async function computeSnapshotResult() {
 // 넣어 계산하든 같은 결과가 나오므로(조성에만 의존, 수학적으로 입력 온도와 무관)
 // 지금 온도를 그대로 넣어도 된다. 여기서 실제로 currentTemperature를 이 평형온도로
 // 갱신해 둔다.
-async function computeSettledResult() {
+function computeSettledResult() {
   const { values, currentTemperature, setCurrentTemperature } = useClimateStore.getState();
   const climateInputs = mapSlidersToClimateInputs(values);
   const rawPhysics = computeClimateV2({ ...climateInputs, currentTemperature });
@@ -164,8 +174,7 @@ async function computeSettledResult() {
   setCurrentTemperature(settledTemperature);
 
   const physics = computeClimateV2({ ...climateInputs, currentTemperature: settledTemperature });
-  const ml = await predictClimateState(climateInputs, physics);
-  return { physics, ml };
+  return { physics, ml: classifyPlanetState(physics) };
 }
 
 // 1단계 아이템 적용 직후 - 온도는 그대로 둔 채 새 조성으로 ΔE가 어떻게 움직이는지
@@ -174,7 +183,7 @@ async function computeSettledResult() {
 // MAX_TEMPERATURE_STEP_K)만 그 ΔE 방향으로 온도를 옮긴다. 맞는 방향 아이템은
 // |ΔE|가 줄고 온도도 조금 개선되며, 틀린 방향이면 |ΔE|가 커지고 평형온도 자체가
 // 더 극단으로 이동한다 - 여러 번의 아이템 선택에 걸쳐 서서히 수렴하거나 악화된다.
-async function computeItemStepResult(nextValues) {
+function computeItemStepResult(nextValues) {
   const { currentTemperature, setCurrentTemperature } = useClimateStore.getState();
   const climateInputs = mapSlidersToClimateInputs(nextValues);
   const immediate = computeClimateV2({ ...climateInputs, currentTemperature });
@@ -183,8 +192,7 @@ async function computeItemStepResult(nextValues) {
   setCurrentTemperature(nextTemperature);
 
   const physics = computeClimateV2({ ...climateInputs, currentTemperature: nextTemperature });
-  const ml = await predictClimateState(climateInputs, physics);
-  return { physics, ml };
+  return { physics, ml: classifyPlanetState(physics) };
 }
 
 // 아이템 효과를 적용한 다음 슬라이더 값(0~100 범위로 clamp).
@@ -238,7 +246,11 @@ const useGameStore = create(
   // 타이머가 돈 총 경과 시간(초) - GamePage가 1초마다 +1 하고, REPORT로 넘어가면
   // 더 이상 증가하지 않아 그 값 그대로 ReportPage에서 "총 걸린 시간"으로 보여준다.
   elapsedSeconds: 0,
-  // REPORT 단계로 넘어간 이유: "planet_stabilized"(성공) | "life_over"(실패) | null(진행 중)
+  // REPORT 단계로 넘어간 이유:
+  //   "planet_stabilized" 성공 - 지구형 안정 도달
+  //   "not_stabilized"    미완 - 최종 확인은 다 했지만 지구형 범위 밖
+  //   "life_over"         실패 - 오답 3회
+  //   null                진행 중
   gameOverReason: null,
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
@@ -294,7 +306,7 @@ const useGameStore = create(
   // 슬라이더를 이미 움직여 뒀으면(useClimateStore.setValue로 실시간 반영됨) 그
   // 값 그대로 재계산하고, 손대지 않았으면 경고에 걸린 원래 방향으로 강제
   // 적용한다(기존 자동 악화와 동일한 fallback). 조성이 바뀌면 평형온도가 움직이고
-  // advanceTemperature가 그 방향으로 currentTemperature를 조금씩 옮긴다. ML
+  // advanceTemperature가 그 방향으로 currentTemperature를 조금씩 옮긴다. 상태
   // 재판정은 아이템 사용/최종 확인 같은 실제 행동 시점에만 하므로 여기서는 안
   // 한다. 성공/실패 어느 쪽이든 pushTimeline을 불러 리포트 타임라인에 남긴다 -
   // 예전 applyClimateEvent는 이걸 전혀 남기지 않아 방치 중 변화가 타임라인에서
@@ -356,7 +368,7 @@ const useGameStore = create(
     }
   },
 
-  // CREATOR -> PROBLEM1. 지금 조성의 있는 그대로의 에너지 상태를 Physics+AI로
+  // CREATOR -> PROBLEM1. 지금 조성의 있는 그대로의 에너지 상태를 물리엔진으로
   // 보여준 뒤 1단계 문제로 진행한다. 만든 조성이 우연히 이미 Earth-like Stable이면
   // 고칠 게 없으니 1단계/아이템 없이 2단계 확인 문제로 바로 간다(그래도 성공은
   // finalizeGame의 안정화 체크 3번을 다 채워야 한다 - 즉시 성공 처리하지 않음).
@@ -365,7 +377,7 @@ const useGameStore = create(
 
     set({ isComputing: true, initialValues: { ...useClimateStore.getState().values } });
     try {
-      const { physics, ml } = await computeSnapshotResult();
+      const { physics, ml } = computeSnapshotResult();
       set({ physicsResult: physics, mlResult: ml });
       get().pushTimeline("초기", "행성 생성", physics, ml);
 
@@ -374,7 +386,7 @@ const useGameStore = create(
         return;
       }
     } catch (err) {
-      console.error("[useGameStore] 초기 물리엔진/ML 계산 실패:", err);
+      console.error("[useGameStore] 초기 물리엔진 계산 실패:", err);
     } finally {
       set({ isComputing: false });
       if (get().currentStage === GAME_STAGES.CREATOR) {
@@ -405,7 +417,7 @@ const useGameStore = create(
 
     set({ isComputing: true });
     try {
-      const { physics, ml } = await computeItemStepResult(nextValues);
+      const { physics, ml } = computeItemStepResult(nextValues);
       const balanced = STABLE_LABELS.has(ml.label);
       const lines = describeItemJudgment(item, physicsResult, physics, ml.label);
       get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml);
@@ -488,14 +500,13 @@ const useGameStore = create(
 
     set({ isComputing: true });
     try {
-      // mlResult는 캐시다 - resolveClimateEvent(이상기후)는 매번 ML을 다시 돌리지
-      // 않으려고 physicsResult(진짜 ΔE)만 갱신하고 mlResult는 그대로 둔다. 그래서
-      // "예전에 한 번 Earth-like Stable을 찍었다"는 사실만 보고 alreadyStable을
-      // 판정하면, 그 이후 방치 중 이상기후로 ΔE가 한참 벗어났는데도 옛 라벨을
-      // 그대로 우려먹어 성공 처리해버리는 버그가 있었다. 지름길을 타기 전에
-      // 항상 지금 physicsResult로 ML을 다시 돌려서 진짜로 안정 상태인지 확인한다.
+      // mlResult는 캐시다 - resolveClimateEvent(이상기후)는 physicsResult(진짜 ΔE)만
+      // 갱신하고 mlResult는 그대로 둔다. 그래서 "예전에 한 번 Earth-like Stable을
+      // 찍었다"는 사실만 보고 alreadyStable을 판정하면, 그 이후 방치 중 이상기후로
+      // ΔE가 한참 벗어났는데도 옛 라벨을 그대로 우려먹어 성공 처리해버리는 버그가
+      // 있었다. 지름길을 타기 전에 항상 지금 physicsResult로 다시 판정한다.
       const climateInputs = mapSlidersToClimateInputs(useClimateStore.getState().values);
-      const freshMl = await predictClimateState(climateInputs, physicsResult);
+      const freshMl = classifyPlanetState(physicsResult);
       const alreadyStable = freshMl.label === EARTH_LIKE_STABLE_LABEL;
 
       if (alreadyStable) {
@@ -519,7 +530,7 @@ const useGameStore = create(
 
         const newCo2Slider = useClimateStore.getState().values.co2;
         const co2Increased = newCo2Slider === prevCo2Slider ? null : newCo2Slider > prevCo2Slider;
-        const { physics, ml } = await computeSettledResult();
+        const { physics, ml } = computeSettledResult();
         const lines = describeFinalizeJudgment(physicsResult, physics, ml.label, { co2Increased });
         get().pushTimeline("최종", `최종 확인 ${nextAttempt}/${MAX_FINAL_ATTEMPTS}`, physics, ml);
         set({
@@ -535,8 +546,16 @@ const useGameStore = create(
       set({ isComputing: false });
     }
 
+    // 최종 확인을 다 채우면 게임이 끝난다. 예전에는 여기서 실제 결과를 보지 않고
+    // 무조건 planet_stabilized(성공)로 끝냈는데, CO2 자동 조정으로도 지구형 범위에
+    // 못 들어오는 조성이 있다(알베도가 너무 높아 CO2 상한까지 올려도 못 데우는 경우 등).
+    // 그러면 "지구형에 도달했다"는 성공 배너 옆에 "저온 안정"이 표시되는 자기모순이 된다.
+    // ReportPage가 최종 상태를 계산하는 것과 같은 방식(planetStateOf)으로 판정한다.
     if (forceStable) {
-      get().goReport("planet_stabilized");
+      const finalPhysics = get().physicsResult;
+      const reachedEarthLike =
+        !!finalPhysics && classifyPlanetState(finalPhysics).label === EARTH_LIKE_STABLE_LABEL;
+      get().goReport(reachedEarthLike ? "planet_stabilized" : "not_stabilized");
       return;
     }
 
@@ -584,9 +603,21 @@ const useGameStore = create(
     }),
     {
       name: "planet-keeper-game",
+      // SOLAR_CONSTANT를 100 -> 297.88로 바꾸면서 ΔE 스케일이 2.9788배가 됐다.
+      // physicsResult/timeline에는 저장 시점 스케일의 ΔE가 그대로 들어 있어서,
+      // 옛 저장본을 그대로 복원하면 새 판정 기준(epsilon 14.894)과 뒤섞인다 -
+      // 예전 "+14.5"(= 지금 +43.2에 해당)가 평형 범위 안으로 잘못 읽혀서
+      // 이상기후가 안 뜨거나, 아이템 후보 선정이 방향을 잃거나, 최종 확인이
+      // 공짜로 통과되는 문제가 생긴다.
+      //
+      // 진행 중인 판의 ΔE를 일일이 환산하는 것보다 새로 시작하는 편이 안전하고,
+      // 게임 한 판이 짧아 손실도 작다. 빈 객체를 반환하면 초기 상태와 병합되어
+      // 사실상 초기화된다. 앞으로 저장 구조를 바꿀 때도 version을 올리면 된다.
+      version: 1,
+      migrate: () => ({}),
       // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -
-      // 저장해두면 새로고침 시 항상 "AI가 판정하는 중..."에서 멈춘 것처럼 보인다.
-      partialize: ({ isComputing, ...rest }) => rest,
+      // 저장해두면 새로고침 시 항상 "계산하는 중..."에서 멈춘 것처럼 보인다.
+      partialize: ({ isComputing: _isComputing, ...rest }) => rest,
       // seenIds/correctIds는 Set이라 JSON.stringify/parse가 기본으로는 배열로
       // 날려버린다 - Set임을 표시해뒀다가 복원 시 되돌린다.
       storage: createJSONStorage(() => localStorage, {

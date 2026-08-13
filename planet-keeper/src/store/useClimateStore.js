@@ -8,7 +8,7 @@ import {
 } from "../utils/physicsEngine.js";
 
 // PlanetCreatePage 슬라이더 + GamePage 표시가 공유하는 변수 목록.
-// 나중에 Physics Engine/ML 추론도 이 키 이름을 그대로 입력으로 쓰게 된다.
+// Physics Engine(mapSlidersToClimateInputs)도 이 키 이름을 그대로 입력으로 쓴다.
 export const CLIMATE_VARIABLES = [
   { key: "iceThickness", label: "빙하 두께" },
   { key: "ocean", label: "바다" },
@@ -18,8 +18,9 @@ export const CLIMATE_VARIABLES = [
 ];
 
 // 전부 50(중립값)이면 우연히 이미 평형(Earth-like Stable)에 가까운 조성이 되어
-// 1단계/아이템 단계를 건너뛰는 경우가 잦았다 - 뚜렷한 Energy Surplus(ΔE≈+14.5)로
-// 시작해 실제로 고칠 게 있는 상태에서 게임이 시작되도록 값을 조정했다. 이 값이
+// 1단계/아이템 단계를 건너뛰는 경우가 잦았다 - 뚜렷한 Energy Surplus(ΔE≈+43.2,
+// 평형 허용범위 ±14.9의 약 3배)로 시작해 실제로 고칠 게 있는 상태에서 게임이
+// 시작되도록 값을 조정했다. 이 값이
 // 유일한 기준점이라 PlanetCreatePage(첫 진입)와 resetClimate(재도전) 둘 다 항상
 // 같은 조성으로 시작한다.
 const DEFAULT_VALUES = { ocean: 50, iceThickness: 20, cloud: 30, atmThickness: 50, co2: 40 };
@@ -63,7 +64,10 @@ const useClimateStore = create(
       currentTemperature: REFERENCE_TEMP_K,
     }),
     }),
-    { name: "planet-keeper-climate" },
+    // 여기 저장되는 값(슬라이더 0~100, 온도 K)은 ΔE 스케일과 무관해서 그대로 둬도
+    // 되지만, useGameStore가 초기화되는데 조성만 남으면 "새 게임인데 이전 판의
+    // 행성"이 되어 헷갈린다. 두 store의 version을 같이 올려 항상 함께 초기화한다.
+    { name: "planet-keeper-climate", version: 1, migrate: () => ({}) },
   ),
 );
 

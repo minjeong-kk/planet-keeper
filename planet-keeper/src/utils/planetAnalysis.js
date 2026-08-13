@@ -1,5 +1,5 @@
 // Physics 결과를 "원인 → 문제 → 해결 방향"으로 해석하는 모듈.
-// ML(predictClimateState)은 지금 상태(label)만 판정하고, 그 상태를 왜 그렇게
+// 상태 판정(planetStateOf)은 지금 상태(label)만 정하고, 그 상태를 왜 그렇게
 // 됐는지 설명하는 건 여기서 physicsResult 실제 값을 기준값과 비교해서 만든다 -
 // 라벨별로 문장을 하드코딩하지 않고, CO2/알베도/대기두께가 실제로 기준보다
 // 높은지 낮은지에 따라 매번 다시 생성된다.
@@ -9,6 +9,7 @@ import {
   BASELINE_ALBEDO,
   BASELINE_ATM_THICKNESS,
   ENERGY_BALANCE_EPSILON,
+  ENERGY_SCALE,
   energyStateOf,
 } from "./physicsEngine.js";
 
@@ -126,7 +127,7 @@ export function analyzePlanetState({ physicsResult, mlResult, co2Ppm, atmThickne
           title: "현재 상태",
           lines: [
             "에너지가 거의 균형 상태입니다.",
-            "실제로 안정적인지는 최종 확인(Final) 단계에서 AI가 판정합니다.",
+            "실제로 안정적인지는 최종 확인(Final) 단계에서 물리엔진이 판정합니다.",
           ],
          },
         {
@@ -228,7 +229,7 @@ export function shortSliderChangeLabel(key, delta) {
   return `${label} ${delta > 0 ? "증가" : "감소"}`;
 }
 
-// ML/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(ML Prediction 배지)와
+// planetStateOf/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(상태 판정 배지)와
 // ReportPage(타임라인 라벨 칩)가 같은 상태를 같은 색으로 보여주도록 공유한다.
 // 라벨이 없으면(아직 판정 전) "neutral"로 - 실제 상태처럼 색이 칠해지면 안 된다.
 const LABEL_TONE = {
@@ -244,16 +245,26 @@ export function labelTone(label) {
   return LABEL_TONE[label] ?? "neutral";
 }
 
-const CHANGE_EPSILON = 0.005;
+// "의미 있는 변화"로 볼 최소 폭. 비교하는 값의 단위가 두 종류라 상수도 둘로 나눈다 -
+// 예전에는 0.005 하나로 둘 다 재고 있었는데, ΔE 쪽 스케일이 바뀌면 0~1 값(알베도·
+// 온실효과)의 감지 폭까지 같이 흔들리는 구조였다.
+const RATIO_EPSILON = 0.005; // 알베도·온실효과 (0~1 비율)
+const ENERGY_EPSILON = 0.005 * ENERGY_SCALE; // ΔE·OLR·ASR (W/m²)
 
-function changeLine(before, after, riseText, fallText) {
-  if (after > before + CHANGE_EPSILON) return riseText;
-  if (after < before - CHANGE_EPSILON) return fallText;
+function changeLine(before, after, riseText, fallText, epsilon) {
+  if (after > before + epsilon) return riseText;
+  if (after < before - epsilon) return fallText;
   return null;
 }
 
 function greenhouseChangeLine(before, after) {
-  return changeLine(before.greenhouseStrength, after.greenhouseStrength, "온실효과가 더 강해졌습니다.", "온실효과가 약해졌습니다.");
+  return changeLine(
+    before.greenhouseStrength,
+    after.greenhouseStrength,
+    "온실효과가 더 강해졌습니다.",
+    "온실효과가 약해졌습니다.",
+    RATIO_EPSILON,
+  );
 }
 
 // 알베도와 온실효과가 "같이" 바뀌는 경우, 둘이 ΔE에 항상 반대 방향으로 작용하는
@@ -302,7 +313,7 @@ const GREENHOUSE_REASON = {
 function physicsChangeBlocks(before, after, itemKey) {
   const blocks = [];
 
-  const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.");
+  const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.", RATIO_EPSILON);
   const greenhouseLine = greenhouseChangeLine(before, after);
 
   // 구름은 albedoOf/greenhouseStrengthOf 둘 다에 들어가는 유일한 변수라 알베도와
@@ -336,6 +347,7 @@ function physicsChangeBlocks(before, after, itemKey) {
         after.outgoingRadiation,
         "우주로 방출되는 에너지(OLR)가 증가했습니다.",
         "우주로 방출되는 에너지(OLR)가 감소했습니다.",
+        ENERGY_EPSILON,
       )
     : null;
   if (outgoingLine) blocks.push([outgoingLine]);
@@ -349,6 +361,7 @@ function physicsChangeBlocks(before, after, itemKey) {
         after.absorbedRadiation,
         "흡수하는 에너지(ASR)가 증가했습니다.",
         "흡수하는 에너지(ASR)가 감소했습니다.",
+        ENERGY_EPSILON,
       )
     : null;
   if (absorbedLine) blocks.push([absorbedLine]);
@@ -371,7 +384,7 @@ function withArrows(blocks) {
   return lines;
 }
 
-// AI가 판정한 평형 상태(Cold/Earth-like/Warm Stable)별 결과 문구 -
+// 물리엔진이 판정한 평형 상태(Cold/Earth-like/Warm Stable)별 결과 문구 -
 // describeItemJudgment와 describeFinalizeJudgment가 공유한다. 둘 다 매번 새로
 // notice를 만들 때 이걸 호출해야 mlResult가 바뀔 때마다 문구도 같이 갱신된다 -
 // 아니면 예전에 뜬 문구가 최신 상태와 안 맞게 그대로 남는다. Energy Surplus/
@@ -395,7 +408,7 @@ function describeStableLabel(label) {
 // 부족했는지를 구분한다 - 안 그러면 "방향은 맞지만 부족한" 경우까지 전부
 // "악화됐다"고 잘못 말하게 된다.
 function describeImbalanceChange(before, after, label) {
-  const worsened = Math.abs(after.deltaEnergy) > Math.abs(before.deltaEnergy) + CHANGE_EPSILON;
+  const worsened = Math.abs(after.deltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
   const warming = label === "Energy Surplus";
   if (worsened) {
     return [
@@ -432,7 +445,7 @@ export function describeItemJudgment(item, before, after, label) {
   ];
 
   blocks.push(deltaEnergyLines(after.deltaEnergy));
-  blocks.push(["AI가 최종 기후 상태를 분석합니다."]);
+  blocks.push(["물리엔진이 최종 기후 상태를 분석합니다."]);
   blocks.push(
     label === "Energy Surplus" || label === "Energy Deficit"
       ? describeImbalanceChange(before, after, label)
@@ -715,7 +728,7 @@ export function previewItemEffect(item) {
   }
 }
 
-// energyStateOf/label_rules.py 기준 "에너지가 평형인" 세 상태 - 도달했다면 복사평형
+// energyStateOf 기준 "에너지가 평형인" 세 상태 - 도달했다면 복사평형
 // 개념이 실제로 이번 판에 나타났다는 뜻이다.
 const RADIATIVE_EQUILIBRIUM_LABELS = new Set(["Cold Stable", "Earth-like Stable", "Warm Stable"]);
 
@@ -736,8 +749,8 @@ export function relevantConceptKeys({ initial, final, timeline, gameOverReason }
   }
 
   if (initial && final) {
-    if (Math.abs(initial.physics.albedo - final.physics.albedo) > CHANGE_EPSILON) keys.add("albedo");
-    if (Math.abs(initial.physics.greenhouseStrength - final.physics.greenhouseStrength) > CHANGE_EPSILON) {
+    if (Math.abs(initial.physics.albedo - final.physics.albedo) > RATIO_EPSILON) keys.add("albedo");
+    if (Math.abs(initial.physics.greenhouseStrength - final.physics.greenhouseStrength) > RATIO_EPSILON) {
       keys.add("greenhouseEffect");
     }
   }
@@ -756,7 +769,7 @@ export function relevantConceptKeys({ initial, final, timeline, gameOverReason }
   const dampedAnywhere = timeline.some((entry, i) => {
     if (i === 0) return false;
     const prev = timeline[i - 1];
-    return Math.abs(entry.physics.deltaEnergy) < Math.abs(prev.physics.deltaEnergy) - CHANGE_EPSILON;
+    return Math.abs(entry.physics.deltaEnergy) < Math.abs(prev.physics.deltaEnergy) - ENERGY_EPSILON;
   });
   if (climateEntries.some((e) => e.label.startsWith("✅")) || dampedAnywhere) {
     keys.add("negativeFeedback");

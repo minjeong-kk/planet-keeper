@@ -80,7 +80,7 @@
   line-height: 1.45;
 }
 
-/* ML Prediction 카드 형태 디자인 */
+/* 행성 상태 판정 카드 형태 디자인 */
 .info-panel__ml-card {
   background: var(--code-bg);
   border: 1px solid var(--border);
@@ -863,6 +863,20 @@
 .game-page__key-card-value {
   font-size: 1.3rem;
   font-weight: 700;
+}
+
+/* ΔE 카드에만 붙는 보조 문구(평형 판정 기준선). 숫자만 보면 이 값이 평형에
+   가까운지 판단할 근거가 화면에 없어서 기준선을 같이 노출한다.
+   word-break: keep-all - 한국어가 어절 중간에서 잘리지 않게. */
+.game-page__key-card-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  word-break: keep-all;
+}
+
+/* 평형 허용범위 안이면 초록으로 표시해 "지금 균형에 들어와 있다"를 즉시 알린다. */
+.game-page__key-card-value--balanced {
+  color: var(--success);
 }
 
 /* 화면 우측 상단에 고정되는 타이머 + 이상기후 경고 패널 묶음 - 경고 패널이

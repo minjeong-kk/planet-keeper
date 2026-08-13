@@ -2,8 +2,7 @@
  * physicsEngine.js — 기후 물리 엔진 (순수 함수)
  *
  * React state / UI / Three.js에 전혀 의존하지 않는 순수 계산 모듈이다.
- * 동일한 함수를 브라우저(게임)와 머신러닝 데이터 생성 스크립트에서 그대로
- * import하여 재사용한다.
+ * 게임의 물리 계산과 상태 판정(planetStateOf)이 모두 여기서 나온다.
  *
  *   import { computeClimateV2, mapSlidersToClimateInputs } from ".../utils/physicsEngine"
  *
@@ -40,61 +39,131 @@
  * 기준 수치 (PLAN.md)
  * ------------------------------------------------------------------
  *
- * - TOA 하향단파복사속 기준 상수 S = 100
- * - CO₂ 기준 농도 = 432 ppm
- * - 기준 온도 = 288 K
+ * - TOA 하향단파복사속 기준 상수 S = 297.88 W/m² (KIM 실측)
+ * - CO₂ 기준 농도 = 429.53 ppm (기상청 관측소 3곳 2024년 실측 평균)
+ * - 기준 온도 = 288.15 K (15°C, 판정 밴드의 중심과 같은 값)
  */
 
 // 라벨 임계값은 실측 데이터에서 도출된 생성 파일에서 읽는다.
-// (data-pipeline/ML-Scripts/derive_thresholds.py → src/data/climateThresholds.js)
-// label_rules.py도 같은 도출 결과를 읽으므로 Python/JS가 어긋날 수 없다.
+// (data-pipeline/Analysis/derive_thresholds.py → src/data/climateThresholds.js)
 import {
-  EPSILON_ENERGY_BALANCE,
   COLD_STABLE_MAX_K,
   EARTH_LIKE_MAX_K,
+  EARTH_REFERENCE_TEMP_K,
 } from "../data/climateThresholds.js"
 
 // ── 과학적 기준 상수 (PLAN.md) ──────────────────────────────────
-export const SOLAR_CONSTANT = 100 // TOA 하향단파복사속 기준
-export const CO2_BASELINE_PPM = 432 // 기상청 안면도 실측 기준 배경 농도
-export const REFERENCE_TEMP_K = 288 // 지구 평균 지표 기온(≈15°C) — 보정 목표값
+// TOA 하향단파복사. KIM 전지구 필드 평균 실측값(physics_reference.csv의 dswrtoa
+// = 297.8821 W/m²)을 소수 둘째 자리로 반올림해서 쓴다.
+//
+// 계획서는 이 값을 100으로 두고 시작했고, 아래 ΔE 기반 상수들(평형 허용오차,
+// 온도 틱)은 전부 그 스케일에서 보정된 값이다. S를 실측값으로 바꾸면 ΔE 전체가
+// ENERGY_SCALE 배로 커지므로, 그 상수들도 같은 배율로 환산해야 판정이 유지된다.
+// 숫자를 손으로 다시 적지 않고 SOLAR_CONSTANT에서 유도하는 이유가 이것이다 —
+// 하나만 고치고 나머지를 빠뜨리면 에러 없이 조용히 판정 기준선만 어긋난다.
+export const SOLAR_CONSTANT = 297.88 // TOA 하향단파복사속 기준 (KIM 실측)
+// ΔE 단위(W/m²)로 표현된 임계값을 가진 다른 모듈들도 이 배율을 써서 환산한다.
+export const ENERGY_SCALE = SOLAR_CONSTANT / 100 // 계획서 기준 스케일(S=100) 대비 배율
+// 기상청 관측소 3곳(울릉도·독도 428.29 / 안면도 431.02 / 고산 429.29)의 2024년
+// 월별 실측 36개를 평균한 값(physics_reference.csv의 co2). 계획서는 432로 두고
+// 시작했는데 그건 어느 관측소 값과도 맞지 않아서 실측 평균으로 교체했다.
+//
+// 이 상수는 sliderToCO2Ppm(슬라이더→ppm)과 greenhouseStrengthOf의 co2Term(ppm→로그
+// 응답) 양쪽에 들어가고 서로 나눠지므로 약분된다 - 즉 값이 바뀌어도 같은 슬라이더
+// 위치에서 온실효과·ΔE·판정은 그대로다. 화면에 표시되는 ppm 숫자만 달라진다.
+export const CO2_BASELINE_PPM = 429.53
+// 지구 평균 지표 기온(15°C = 288.15 K) — 유효 σ 보정의 목표값이다.
+//
+// 숫자를 여기 적지 않고 climateThresholds.js에서 가져오는 이유: 판정 밴드
+// (COLD_STABLE_MAX_K ~ EARTH_LIKE_MAX_K)가 derive_thresholds.py에서 이 값을
+// 중심으로 ±(관측 IQR/2) 하게 계산된다. 엔진이 평형을 맞추는 온도와 밴드의
+// 중심이 다르면 "평형인데 지구형이 아닌" 구간이 생기므로 같은 값을 써야 한다.
+// 예전에는 여기 288, 저기 288.15로 0.15 K 어긋나 있었다.
+export const REFERENCE_TEMP_K = EARTH_REFERENCE_TEMP_K
 
 const clamp = (x, lo, hi) => Math.min(hi, Math.max(lo, x))
 
+// 지표 구성별 반사율(문헌 통념값). 계수 자체가 "이 지표는 얼마나 밝은가"라는
+// 물리량이라, 값만 봐도 타당한지 판단할 수 있다.
+// 빙하 슬라이더 100%는 "행성이 눈·얼음으로 완전히 덮인 상태"이므로 신적설 쪽 값을
+// 쓴다(신적설 0.8~0.9 / 해빙 0.5~0.7 / 빙하빙 0.4~0.6). 스노우볼 지구의 알베도
+// 추정치도 0.6~0.8이라 그 상단에 해당한다.
+export const ALBEDO_ICE = 0.8
+export const ALBEDO_OCEAN = 0.08 // 해양 (0.06~0.10)
+export const ALBEDO_LAND = 0.2 // 육지 평균 (숲 0.15 ~ 사막 0.35)
+export const ALBEDO_CLOUD = 0.5 // 구름 — 개발계획서 (3)1의 값
+
 /**
  * 지표/대기 구성에 따른 행성 알베도(반사율, 0~1).
- * 빙하·구름은 반사율을 높이고, 바다는 어두워 반사율을 살짝 낮춘다.
  *
- * 구름 계수 0.5는 개발계획서 (3)1의 알베도 공식(구름량 × 0.5)에서 온 값이다.
- * 이전 구현은 0.3이었는데, 그러면 기준 조성(빙하 0.1 / 바다 0.7 / 구름 0.3)의
- * 행성 알베도가 0.22가 되어 계획서 데이터 표의 지구 평균 0.30과 어긋났다.
+ *   육지   = 1 − 빙하 − 바다                     (남는 면적)
+ *   지표면 = 각 지표의 면적 가중 평균
+ *   행성   = 지표면 × (1 − 구름) + 구름 × 0.5    (구름이 지표를 가림)
  *
- *   구름 0.3 → 지표면분 0.130 + 구름분 0.090 = 0.220
- *   구름 0.5 → 지표면분 0.130 + 구름분 0.150 = 0.280   ← 실제 지구 ≈0.30
+ * 예전에는 `0.12 + 0.45·빙하 + 0.5·구름 − 0.05·바다` 라는 덧셈식이었다.
+ * 계획서에서 온 값은 구름 계수 0.5 하나뿐이었고 나머지 세 계수는 출처가 없었는데,
+ * 극단 조성에서 실제와 크게 어긋났다.
  *
- * 지표면분(0.130)은 실제 지구와 이미 맞았고, 어긋난 항은 구름 기여 하나였다.
- * 실제 지구에서도 행성 알베도의 절반 이상이 구름 몫이다.
+ *   바다 100% → 0.22 (실제 해양 ≈0.1)    사막(육지 100%) → 0.145 (실제 ≈0.2~0.35)
+ *   구름 100% → 0.62 (지표가 안 보이는데도 지표분이 남아 있음)
+ *
+ * 원인은 구름을 "지표에 더하는" 항으로 둔 것이다. 구름은 지표를 가리므로 면적
+ * 가중으로 결합해야 하고, 그렇게 하면 구름 100%에서 정확히 구름 알베도 0.5가
+ * 나온다. 계획서의 0.5는 버리지 않고 "구름 자체의 반사율"로 그대로 쓴다.
+ *
+ * 빙하·바다 슬라이더는 서로 독립이라 합이 1을 넘을 수 있다. 그때는 육지가 0이 되고
+ * 두 지표의 비율로 정규화된다(예: 빙하 100 + 바다 100 → 반반 섞인 지표).
  */
 export function albedoOf({ glacierRatio, oceanRatio, cloudRatio }) {
+  const landRatio = Math.max(0, 1 - glacierRatio - oceanRatio)
+  const totalSurface = glacierRatio + oceanRatio + landRatio // 항상 ≥ 1
+  const surfaceAlbedo =
+    (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * ALBEDO_LAND) /
+    totalSurface
+
   return clamp(
-    0.12 + 0.45 * glacierRatio + 0.5 * cloudRatio - 0.05 * oceanRatio,
+    surfaceAlbedo * (1 - cloudRatio) + cloudRatio * ALBEDO_CLOUD,
     0.05,
     0.9,
   )
 }
 
+// 기준 조성에서의 온실효과 상수항.
+//
+// 실제 지구의 유효 온실효과는 OLR(≈240 W/m²)과 지표 복사(σ·288.15⁴ = 390.92 W/m²)에서
+//   g_earth = 1 − 240 / 390.92 = 0.386
+// 로 구해진다. 여기에 기준 조성의 구름 기여(0.1 × 0.3 = 0.03)가 더해지므로,
+// 상수항은 0.386 − 0.03 = 0.356 으로 둬야 기준 조성의 온실효과가 실제 지구와 같아진다.
+//
+// 예전에는 0.30이었는데 출처가 어디에도 없었다(계획서에도 없음). 기준 조성에서
+// 0.33이 나와 실제 지구 0.386과 어긋났다.
+const GREENHOUSE_BASE = 0.356
+
+// 온실효과 상한. g = 1 − ε 이고 금성이 g ≈ 0.99이므로 "폭주 직전"에 해당한다.
+// 예전 상한 0.8에서는 무작위 조성의 27%가 벽에 붙어, 그 구간에서 CO₂·대기두께
+// 아이템을 써도 clamp가 잘라내 화면상 아무 변화가 없었다(0.85에서는 21%).
+const GREENHOUSE_MAX = 0.85
+
+// 온실효과의 각 항. co2PpmForTargetTemperature(역함수)도 같은 식을 써야 하므로
+// 계수를 양쪽에 적지 않고 여기 한 번만 둔다 - 예전에는 복제돼 있어서, 상수를
+// 한쪽만 고쳤을 때 2단계 강제 안정화가 조용히 빗나갔다.
+const co2GreenhouseTerm = (co2Ppm) =>
+  0.25 * Math.log2(Math.max(co2Ppm, 1) / CO2_BASELINE_PPM)
+const atmGreenhouseTerm = (atmThickness) => 0.35 * (atmThickness - 1) // 1 = 지구 기준
+const cloudGreenhouseTerm = (cloudRatio) => 0.1 * cloudRatio
+
 /**
- * 온실효과 강도(0~0.8). 값이 클수록 지표 복사를 더 많이 되잡아 온난화된다.
+ * 온실효과 강도(0~GREENHOUSE_MAX). 값이 클수록 지표 복사를 더 많이 되잡아 온난화된다.
  * CO₂는 로그 응답(복사강제력 ∝ log), 대기 두께와 구름도 기여한다.
  */
 function greenhouseStrengthOf({ co2Ppm, atmThickness, cloudRatio }) {
-  const co2Term = 0.25 * Math.log2(Math.max(co2Ppm, 1) / CO2_BASELINE_PPM)
-  const atmTerm = 0.35 * (atmThickness - 1) // atmThickness=1 이 지구 기준
-  const cloudTerm = 0.1 * cloudRatio
-  return clamp(0.3 + co2Term + atmTerm + cloudTerm, 0, 0.8)
+  const co2Term = co2GreenhouseTerm(co2Ppm)
+  const atmTerm = atmGreenhouseTerm(atmThickness)
+  const cloudTerm = cloudGreenhouseTerm(cloudRatio)
+  return clamp(GREENHOUSE_BASE + co2Term + atmTerm + cloudTerm, 0, GREENHOUSE_MAX)
 }
 
-// 지구 기준 상태(288 K)에서 ASR ≈ OLR(deltaEnergy ≈ 0)가 되도록
+// 지구 기준 상태(288.15 K)에서 ASR ≈ OLR(deltaEnergy ≈ 0)가 되도록
 // 유효 σ(EFFECTIVE_SIGMA)를 보정한다.
 const BASELINE_STATE = {
   glacierRatio: 0.1,
@@ -190,13 +259,13 @@ export function mapSlidersToClimateInputs(sliders = {}) {
 }
 
 // 알베도/대기두께 "기준(중립)" 값 - Planet Summary 원인 분석(현재 값 vs 기준값 비교)에 쓴다.
-// BASELINE_STATE(288K에서 deltaEnergy≈0이 되도록 보정한 조성)의 알베도를 그대로 쓴다.
+// BASELINE_STATE(288.15K에서 deltaEnergy≈0이 되도록 보정한 조성)의 알베도를 그대로 쓴다.
 export const BASELINE_ALBEDO = albedoOf(BASELINE_STATE)
 export const BASELINE_ATM_THICKNESS = BASELINE_STATE.atmThickness // 1 (지구 기준)
 
 // equilibriumTemperatureOf는 이 파일 아래(온도 동역학 섹션)에 정의돼 있다 -
 // 병합 전 이쪽 브랜치가 만든 버전은 clamp/가드가 없어서, 그걸 포함하는
-// 최신(ML 파이프라인) 버전으로 통합했다. 이름/시그니처는 그대로라 아래
+// clamp가 있는 버전으로 통합했다. 이름/시그니처는 그대로라 아래
 // co2PpmForTargetTemperature나 useGameStore.js 쪽 호출부는 안 바뀐다.
 
 /**
@@ -209,11 +278,14 @@ export const BASELINE_ATM_THICKNESS = BASELINE_STATE.atmThickness // 1 (지구 �
  * OLR=ASR이 되도록 필요한 온실효과 강도를 구한 뒤 co2Term을 역산한다.
  */
 export function co2PpmForTargetTemperature({ atmThickness, cloudRatio }, absorbedRadiation, targetTempK) {
+  // greenhouseStrengthOf의 역함수다 - 상수와 각 항을 그쪽과 공유해서 어긋날 수 없게 한다.
   const desiredEmissivity = absorbedRadiation / (EFFECTIVE_SIGMA * Math.pow(targetTempK, 4))
-  const desiredGreenhouse = clamp(1 - desiredEmissivity, 0, 0.8)
-  const atmTerm = 0.35 * (atmThickness - 1)
-  const cloudTerm = 0.1 * cloudRatio
-  const co2Term = desiredGreenhouse - 0.3 - atmTerm - cloudTerm
+  const desiredGreenhouse = clamp(1 - desiredEmissivity, 0, GREENHOUSE_MAX)
+  const co2Term =
+    desiredGreenhouse -
+    GREENHOUSE_BASE -
+    atmGreenhouseTerm(atmThickness) -
+    cloudGreenhouseTerm(cloudRatio)
   const co2Ppm = CO2_BASELINE_PPM * Math.pow(2, co2Term / 0.25)
   return clamp(co2Ppm, CO2_BASELINE_PPM * 0.3, CO2_BASELINE_PPM * 3.0)
 }
@@ -223,9 +295,15 @@ export function co2PpmToSlider(co2Ppm) {
   return clamp(((co2Ppm / CO2_BASELINE_PPM - 0.3) / 2.7) * 100, 0, 100)
 }
 
-// 에너지 평형 판정 허용오차. label_rules.py와 같은 값을 쓰는 것이 구조적으로
-// 보장된다 - 둘 다 derive_thresholds.py가 생성한 파일에서 읽기 때문이다.
-export const ENERGY_BALANCE_EPSILON = EPSILON_ENERGY_BALANCE
+// 에너지 평형 판정 허용오차 - |ΔE| 가 이 값 이하면 "평형"으로 본다.
+//
+// 관측량이 아니라 설계 허용오차다(예전에는 derive_thresholds.py가 관측 임계값과
+// 함께 내보냈지만, 관측에서 나오는 값이 아니라 여기 두는 것이 맞다. Python 쪽에
+// 스케일 배율을 복제해 두면 한쪽만 바뀌었을 때 잡아낼 방법도 없다).
+//
+// 5.0은 S=100 스케일에서 "평형온도로부터 약 4.6 K 이내"에 해당하는 값이었고,
+// ENERGY_SCALE을 곱해 지금 스케일에서도 같은 온도 폭을 유지한다.
+export const ENERGY_BALANCE_EPSILON = 5.0 * ENERGY_SCALE
 
 export function energyStateOf(deltaEnergy) {
   if (deltaEnergy > ENERGY_BALANCE_EPSILON) return "Energy Surplus"
@@ -235,8 +313,8 @@ export function energyStateOf(deltaEnergy) {
 
 // ── 온도 동역학 ────────────────────────────────────────────────────
 // computeClimateV2는 주어진 온도에서 수지만 평가하고 온도를 바꾸지 않는다.
-// 온도를 실제로 움직이는 규칙은 게임 로직의 것이지만, ML 데이터 생성 스크립트도
-// 같은 규칙을 써야 하므로 순수 함수로 여기 모아 둔다.
+// 온도를 실제로 움직이는 규칙은 게임 로직의 것이지만, 여러 호출부가 같은 규칙을
+// 써야 하므로 순수 함수로 여기 모아 둔다.
 
 // 온도가 물리적으로 의미 있는 범위를 벗어나 발산하지 않도록 하는 상하한.
 export const TEMPERATURE_FLOOR_K = 150
@@ -268,7 +346,10 @@ export function equilibriumTemperatureOf(physics) {
 // ΔE > 0(흡수 과다)이면 온도가 오르고, 오르면 OLR(∝T⁴)이 커져 ΔE가 줄어든다.
 // 즉 평형온도로 단조 수렴하며 평형 근처에서는 ΔE가 작아져 자동으로 멈춘다.
 // 한 틱 이동량에 상한을 둬서 극단적인 ΔE에서도 평형을 지나치지 않게 한다.
-export const TEMPERATURE_STEP_PER_ENERGY = 0.05
+// 0.05는 S=100 스케일에서 보정된 값이다. ΔE가 ENERGY_SCALE 배로 커졌으므로
+// 같은 배율로 나눠야 한 틱에 움직이는 온도가 그대로 유지된다.
+export const TEMPERATURE_STEP_PER_ENERGY = 0.05 / ENERGY_SCALE
+// 이쪽은 K 단위라 ΔE 스케일과 무관하다 - 환산하지 않는다.
 export const MAX_TEMPERATURE_STEP_K = 3
 
 /** 현재 온도에서 한 틱만큼 ΔE 방향으로 이동한 다음 온도(K). */
@@ -285,11 +366,14 @@ export function stepTemperature(currentTemperature, deltaEnergy) {
   )
 }
 
-// ── 행성 상태 5분류 (label_rules.py와 같은 규칙) ─────────────────────
+// ── 행성 상태 5분류 ────────────────────────────────────────────────
 // ΔE로 평형/불평형을 먼저 가르고, 평형이면 온도로 저온/지구형/고온을 가른다.
 // 클래스 번호는 저온 → 고온 순서다.
-// 온도 구간은 실측 데이터에서 도출된 값이며(derive_thresholds.py),
-// label_rules.py와 같은 생성 파일을 읽으므로 한쪽만 바뀌어 어긋날 수 없다.
+// 온도 구간은 실측 데이터에서 도출된 값이다(derive_thresholds.py).
+//
+// 예전에는 이 판정을 학습된 ONNX 모델이 대신했지만, 라벨이 ΔE·온도만으로 완전히
+// 결정되는 구조라 모델은 물리 규칙의 근사(정확도 0.9694)에 지나지 않았다.
+// 지금은 게임이 이 함수를 직접 호출해 정확값을 쓴다.
 export { COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K }
 
 export const PLANET_STATES = [
@@ -300,7 +384,7 @@ export const PLANET_STATES = [
   { state: 4, label: "Energy Surplus", korean: "고온 불평형" },
 ]
 
-/** ΔE와 현재 온도로부터 행성 상태(0~4)를 판정한다. label_rules.assign_label과 동일. */
+/** ΔE와 현재 온도로부터 행성 상태(0~4)를 판정한다. */
 export function planetStateOf(deltaEnergy, temperatureK) {
   if (deltaEnergy < -ENERGY_BALANCE_EPSILON) return 0
   if (deltaEnergy > ENERGY_BALANCE_EPSILON) return 4

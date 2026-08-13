@@ -29,7 +29,7 @@ BASE_URL = "https://apihub.kma.go.kr/api/typ05/api/GK2A/LE2"
 
 DATASETS_DIR = "../Datasets"
 os.makedirs(DATASETS_DIR, exist_ok=True)
-OUTPUT_FILE = os.path.join(DATASETS_DIR, "ml_gk2a_dataset.csv")
+OUTPUT_FILE = os.path.join(DATASETS_DIR, "observed_gk2a_dataset.csv")
 
 # KIM API가 최근 180일까지만 조회 가능 -> 그 범위를 N_TARGET_DATES개로 균등 분산.
 N_TARGET_DATES = 50
@@ -67,7 +67,7 @@ def next_tmfc():
     return None  # 계획된 30일 전부 완료
 
 
-# 인자로 날짜를 직접 줄 수도 있고(예: python3 ml-gk2a.py 2026060100),
+# 인자로 날짜를 직접 줄 수도 있고(예: python3 observed-gk2a.py 2026060100),
 # 안 주면 180일 범위 안에서 아직 안 받은 다음 날짜를 자동으로 고른다.
 # 단, 하루 호출 상한은 "실제 오늘"을 기준으로 걸리므로 실행 자체는 여전히 하루 1번씩만.
 if len(sys.argv) > 1:
@@ -80,7 +80,7 @@ else:
 
 DATE = TMFC + "00"    # GK2A는 분(mm) 단위까지 포함 (YYYYMMDDHHmm)
 
-# 하루당 샘플 개수 (ml-kim.py와 동일). 하루 개수를 줄이고 날짜 종류를 늘려서
+# 하루당 샘플 개수 (observed-kim.py와 동일). 하루 개수를 줄이고 날짜 종류를 늘려서
 # 계절/날씨 편차를 줄이는 쪽으로 (30개 x 50일 = 1500개, 하루 호출 60회).
 SAMPLE_SIZE = 30
 

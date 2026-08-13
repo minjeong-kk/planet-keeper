@@ -1,14 +1,14 @@
 """실측 데이터로 '현대 지구형 안정 평형' 표준 범위(라벨 임계값)를 도출한다.
 
 개발계획서 (2)의 "기상청·천리안 실측 데이터로 '현대 지구형 안정 평형' 표준 범위를
-정의하고" 에 해당하는 단계다. 이전에는 label_rules.py에 280K/295K가 "예시값"으로
-하드코딩되어 있었고, 실측 데이터는 라벨 결정에 전혀 쓰이지 않았다.
+정의하고" 에 해당하는 단계다. 이전에는 280K/295K가 "예시값"으로 하드코딩되어 있었고,
+실측 데이터는 상태 판정에 전혀 쓰이지 않았다.
 
 도출 방식
 ---------
 관측 t2m의 '폭'만 쓰고 '중심'은 계획서 기준값을 쓴다.
 
-  - ml_dataset.csv의 t2m 평균은 지구 평균(288.15K)보다 따뜻하게 치우쳐 있다.
+  - observed_kim_dataset.csv의 t2m 평균은 지구 평균(288.15K)보다 따뜻하게 치우쳐 있다.
     KMA API 조회 기간과 GK2A 관측 영역 제약으로 여름철·저위도 표본이 많기 때문이며,
     README '알려진 한계' 2번과 6번에 이미 기록된 편향이다.
   - 따라서 관측 '평균'을 지구형 중심으로 쓰면 안 된다. 대신 관측이 신뢰성 있게
@@ -17,22 +17,25 @@
 
     지구형 안정 범위 = 288.15K ± (관측 t2m IQR / 2)
 
-에너지 평형 허용오차(epsilon)는 관측량이 아니라 설계 허용오차이므로 상수로 둔다.
-물리엔진 기준 상태에서 dΔE/dT ≈ 4·ASR_base/T_ref ≈ 1.08 (단위: ΔE per K)이므로
-epsilon 5.0 은 "평형온도에서 약 4.6K 이내"에 해당한다.
+에너지 평형 허용오차(epsilon)는 여기서 내보내지 않는다. 관측량이 아니라 설계
+허용오차이고, 값이 SOLAR_CONSTANT 스케일에 비례하기 때문이다. 이 스크립트가
+스케일 배율을 따로 들고 있으면 physicsEngine.js와 어긋나도 잡아낼 방법이 없어서,
+physicsEngine.js가 SOLAR_CONSTANT에서 직접 유도하도록 옮겼다.
 
 출력
 ----
-같은 값을 두 형식으로 쓴다 - 이렇게 해야 Python(label_rules.py)과
-JS(physicsEngine.js)가 같은 값을 쓰는 것이 구조적으로 보장된다.
-예전에는 두 파일에 상수를 따로 적어 두고 주석으로만 "같은 값"이라고 해 두었다.
+같은 값을 두 형식으로 쓴다.
 
-  - data-pipeline/Datasets/climate_thresholds.json  (label_rules.py가 읽음)
-  - src/data/climateThresholds.js                   (physicsEngine.js가 import)
+  - data-pipeline/Datasets/climate_thresholds.json  (도출 근거 기록용 - derivation 필드에
+                                                     표본 수·관측 범위·IQR이 남는다)
+  - src/data/climateThresholds.js                   (physicsEngine.js가 import - 실제 소비처)
 
 프론트 쪽을 JSON이 아니라 생성된 JS 모듈로 두는 이유: JSON import는 Node에서
-import attributes(`with { type: "json" }`)를 요구하는데, 이 파일은 브라우저(Vite)와
-Node(run_physics_engine.mjs 경유) 양쪽에서 로드되므로 JS 모듈이 가장 안전하다.
+import attributes(`with { type: "json" }`)를 요구해서, 브라우저(Vite)와 Node 양쪽에서
+로드하려면 JS 모듈이 가장 안전하다.
+
+이 스크립트가 두 파일의 유일한 생성자다 - 값이 어긋날 수 없는 구조이므로 별도의
+동기화 검사가 필요 없다(예전 verify_sync.py의 임계값 검사가 하던 역할).
 
 사용법:
     python3 derive_thresholds.py
@@ -52,10 +55,7 @@ logger = logging.getLogger(__name__)
 # 계획서 3쪽 "지구 기준 세팅값" — 현대 지구 평균 기온 15°C.
 EARTH_REFERENCE_TEMP_K = 288.15
 
-# 에너지 평형 판정 허용오차(설계값, 관측량 아님). 위 docstring의 근거 참고.
-EPSILON_ENERGY_BALANCE = 5.0
-
-OBSERVED_DATASET = config.DATASETS_DIR / "ml_dataset.csv"
+OBSERVED_DATASET = config.DATASETS_DIR / "observed_kim_dataset.csv"
 JSON_FOR_PYTHON = config.DATASETS_DIR / "climate_thresholds.json"
 JS_FOR_FRONTEND = (
     config.DATA_PIPELINE_DIR.parent / "src" / "data" / "climateThresholds.js"
@@ -67,7 +67,6 @@ def derive(observed_t2m: pd.Series) -> dict:
     half_width = (q75 - q25) / 2
 
     return {
-        "epsilon_energy_balance": EPSILON_ENERGY_BALANCE,
         "cold_stable_max_k": round(EARTH_REFERENCE_TEMP_K - half_width, 2),
         "earth_like_max_k": round(EARTH_REFERENCE_TEMP_K + half_width, 2),
         "derivation": {
@@ -101,7 +100,7 @@ def write_js_module(path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         "// ⚠️ 자동 생성 파일 — 직접 수정하지 마세요.\n"
-        "// data-pipeline/ML-Scripts/derive_thresholds.py 를 실행하면 다시 생성됩니다.\n"
+        "// data-pipeline/Analysis/derive_thresholds.py 를 실행하면 다시 생성됩니다.\n"
         "//\n"
         f"// 근거: {d['source']} 관측 {d['n_observations']}개 지점\n"
         f"//       관측 t2m {d['observed_t2m_min_k']}~{d['observed_t2m_max_k']} K "
@@ -109,9 +108,10 @@ def write_js_module(path, payload: dict) -> None:
         f"//       IQR {d['observed_iqr_k'][0]}~{d['observed_iqr_k'][1]} K\n"
         f"//       {d['note']}\n"
         "//\n"
-        "// label_rules.py가 읽는 climate_thresholds.json 과 같은 값이다.\n\n"
-        "export const EPSILON_ENERGY_BALANCE = "
-        f"{payload['epsilon_energy_balance']}\n"
+        "// climate_thresholds.json 과 같은 값이다(도출 근거는 그 파일의 derivation 필드).\n"
+        "//\n"
+        "// 에너지 평형 허용오차(epsilon)는 여기 없다 - 관측값이 아니라 설계값이라\n"
+        "// physicsEngine.js가 SOLAR_CONSTANT에서 직접 유도한다.\n\n"
         f"export const COLD_STABLE_MAX_K = {payload['cold_stable_max_k']}\n"
         f"export const EARTH_LIKE_MAX_K = {payload['earth_like_max_k']}\n"
         f"export const EARTH_REFERENCE_TEMP_K = {d['earth_reference_temp_k']}\n",
@@ -126,15 +126,14 @@ def main() -> None:
 
     df = pd.read_csv(OBSERVED_DATASET)
     if "t2m" not in df.columns:
-        raise ValueError("ml_dataset.csv에 t2m 컬럼이 없습니다.")
+        raise ValueError(f"{OBSERVED_DATASET.name}에 t2m 컬럼이 없습니다.")
 
     thresholds = derive(df["t2m"].dropna())
 
     logger.info(
         f"관측 {thresholds['derivation']['n_observations']}개 지점 → "
         f"지구형 안정 범위 {thresholds['cold_stable_max_k']} ~ "
-        f"{thresholds['earth_like_max_k']} K "
-        f"(epsilon {thresholds['epsilon_energy_balance']})"
+        f"{thresholds['earth_like_max_k']} K"
     )
 
     write_json(JSON_FOR_PYTHON, thresholds)
