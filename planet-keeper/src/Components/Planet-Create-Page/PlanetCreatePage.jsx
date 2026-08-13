@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
-import PlanetUI from "../Planet-ui.jsx";
+import PlanetUI, { LocationPhoto3D } from "../Planet-ui.jsx";
 import PlanetLocationPicker from "./PlanetLocationPicker.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
@@ -118,17 +118,15 @@ function Slider({ id, value, min, cap, onChange, onGrab }) {
 }
 
 // 지점 선택 직후(슬라이더를 아직 안 만졌을 때) 3D 지구 대신 보여주는 자리.
-// imageUrl이 없는 지점(아직 라이선스 확인 전)은 회색 플레이스홀더 + 지점
-// 이름만 보여준다. imageUrl이 채워지면 이 컴포넌트가 자동으로 img를 그리고,
-// 호출부(PlanetCreatePage)는 안 건드려도 된다.
+// imageUrl이 있으면 그 사진을 작은 3D 액자(LocationPhoto3D)에 넣어 살짝
+// 흔들리는 입체감을 준다 - 실제 지리 정보는 없는 순수 시각 효과다. imageUrl이
+// 없는 지점(아직 라이선스 확인 전)은 회색 플레이스홀더 + 지점 이름만 보여준다.
 function LocationPreview({ location }) {
   if (location.imageUrl) {
     return (
-      <img
-        className="planet-create-page__location-preview"
-        src={location.imageUrl}
-        alt={location.name}
-      />
+      <div className="planet-create-page__location-preview" role="img" aria-label={location.name}>
+        <LocationPhoto3D imageUrl={location.imageUrl} />
+      </div>
     );
   }
   return (

@@ -61,14 +61,13 @@
   overflow: hidden;
 }
 
-/* 지점 이미지(또는 회색 플레이스홀더) - 3D 지구를 언마운트하지 않고 그 위에
-   겹쳐서 덮는다(inset:0). PlanetCreatePage.jsx 주석 참고. */
+/* 지점 이미지(3D 액자 또는 회색 플레이스홀더) - 3D 지구를 언마운트하지 않고
+   그 위에 겹쳐서 덮는다(inset:0). PlanetCreatePage.jsx 주석 참고. */
 .planet-create-page__location-preview {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
 }
 
 .planet-create-page__location-preview--placeholder {
