@@ -101,7 +101,7 @@ function shuffled(list) {
 const ITEM_CHOICES_SHOWN = 4;
 
 // 이보다 작은 ΔE 변화는 "효과 없음"으로 본다 - co2/atmThickness가 이미
-// greenhouseStrength clamp(0.8) 상한에 걸린 경우 등, 슬라이더를 움직여도 실제로는
+// greenhouseStrength 상한(GREENHOUSE_MAX)에 걸린 경우 등, 슬라이더를 움직여도 실제로는
 // 아무 것도 안 바뀌는 경우가 있다(부동소수 오차 여유도 겸한다).
 // ΔE 단위(W/m²)라 SOLAR_CONSTANT 스케일을 따라간다 - 0.01은 S=100 기준으로 잡은 값이다.
 // ItemInfoModal("지금 사용하면" 미리보기)도 같은 기준을 써야 판정이 어긋나지 않는다.
@@ -246,7 +246,11 @@ const useGameStore = create(
   // 타이머가 돈 총 경과 시간(초) - GamePage가 1초마다 +1 하고, REPORT로 넘어가면
   // 더 이상 증가하지 않아 그 값 그대로 ReportPage에서 "총 걸린 시간"으로 보여준다.
   elapsedSeconds: 0,
-  // REPORT 단계로 넘어간 이유: "planet_stabilized"(성공) | "life_over"(실패) | null(진행 중)
+  // REPORT 단계로 넘어간 이유:
+  //   "planet_stabilized" 성공 - 지구형 안정 도달
+  //   "not_stabilized"    미완 - 최종 확인은 다 했지만 지구형 범위 밖
+  //   "life_over"         실패 - 오답 3회
+  //   null                진행 중
   gameOverReason: null,
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
@@ -542,8 +546,16 @@ const useGameStore = create(
       set({ isComputing: false });
     }
 
+    // 최종 확인을 다 채우면 게임이 끝난다. 예전에는 여기서 실제 결과를 보지 않고
+    // 무조건 planet_stabilized(성공)로 끝냈는데, CO2 자동 조정으로도 지구형 범위에
+    // 못 들어오는 조성이 있다(알베도가 너무 높아 CO2 상한까지 올려도 못 데우는 경우 등).
+    // 그러면 "지구형에 도달했다"는 성공 배너 옆에 "저온 안정"이 표시되는 자기모순이 된다.
+    // ReportPage가 최종 상태를 계산하는 것과 같은 방식(planetStateOf)으로 판정한다.
     if (forceStable) {
-      get().goReport("planet_stabilized");
+      const finalPhysics = get().physicsResult;
+      const reachedEarthLike =
+        !!finalPhysics && classifyPlanetState(finalPhysics).label === EARTH_LIKE_STABLE_LABEL;
+      get().goReport(reachedEarthLike ? "planet_stabilized" : "not_stabilized");
       return;
     }
 

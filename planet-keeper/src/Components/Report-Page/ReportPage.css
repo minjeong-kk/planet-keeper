@@ -115,6 +115,12 @@
   background-color: var(--danger-bg);
 }
 
+/* 목숨은 남았지만 지구형 범위에 못 든 종료 - 실패(빨강)와 성공(초록) 사이의 톤. */
+.report-page__banner--partial {
+  border-color: var(--warm);
+  background-color: var(--warm-bg);
+}
+
 .report-page__summary-main h2 {
   margin: 0 0 8px 0;
   font-size: 1.4rem;
