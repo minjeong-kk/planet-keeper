@@ -38,8 +38,22 @@ const useClimateStore = create(
   values: { ...DEFAULT_VALUES },
   currentTemperature: REFERENCE_TEMP_K,
 
+  // 빙하+바다 비율의 합은 항상 100을 넘을 수 없다(physicsEngine.albedoOf가
+  // landRatio = 1 - 빙하 - 바다로 전제). 한쪽을 밀어 올려 100을 넘기려 하면,
+  // 반대쪽을 실시간으로 밀어낸다 - 스토어에서 처리해두면 어느 UI(행성 만들기
+  // 슬라이더/이상기후 대응 미니 슬라이더/앞으로 생길 지점 선택 등)에서 값을
+  // 바꾸든 항상 같은 규칙이 적용된다.
   setValue: (key, value) =>
-    set((state) => ({ values: { ...state.values, [key]: value } })),
+    set((state) => {
+      const values = { ...state.values, [key]: value };
+      if (key === "iceThickness" || key === "ocean") {
+        const other = key === "iceThickness" ? "ocean" : "iceThickness";
+        if (values[key] + values[other] > 100) {
+          values[other] = 100 - values[key];
+        }
+      }
+      return { values };
+    }),
 
   setCurrentTemperature: (temp) => set({ currentTemperature: temp }),
 

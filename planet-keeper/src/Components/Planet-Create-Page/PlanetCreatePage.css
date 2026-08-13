@@ -112,7 +112,8 @@
   text-shadow: 0 0 8px var(--neon-glow);
 }
 
-/* ── 글래스모피즘 네온 슬라이더 ── */
+/* ── 글래스모피즘 네온 슬라이더(네이티브) ── 대기두께/구름/CO2처럼 서로 얽히지
+   않는 슬라이더는 이 네이티브 <input type="range">를 그대로 쓴다. */
 .planet-create-page__slider {
   -webkit-appearance: none;
   appearance: none;
@@ -121,7 +122,6 @@
   border-radius: 10px;
   cursor: pointer;
   outline: none;
-  /* 채워지는 왼쪽(네온) + 반투명 다크 트랙(우측). --fill 은 인라인 스타일로 주입 */
   background: linear-gradient(
     to right,
     var(--neon) 0 var(--fill, 50%),
@@ -134,7 +134,6 @@
   touch-action: none;
 }
 
-/* WebKit 손잡이 */
 .planet-create-page__slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -154,7 +153,6 @@
   transform: scale(1.2);
 }
 
-/* Firefox 트랙/진행/손잡이 */
 .planet-create-page__slider::-moz-range-track {
   height: 6px;
   border-radius: 10px;
@@ -176,6 +174,77 @@
 }
 .planet-create-page__slider:hover::-moz-range-thumb {
   transform: scale(1.25);
+}
+
+/* ── 글래스모피즘 네온 슬라이더(커스텀, div 기반) ── 빙하/바다처럼 서로 캡을
+   실시간으로 밀어내야 하는 경우에만 쓴다.
+   네이티브 <input type="range">는 손잡이 위치를 min/max 속성에 직접 묶어서
+   계산하기 때문에, 트랙을 0~100으로 그리면서 이동 가능 범위만 10~80처럼 좁게
+   막는 게 불가능하다(둘을 분리하려면 min/max를 실제로 좁혀야 하는데, 그러면
+   커플링(빙하/바다)에 따라 트랙 폭 자체의 값↔위치 비율이 슬라이더마다 달라져서
+   "같은 칸인데 왜 이렇게 다르게 움직이지"처럼 보인다).
+   그래서 트랙/손잡이를 직접 그리고, 값은 항상 0~100 스케일로 트랙 전체에 매핑한
+   뒤, 실제로 손잡이가 갈 수 있는 구간(min~cap)만 별도로 표시한다. */
+.planet-create-page__slider-track {
+  position: relative;
+  width: 100%;
+  height: 6px;
+  border-radius: 10px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  box-shadow: 0 0 6px rgba(45, 212, 191, 0.12) inset;
+  outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+}
+
+.planet-create-page__slider-track:focus-visible {
+  box-shadow: 0 0 0 2px var(--neon-glow), 0 0 6px rgba(45, 212, 191, 0.12) inset;
+}
+
+/* 실제로 조작 가능한 구간(min~cap) - 트랙 전체(0~100) 위에서 이 구간만 밝게
+   띄워서, 왜 손잡이가 거기서 멈추는지 한눈에 보이게 한다. */
+.planet-create-page__slider-usable {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.28);
+  pointer-events: none;
+}
+
+.planet-create-page__slider-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: 10px;
+  background: var(--neon);
+  pointer-events: none;
+}
+
+.planet-create-page__slider-thumb {
+  position: absolute;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--neon);
+  box-shadow: 0 0 8px var(--neon-glow);
+  transform: translate(-50%, -50%);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  pointer-events: none;
+}
+
+.planet-create-page__slider-track:hover .planet-create-page__slider-thumb {
+  transform: translate(-50%, -50%) scale(1.25);
+  box-shadow: 0 0 16px var(--neon-glow);
+}
+
+.planet-create-page__slider-track:active .planet-create-page__slider-thumb {
+  transform: translate(-50%, -50%) scale(1.2);
 }
 
 .planet-create-page__actions {
