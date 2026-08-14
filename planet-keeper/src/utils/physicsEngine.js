@@ -291,14 +291,18 @@ export function co2PpmForTargetTemperature({ atmThickness, cloudRatio }, absorbe
 }
 
 // sliderToCO2Ppm의 역함수 - 자동 조정된 ppm을 다시 슬라이더 값(0~100)으로 되돌린다.
+// 슬라이더는 정수 퍼센트라, 부동소수점 나눗셈이 남기는 37.499999999999996
+// 같은 오차를 여기서 반올림해 지운다(호출부마다 반올림하면 빠뜨리기 쉬움).
 export function co2PpmToSlider(co2Ppm) {
-  return clamp(((co2Ppm / CO2_BASELINE_PPM - 0.3) / 2.7) * 100, 0, 100)
+  return Math.round(clamp(((co2Ppm / CO2_BASELINE_PPM - 0.3) / 2.7) * 100, 0, 100))
 }
 
 // mapSlidersToClimateInputs의 atmThickness(0.4~2.0) 역함수 - 지점 선택처럼 이미
-// 물리 단위로 된 값을 슬라이더 값(0~100)으로 되돌릴 때 쓴다.
+// 물리 단위로 된 값을 슬라이더 값(0~100)으로 되돌릴 때 쓴다. co2PpmToSlider와
+// 같은 이유로 정수 반올림한다(예: atmThickness=1.0 → 37.5가 아니라
+// 37.49999999999999로 뜨는 부동소수점 오차 방지).
 export function atmThicknessToSlider(atmThickness) {
-  return clamp(((atmThickness - 0.4) / 1.6) * 100, 0, 100)
+  return Math.round(clamp(((atmThickness - 0.4) / 1.6) * 100, 0, 100))
 }
 
 // 에너지 평형 판정 허용오차 - |ΔE| 가 이 값 이하면 "평형"으로 본다.

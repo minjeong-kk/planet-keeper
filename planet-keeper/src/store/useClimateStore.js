@@ -19,6 +19,23 @@ export const CLIMATE_VARIABLES = [
   { key: "co2", label: "CO2" },
 ];
 
+// 빙하+바다 비율의 합은 항상 100을 넘을 수 없다(physicsEngine.albedoOf가
+// landRatio = 1 - 빙하 - 바다로 전제). 순수 함수로 빼서 setValue·
+// setValuesFromPoint·useGameStore.nextSliderValues가 전부 이거 하나만 쓴다 -
+// 예전엔 setValue에만 이 규칙이 있고 nextSliderValues(아이템 적용 시 "다음 값"
+// 계산)에는 없어서, 아이템 사용 시 리포트가 예상한 ΔE와 실제 스토어에 반영된
+// ΔE가 갈라지는 버그가 있었다(예: 빙하20/바다80에서 빙하+8 아이템 → 예상은
+// {28,80}, 실제 저장은 {28,72}). 한쪽을 밀어 올려 100을 넘기려 하면 반대쪽을
+// 실시간으로 밀어내는 규칙이 이제 어디서 호출하든 항상 똑같이 적용된다.
+export function applyIceOceanCoupling(values, key) {
+  const coupledKey = key === "iceThickness" ? "ocean" : key === "ocean" ? "iceThickness" : null;
+  if (!coupledKey) return values;
+  if (values[key] + values[coupledKey] > 100) {
+    return { ...values, [coupledKey]: 100 - values[key] };
+  }
+  return values;
+}
+
 // 전부 50(중립값)이면 우연히 이미 평형(Earth-like Stable)에 가까운 조성이 되어
 // 1단계/아이템 단계를 건너뛰는 경우가 잦았다 - 뚜렷한 Energy Surplus(ΔE≈+43.2,
 // 평형 허용범위 ±14.9의 약 3배)로 시작해 실제로 고칠 게 있는 상태에서 게임이
@@ -49,20 +66,9 @@ const useClimateStore = create(
   selectedLocation: null,
   isViewingLocationImage: false,
 
-  // 빙하+바다 비율의 합은 항상 100을 넘을 수 없다(physicsEngine.albedoOf가
-  // landRatio = 1 - 빙하 - 바다로 전제). 한쪽을 밀어 올려 100을 넘기려 하면,
-  // 반대쪽을 실시간으로 밀어낸다 - 스토어에서 처리해두면 어느 UI(행성 만들기
-  // 슬라이더/이상기후 대응 미니 슬라이더/앞으로 생길 지점 선택 등)에서 값을
-  // 바꾸든 항상 같은 규칙이 적용된다.
   setValue: (key, value) =>
     set((state) => {
-      const values = { ...state.values, [key]: value };
-      if (key === "iceThickness" || key === "ocean") {
-        const other = key === "iceThickness" ? "ocean" : "iceThickness";
-        if (values[key] + values[other] > 100) {
-          values[other] = 100 - values[key];
-        }
-      }
+      const values = applyIceOceanCoupling({ ...state.values, [key]: value }, key);
       // 값이 실제로 달라질 때만 이미지 모드를 끈다 - 클릭/포커스만으로는 안 꺼짐
       // (같은 값을 다시 세팅하는 호출은 "조작"으로 안 침).
       const changed = state.values[key] !== value;
@@ -87,16 +93,14 @@ const useClimateStore = create(
   setValuesFromPoint: (point) =>
     set((state) => {
       const clamp = (v) => Math.min(100, Math.max(0, v));
-      let iceThickness = clamp(point.values.iceThickness);
-      let ocean = clamp(point.values.ocean);
-      // setValue와 같은 규칙(빙하+바다 ≤ 100)을 여기서도 지킨다.
-      if (iceThickness + ocean > 100) ocean = 100 - iceThickness;
+      const iceThickness = clamp(point.values.iceThickness);
+      // 빙하+바다 상호제약(applyIceOceanCoupling)도 여기서 그대로 쓴다 - 이제
+      // 어느 진입점이든 같은 규칙 하나만 쓴다.
+      const withIce = { ...state.values, iceThickness, ocean: clamp(point.values.ocean) };
 
       return {
         values: {
-          ...state.values,
-          iceThickness,
-          ocean,
+          ...applyIceOceanCoupling(withIce, "iceThickness"),
           cloud: clamp(point.values.cloud),
           atmThickness: atmThicknessToSlider(point.values.atmThickness),
           co2: co2PpmToSlider(point.values.co2),

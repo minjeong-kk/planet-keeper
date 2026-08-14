@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
-import useClimateStore, { CLIMATE_VARIABLES } from "./useClimateStore.js";
+import useClimateStore, { CLIMATE_VARIABLES, applyIceOceanCoupling } from "./useClimateStore.js";
 import {
   computeClimateV2,
   mapSlidersToClimateInputs,
@@ -195,10 +195,13 @@ function computeItemStepResult(nextValues) {
   return { physics, ml: classifyPlanetState(physics) };
 }
 
-// 아이템 효과를 적용한 다음 슬라이더 값(0~100 범위로 clamp).
+// 아이템 효과를 적용한 다음 슬라이더 값(0~100 범위로 clamp). 빙하/바다 상호제약도
+// useClimateStore.setValue와 똑같이 applyIceOceanCoupling을 쓴다 - 여기서
+// 빠뜨리면 "아이템 적용 예상 ΔE"(이 함수로 미리 계산)와 "실제 저장된 값"
+// (setValue가 따로 제약을 걸어 나온 값)이 서로 달라지는 문제가 생긴다.
 function nextSliderValues(values, item) {
   const nextValue = Math.min(100, Math.max(0, values[item.key] + item.delta));
-  return { ...values, [item.key]: nextValue };
+  return applyIceOceanCoupling({ ...values, [item.key]: nextValue }, item.key);
 }
 
 const useGameStore = create(

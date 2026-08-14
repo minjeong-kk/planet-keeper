@@ -20,10 +20,14 @@ const VARIABLE_ICONS = [
 const LABEL_BY_KEY = Object.fromEntries(CLIMATE_VARIABLES.map((v) => [v.key, v.label]));
 const VARIABLES = VARIABLE_ICONS.map((v) => ({ ...v, label: LABEL_BY_KEY[v.key] }));
 
-// (b) 슬라이더를 조작해서 갈 수 있는 값의 범위 - 0%/100% 같은 극단값에서 시작하지
-// 못하도록 실제 조작 가능 범위를 좁힌다. useClimateStore.DEFAULT_VALUES(페이지
-// 진입 시 보이는 기본값)와는 다른 개념이라 그건 그대로 두고, 여기서만 min/max를 좁힌다.
-const SLIDER_RANGE = { min: 10, max: 80 };
+// (b) 슬라이더를 조작해서 갈 수 있는 값의 범위. 예전엔 10~80으로 좁혀서 0%/100%
+// 같은 극단값에서 시작 못 하게 했는데, 그러면 "바다 10%일 때 빙하가 90%까지
+// 갈 수 있어야 하는" 정상적인 조합도 막히고, 지점 데이터(사하라 바다 0%, 남극
+// 빙하 95%, 태평양 바다 98%)와도 충돌했다. 그래서 0~100으로 완전히 열고,
+// 실제로 불가능한 조합(빙하+바다>100)만 applyIceOceanCoupling으로 막는다.
+// "시작할 때 극단값이면 안 된다"는 건 useClimateStore.DEFAULT_VALUES가 이미
+// 담당하고 있어서(그 자체가 0/100이 아님) 여기 범위를 여는 것과 무관하다.
+const SLIDER_RANGE = { min: 0, max: 100 };
 
 // (a) 빙하+바다 비율의 합이 100을 넘지 않게 하는 건 이제 useClimateStore.setValue가
 // 직접 한다(어느 쪽을 밀어도 실시간으로 반대쪽을 밀어냄) - 그래서 여기서는 그
@@ -118,20 +122,18 @@ function Slider({ id, value, min, cap, onChange, onGrab }) {
 }
 
 // 지점 선택 직후(슬라이더를 아직 안 만졌을 때) 3D 지구 대신 보여주는 자리.
-// imageUrl이 있으면 그 사진을 작은 3D 액자(LocationPhoto3D)에 넣어 살짝
-// 흔들리는 입체감을 준다 - 실제 지리 정보는 없는 순수 시각 효과다. imageUrl이
-// 없는 지점(아직 라이선스 확인 전)은 회색 플레이스홀더 + 지점 이름만 보여준다.
+// imageUrl이 있는 지점(지금은 사하라만)만 그 사진을 작은 3D 액자(LocationPhoto3D)에
+// 넣어 살짝 흔들리는 입체감을 준다 - 실제 지리 정보는 없는 순수 시각 효과다.
+// imageUrl이 없는 지점(아직 라이선스 확인 전)은 아무것도 덮지 않는다 - 이미
+// 밑에 항상 켜져 있는 PlanetUI가 그 지점의 슬라이더 값(빙하·바다·구름 등)을
+// 실시간으로 반영하고 있어서, 따로 플레이스홀더를 덮으면 오히려 "그냥 파란
+// 원"으로만 보이고 정보가 없다. null을 반환하면 PlanetCreatePage가 렌더링을
+// 생략하고 PlanetUI가 그대로 드러난다.
 function LocationPreview({ location }) {
-  if (location.imageUrl) {
-    return (
-      <div className="planet-create-page__location-preview" role="img" aria-label={location.name}>
-        <LocationPhoto3D imageUrl={location.imageUrl} />
-      </div>
-    );
-  }
+  if (!location.imageUrl) return null;
   return (
-    <div className="planet-create-page__location-preview planet-create-page__location-preview--placeholder">
-      <span>{location.name}</span>
+    <div className="planet-create-page__location-preview" role="img" aria-label={location.name}>
+      <LocationPhoto3D imageUrl={location.imageUrl} />
     </div>
   );
 }
