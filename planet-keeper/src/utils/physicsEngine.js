@@ -114,23 +114,45 @@ export const ALBEDO_CLOUD = 0.5 // 구름 — 개발계획서 (3)1의 값
  * 빙하·바다 슬라이더는 서로 독립이라 합이 1을 넘을 수 있다. 그때는 육지가 0이 되고
  * 두 지표의 비율로 정규화된다(예: 빙하 100 + 바다 100 → 반반 섞인 지표).
  *
- * landAlbedo(선택): 육지의 반사율을 지점별 실측값으로 바꾼다. 지구의 육지는
- * 사막 0.35 ~ 열대림 0.13 으로 편차가 커서, 평균값 하나로는 "사하라 행성"과
- * "아마존 행성"이 같은 밝기가 되어 버린다. 지점 선택(climatePoints.js)이 KIM
- * 실측에서 역산한 값을 넘긴다. 안 넘기면 기존과 똑같이 ALBEDO_LAND를 쓴다.
+ * measuredSurfaceAlbedo(선택): 지점 선택이 넘기는 그 지점의 실측 지표면 반사율
+ * (climatePoints.js, KIM의 1 − Σrss/Σdswrsfc 로 역산). 있으면 위의 면적 가중
+ * 계산을 통째로 대체한다.
+ *
+ * 육지 항에만 넣지 않는 이유: 실측값은 그 지점의 빙하·바다·육지를 이미 다 포함한
+ * "지표 전체의 반사율"이다. 육지 항에만 넣으면 육지가 없는 지점에서 측정값이
+ * 통째로 버려진다 - 남극(육지 0%)의 실측 0.820과 태평양(육지 2%)의 0.042가
+ * 무시되고 하드코딩된 ALBEDO_ICE/ALBEDO_OCEAN이 쓰이는 문제가 있었다.
+ *
+ * 대체해도 구름은 그대로 덮는다 - 실측은 지표면 값이고 구름은 그 위에 있다.
+ * 슬라이더로 빙하·바다를 바꾸면 실측값과 어긋나므로, 호출부(useClimateStore)가
+ * 조성이 바뀌는 순간 이 값을 떨어뜨린다.
  */
-export function albedoOf({ glacierRatio, oceanRatio, cloudRatio, landAlbedo = ALBEDO_LAND }) {
-  const landRatio = Math.max(0, 1 - glacierRatio - oceanRatio)
-  const totalSurface = glacierRatio + oceanRatio + landRatio // 항상 ≥ 1
-  const surfaceAlbedo =
-    (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * landAlbedo) /
-    totalSurface
+export function albedoOf({
+  glacierRatio,
+  oceanRatio,
+  cloudRatio,
+  measuredSurfaceAlbedo,
+}) {
+  let surfaceAlbedo
+  // Number.isFinite로 검사한다 - typeof만 보면 NaN이 통과해 알베도 전체가 NaN이 되고,
+  // null은 애초에 typeof "object"라 걸러지지만 생성기가 값 없음을 null로 내보내므로
+  // 두 경우를 한 번에 막는다.
+  if (Number.isFinite(measuredSurfaceAlbedo)) {
+    surfaceAlbedo = clamp(measuredSurfaceAlbedo, 0, 1)
+  } else {
+    const landRatio = Math.max(0, 1 - glacierRatio - oceanRatio)
+    const totalSurface = glacierRatio + oceanRatio + landRatio // 항상 ≥ 1
+    surfaceAlbedo =
+      (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * ALBEDO_LAND) /
+      totalSurface
+  }
 
-  return clamp(
-    surfaceAlbedo * (1 - cloudRatio) + cloudRatio * ALBEDO_CLOUD,
-    0.05,
-    0.9,
-  )
+  // 하한 0.05는 "슬라이더로 만들 수 있는 행성"의 최소 반사율이다. 실측 지표면
+  // 반사율은 그보다 낮을 수 있으므로(태평양 0.042 - 실제 해양이 그만큼 어둡다)
+  // 실측을 쓸 때는 하한을 0으로 둔다. 안 그러면 잘려서 실측이 반영되지 않는다.
+  const floor = Number.isFinite(measuredSurfaceAlbedo) ? 0 : 0.05
+
+  return clamp(surfaceAlbedo * (1 - cloudRatio) + cloudRatio * ALBEDO_CLOUD, floor, 0.9)
 }
 
 // 기준 조성에서의 온실효과 상수항.
@@ -212,9 +234,14 @@ export function computeClimateV2(inputs = {}) {
   const co2Ppm = Math.max(0, inputs.co2Ppm ?? CO2_BASELINE_PPM)
   const currentTemperature = inputs.currentTemperature ?? REFERENCE_TEMP_K
 
-  // landAlbedo는 지점 선택에서만 넘어온다(그 지점 육지의 실측 반사율). 안 넘어오면
-  // albedoOf가 기본값 ALBEDO_LAND를 쓰므로 기존 동작과 같다.
-  const albedo = albedoOf({ glacierRatio, oceanRatio, cloudRatio, landAlbedo: inputs.landAlbedo })
+  // measuredSurfaceAlbedo는 지점 선택에서만 넘어온다(그 지점 지표면의 실측 반사율).
+  // 안 넘어오면 albedoOf가 슬라이더 기반 면적 가중으로 계산한다 - 기존 동작과 같다.
+  const albedo = albedoOf({
+    glacierRatio,
+    oceanRatio,
+    cloudRatio,
+    measuredSurfaceAlbedo: inputs.measuredSurfaceAlbedo,
+  })
   const absorbedRadiation = SOLAR_CONSTANT * (1 - albedo)
 
   const greenhouseStrength = greenhouseStrengthOf({
@@ -262,12 +289,12 @@ export function mapSlidersToClimateInputs(sliders = {}) {
     cloudRatio: s(sliders.cloud),
     atmThickness: 0.4 + s(sliders.atmThickness) * 1.6, // 0.4 ~ 2.0 (1≈지구)
     co2Ppm: sliderToCO2Ppm(sliders.co2),
-    // landAlbedo는 슬라이더가 아니라 지점 선택이 실어 보내는 값이라 변환 없이
-    // 그대로 통과시킨다. 여기서 처리하는 이유: 게임 전체가 computeClimateV2를
-    // 부를 때 항상 이 함수를 거치므로, 호출부마다 따로 챙기지 않아도 자동으로
-    // 전달된다(호출부에 맡기면 한 곳만 빠뜨려도 그 경로만 조용히 어긋난다).
-    // 없으면 undefined가 되고 albedoOf가 기본값 ALBEDO_LAND를 쓴다.
-    landAlbedo: sliders.landAlbedo,
+    // measuredSurfaceAlbedo는 슬라이더가 아니라 지점 선택이 실어 보내는 값이라
+    // 변환 없이 그대로 통과시킨다. 여기서 처리하는 이유: 게임 전체가
+    // computeClimateV2를 부를 때 항상 이 함수를 거치므로, 호출부마다 따로 챙기지
+    // 않아도 자동으로 전달된다(호출부에 맡기면 한 곳만 빠뜨려도 그 경로만 조용히
+    // 어긋난다). 없으면 undefined가 되고 albedoOf가 슬라이더로 계산한다.
+    measuredSurfaceAlbedo: sliders.measuredSurfaceAlbedo,
   }
 }
 

@@ -6,7 +6,7 @@
 //
 //   t2m          기온 실측 평균(K) - 그 지점의 시작 온도
 //   cloud        전운량 tcld(0~1) 평균 × 100
-//   landAlbedo   1 − Σrss / Σdswrsfc (지표면 반사율 역산)
+//   surfaceAlbedo 1 − Σrss / Σdswrsfc (그 지점 지표면 전체의 반사율)
 //   atmThickness 지면기압 ps / 101325
 //   co2          지점별 관측이 없어 전지구 기준값 공통 적용
 //   iceThickness/ocean  측정값이 아니라 지리적 사실(build_presets.py의 GEOGRAPHY)
@@ -23,7 +23,7 @@ export const CLIMATE_POINTS = [
     lng: 127.0,
     values: { iceThickness: 5, ocean: 20, cloud: 55, atmThickness: 1.003, co2: 429.53 },
     t2m: 288.9,
-    landAlbedo: 0.107,
+    surfaceAlbedo: 0.107,
     imageUrl: null,
   },
   {
@@ -33,7 +33,7 @@ export const CLIMATE_POINTS = [
     lng: 8.7,
     values: { iceThickness: 0, ocean: 0, cloud: 21, atmThickness: 0.894, co2: 429.53 },
     t2m: 299.6,
-    landAlbedo: 0.323,
+    surfaceAlbedo: 0.323,
     imageUrl: "/assets/location-sahara.jpg",
   },
   {
@@ -43,7 +43,7 @@ export const CLIMATE_POINTS = [
     lng: 0.0,
     values: { iceThickness: 95, ocean: 5, cloud: 85, atmThickness: 0.665, co2: 429.53 },
     t2m: 230.4,
-    landAlbedo: 0.82,
+    surfaceAlbedo: 0.82,
     imageUrl: null,
   },
   {
@@ -53,7 +53,7 @@ export const CLIMATE_POINTS = [
     lng: -160.0,
     values: { iceThickness: 0, ocean: 98, cloud: 98, atmThickness: 0.995, co2: 429.53 },
     t2m: 300.8,
-    landAlbedo: 0.042,
+    surfaceAlbedo: 0.042,
     imageUrl: null,
   },
   {
@@ -63,7 +63,7 @@ export const CLIMATE_POINTS = [
     lng: -60.0,
     values: { iceThickness: 0, ocean: 10, cloud: 87, atmThickness: 0.993, co2: 429.53 },
     t2m: 299.2,
-    landAlbedo: 0.144,
+    surfaceAlbedo: 0.144,
     imageUrl: null,
   },
 ];

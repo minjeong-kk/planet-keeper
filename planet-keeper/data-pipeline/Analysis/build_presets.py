@@ -8,7 +8,7 @@
 --------
 t2m          12일 × 4시각(hf 0/6/12/18)의 산술평균. 그 지점의 시작 온도(K).
 cloud        tcld(0~1) 같은 표본의 평균 × 100 → 슬라이더 스케일(0~100).
-landAlbedo   1 - Σrss / Σdswrsfc  (플럭스 가중).
+surfaceAlbedo 1 - Σrss / Σdswrsfc  (플럭스 가중).
              일별 비율을 평균하면 흐린 날(분모가 작음)에 과도한 가중이 실린다.
              dswrsfc가 MIN_DSWRSFC 미만인 표본은 0/0에 가까워 제외한다.
 atmThickness ps / 101325 (해수면 표준기압 대비). 고도가 반영되는 값이라
@@ -115,10 +115,10 @@ def build_point(pid, agg):
     if dropped:
         warnings.append(f"일사 약한 표본 {dropped}건 제외(dswrsfc < {MIN_DSWRSFC})")
     if usable:
-        land_albedo = 1 - sum(r for _, r in usable) / sum(d for d, _ in usable)
+        surface_albedo = 1 - sum(r for _, r in usable) / sum(d for d, _ in usable)
     else:
-        land_albedo = None
-        warnings.append("알베도 표본 없음 - landAlbedo를 비웁니다(엔진 기본값 사용)")
+        surface_albedo = None
+        warnings.append("알베도 표본 없음 - surfaceAlbedo를 비웁니다(엔진이 슬라이더로 계산)")
 
     atm = sum(agg["ps"]) / len(agg["ps"]) / STANDARD_PRESSURE_PA if agg["ps"] else 1.0
     if not agg["ps"]:
@@ -137,7 +137,7 @@ def build_point(pid, agg):
             "co2": CO2_BASELINE_PPM,
         },
         "t2m": round(t2m, 1),
-        "landAlbedo": None if land_albedo is None else round(land_albedo, 3),
+        "surfaceAlbedo": None if surface_albedo is None else round(surface_albedo, 3),
         "imageUrl": geo["imageUrl"],
         "_samples": {"t2m": len(agg["t2m"]), "sun": len(usable)},
         "_warnings": warnings,
@@ -161,7 +161,7 @@ def render_js(points, meta):
         "//",
         "//   t2m          기온 실측 평균(K) - 그 지점의 시작 온도",
         "//   cloud        전운량 tcld(0~1) 평균 × 100",
-        "//   landAlbedo   1 − Σrss / Σdswrsfc (지표면 반사율 역산)",
+        "//   surfaceAlbedo 1 − Σrss / Σdswrsfc (그 지점 지표면 전체의 반사율)",
         "//   atmThickness 지면기압 ps / 101325",
         "//   co2          지점별 관측이 없어 전지구 기준값 공통 적용",
         "//   iceThickness/ocean  측정값이 아니라 지리적 사실(build_presets.py의 GEOGRAPHY)",
@@ -183,7 +183,7 @@ def render_js(points, meta):
             f"    values: {{ iceThickness: {v['iceThickness']}, ocean: {v['ocean']}, "
             f"cloud: {v['cloud']}, atmThickness: {v['atmThickness']}, co2: {v['co2']} }},",
             f"    t2m: {p['t2m']},",
-            f"    landAlbedo: {js(p['landAlbedo'])},",
+            f"    surfaceAlbedo: {js(p['surfaceAlbedo'])},",
             f"    imageUrl: {js(p['imageUrl'])},",
             "  },",
         ]
@@ -197,14 +197,22 @@ def main():
     dates = sorted({r["tmfc"][:8] for r in rows})
     logger.info(f"수집 표본 {len(rows)}건, 지점 {len(by_point)}개, 날짜 {len(dates)}일")
 
+    # 수집이 중간에 끊긴 캐시로 돌리면 지점이 빠진 채 파일을 덮어쓰게 된다. 이 파일이
+    # 게임의 지점 목록 그 자체(유일한 생성자)라, 지도에서 마커가 조용히 사라진다.
+    # 그래서 하나라도 없으면 아예 생성하지 않는다.
+    missing = [pid for pid in ORDER if pid not in by_point]
+    if missing:
+        raise ValueError(
+            f"표본이 없는 지점: {', '.join(missing)}\n"
+            f"수집이 끝나지 않았습니다. preset-kim.py를 다시 실행하세요"
+            f"(캐시에 있는 건 건너뛰고 없는 것만 받습니다)."
+        )
+
     points = []
     for pid in ORDER:
-        if pid not in by_point:
-            logger.warning(f"{pid}: 표본 없음 - 건너뜁니다")
-            continue
         p = build_point(pid, by_point[pid])
         points.append(p)
-        alb = "없음" if p["landAlbedo"] is None else f"{p['landAlbedo']:.3f}"
+        alb = "없음" if p["surfaceAlbedo"] is None else f"{p['surfaceAlbedo']:.3f}"
         logger.info(
             f"  {p['name']:<10} t2m {p['t2m']:>6.1f}K  구름 {p['values']['cloud']:>3}%  "
             f"알베도 {alb:>6}  대기 {p['values']['atmThickness']:.3f}  "

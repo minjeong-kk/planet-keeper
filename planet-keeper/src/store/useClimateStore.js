@@ -69,9 +69,17 @@ const useClimateStore = create(
   setValue: (key, value) =>
     set((state) => {
       const values = applyIceOceanCoupling({ ...state.values, [key]: value }, key);
+      const changed = state.values[key] !== value;
+
+      // 지표 구성(빙하/바다)을 실제로 바꾸면 그 지점의 실측 지표면 반사율은 더 이상
+      // 이 행성을 설명하지 못하므로 버린다 - 안 버리면 빙하를 100까지 올려도
+      // 알베도가 실측값에 고정돼 슬라이더가 먹지 않는 것처럼 보인다. 그때부터는
+      // albedoOf가 슬라이더 기반 면적 가중으로 되돌아간다.
+      const surfaceChanged = changed && (key === "iceThickness" || key === "ocean");
+      if (surfaceChanged) delete values.measuredSurfaceAlbedo;
+
       // 값이 실제로 달라질 때만 이미지 모드를 끈다 - 클릭/포커스만으로는 안 꺼짐
       // (같은 값을 다시 세팅하는 호출은 "조작"으로 안 침).
-      const changed = state.values[key] !== value;
       return {
         values,
         ...(changed && state.isViewingLocationImage ? { isViewingLocationImage: false } : {}),
@@ -110,7 +118,10 @@ const useClimateStore = create(
           // 모든 경로에 자동으로 전달된다. 별도 필드로 두면 computeClimateV2를 부르는
           // 여러 곳에서 각자 챙겨야 하고, 한 곳만 빠뜨려도 그 경로만 조용히 어긋난다.
           // 지점 없이 시작하면 undefined라 albedoOf가 기본값(ALBEDO_LAND)을 쓴다.
-          landAlbedo: typeof point.landAlbedo === "number" ? point.landAlbedo : undefined,
+          // 생성기는 일사 표본이 없으면 null을 낸다. albedoOf의 typeof 검사가
+          // 한 번 더 막지만, 여기서도 걸러 null이 store에 들어가지 않게 한다.
+          measuredSurfaceAlbedo:
+            typeof point.surfaceAlbedo === "number" ? point.surfaceAlbedo : undefined,
         },
         ...(typeof point.t2m === "number" ? { currentTemperature: point.t2m } : {}),
         selectedLocation: point,

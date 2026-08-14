@@ -68,6 +68,34 @@ SUN_DATES = ["2026021700", "2026030500", "2026032100"]
 # 이보다 약한 일사는 알베도 분모로 쓰지 않는다(0/0 방지).
 MIN_DSWRSFC = 50.0
 
+# KIM이 보관하는 기간(대략). 위 날짜는 2026-08-14 수집 시점 기준으로 고른 절대값이라,
+# 시간이 지나면 조회 창을 벗어난다. 그때 그냥 돌리면 값이 안 와서 알베도가 비거나
+# 여름 표본만 남는데, 경고만 보고 지나치기 쉬워 아예 실행을 막는다.
+KIM_RETENTION_DAYS = 180
+
+
+def check_dates_in_window():
+    """날짜가 아직 조회 가능한지 확인한다. 벗어났으면 무엇을 어떻게 고쳐야 하는지 알린다."""
+    today = date.today()
+    stale = []
+    for tmfc in sorted(set(TEMP_DATES + SUN_DATES)):
+        d = date(int(tmfc[:4]), int(tmfc[4:6]), int(tmfc[6:8]))
+        age = (today - d).days
+        if age > KIM_RETENTION_DAYS:
+            stale.append((tmfc, age))
+    if not stale:
+        return
+
+    print("❌ 조회 창(약 180일)을 벗어난 날짜가 있습니다:")
+    for tmfc, age in stale:
+        print(f"     {tmfc}  ({age}일 전)")
+    print()
+    print("  TEMP_DATES / SUN_DATES 를 다시 잡아야 합니다.")
+    print(f"    TEMP_DATES  {today - timedelta(days=KIM_RETENTION_DAYS - 2)} ~ {today} 사이 12일 균등 분산")
+    print("    SUN_DATES   그중 가장 이른 쪽 3일 (남극에 태양이 남아 있어야 알베도를 구할 수 있음)")
+    print("  날짜를 바꾸면 preset_kim_cache.csv 도 지우고 새로 받으세요(옛 날짜와 섞이면 안 됨).")
+    raise SystemExit(1)
+
 DATASETS_DIR = "../Datasets"
 os.makedirs(DATASETS_DIR, exist_ok=True)
 CACHE_FILE = os.path.join(DATASETS_DIR, "preset_kim_cache.csv")
@@ -88,10 +116,13 @@ def fetch(name, lat, lon, tmfc, hf):
     }
     # 429(속도 제한)와 순간적인 네트워크 오류만 짧게 재시도한다.
     # 403(할당량 초과)은 재시도해도 소용없어서 그대로 올린다.
+    r = None
+    last_error = None
     for attempt in range(3):
         try:
             r = requests.get(BASE_URL, params=params, timeout=30)
         except requests.exceptions.RequestException as e:
+            last_error = e
             wait = 5 * (attempt + 1)
             print(f"    네트워크 오류({e.__class__.__name__}) - {wait}초 후 재시도")
             time.sleep(wait)
@@ -104,6 +135,10 @@ def fetch(name, lat, lon, tmfc, hf):
         r.raise_for_status()
         break
     else:
+        # 3번 다 네트워크 오류면 r이 없다 - 그대로 raise_for_status를 부르면
+        # UnboundLocalError가 나서 진짜 원인이 가려진다.
+        if r is None:
+            raise last_error
         r.raise_for_status()
 
     for line in r.text.splitlines():
@@ -150,6 +185,8 @@ def main():
     if not API_KEY:
         print("❌ .env에서 API_KEY(또는 authKey)를 찾지 못했습니다.")
         return
+
+    check_dates_in_window()
 
     print("지점별 현지 정오 UTC 시각")
     for pid, name, _, lon in POINTS:
