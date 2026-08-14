@@ -104,6 +104,13 @@ const useClimateStore = create(
           cloud: clamp(point.values.cloud),
           atmThickness: atmThicknessToSlider(point.values.atmThickness),
           co2: co2PpmToSlider(point.values.co2),
+          // 그 지점 육지의 실측 반사율(사하라 0.32 = 모래 / 아마존 0.14 = 열대림).
+          // 슬라이더가 아닌데 values에 같이 담는 이유: 게임 전체가
+          // mapSlidersToClimateInputs(values)를 거쳐 물리를 계산하므로, 여기 넣어두면
+          // 모든 경로에 자동으로 전달된다. 별도 필드로 두면 computeClimateV2를 부르는
+          // 여러 곳에서 각자 챙겨야 하고, 한 곳만 빠뜨려도 그 경로만 조용히 어긋난다.
+          // 지점 없이 시작하면 undefined라 albedoOf가 기본값(ALBEDO_LAND)을 쓴다.
+          landAlbedo: typeof point.landAlbedo === "number" ? point.landAlbedo : undefined,
         },
         ...(typeof point.t2m === "number" ? { currentTemperature: point.t2m } : {}),
         selectedLocation: point,

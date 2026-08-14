@@ -113,12 +113,17 @@ export const ALBEDO_CLOUD = 0.5 // 구름 — 개발계획서 (3)1의 값
  *
  * 빙하·바다 슬라이더는 서로 독립이라 합이 1을 넘을 수 있다. 그때는 육지가 0이 되고
  * 두 지표의 비율로 정규화된다(예: 빙하 100 + 바다 100 → 반반 섞인 지표).
+ *
+ * landAlbedo(선택): 육지의 반사율을 지점별 실측값으로 바꾼다. 지구의 육지는
+ * 사막 0.35 ~ 열대림 0.13 으로 편차가 커서, 평균값 하나로는 "사하라 행성"과
+ * "아마존 행성"이 같은 밝기가 되어 버린다. 지점 선택(climatePoints.js)이 KIM
+ * 실측에서 역산한 값을 넘긴다. 안 넘기면 기존과 똑같이 ALBEDO_LAND를 쓴다.
  */
-export function albedoOf({ glacierRatio, oceanRatio, cloudRatio }) {
+export function albedoOf({ glacierRatio, oceanRatio, cloudRatio, landAlbedo = ALBEDO_LAND }) {
   const landRatio = Math.max(0, 1 - glacierRatio - oceanRatio)
   const totalSurface = glacierRatio + oceanRatio + landRatio // 항상 ≥ 1
   const surfaceAlbedo =
-    (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * ALBEDO_LAND) /
+    (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * landAlbedo) /
     totalSurface
 
   return clamp(
@@ -207,7 +212,9 @@ export function computeClimateV2(inputs = {}) {
   const co2Ppm = Math.max(0, inputs.co2Ppm ?? CO2_BASELINE_PPM)
   const currentTemperature = inputs.currentTemperature ?? REFERENCE_TEMP_K
 
-  const albedo = albedoOf({ glacierRatio, oceanRatio, cloudRatio })
+  // landAlbedo는 지점 선택에서만 넘어온다(그 지점 육지의 실측 반사율). 안 넘어오면
+  // albedoOf가 기본값 ALBEDO_LAND를 쓰므로 기존 동작과 같다.
+  const albedo = albedoOf({ glacierRatio, oceanRatio, cloudRatio, landAlbedo: inputs.landAlbedo })
   const absorbedRadiation = SOLAR_CONSTANT * (1 - albedo)
 
   const greenhouseStrength = greenhouseStrengthOf({
@@ -255,6 +262,12 @@ export function mapSlidersToClimateInputs(sliders = {}) {
     cloudRatio: s(sliders.cloud),
     atmThickness: 0.4 + s(sliders.atmThickness) * 1.6, // 0.4 ~ 2.0 (1≈지구)
     co2Ppm: sliderToCO2Ppm(sliders.co2),
+    // landAlbedo는 슬라이더가 아니라 지점 선택이 실어 보내는 값이라 변환 없이
+    // 그대로 통과시킨다. 여기서 처리하는 이유: 게임 전체가 computeClimateV2를
+    // 부를 때 항상 이 함수를 거치므로, 호출부마다 따로 챙기지 않아도 자동으로
+    // 전달된다(호출부에 맡기면 한 곳만 빠뜨려도 그 경로만 조용히 어긋난다).
+    // 없으면 undefined가 되고 albedoOf가 기본값 ALBEDO_LAND를 쓴다.
+    landAlbedo: sliders.landAlbedo,
   }
 }
 
