@@ -45,13 +45,21 @@ API_KEY = os.getenv("API_KEY") or os.getenv("authKey")
 
 BASE_URL = "https://apihub.kma.go.kr/api/typ01/cgi-bin/url/nph-kim_nc_pt_txt2"
 
-# src/data/climatePoints.js 와 같은 지점·좌표를 쓴다(그 파일을 교체할 데이터라서).
+# 앞의 5개는 src/data/climatePoints.js 에 실제로 쓰이는 지점이다(build_presets.py의
+# ORDER/GEOGRAPHY와 같은 id). 뒤의 4개는 아직 게임에 안 넣었지만 미리 받아 두는 것 -
+# KIM은 약 180일치만 보관해서 지금 안 받으면 이 날짜를 다시는 못 쓴다. 나중에 지점을
+# 늘릴 땐 API 호출 없이 build_presets.py의 GEOGRAPHY/ORDER에만 추가하면 된다.
 POINTS = [
     ("seoul", "서울", 37.5, 127.0),
     ("sahara", "사하라 사막", 23.4, 8.7),
     ("antarctica", "남극", -75.3, 0.0),
     ("pacific", "태평양 중심", 0.0, -160.0),
     ("amazon", "아마존", -3.5, -60.0),
+    # ── 예비 수집(게임 미반영) ──
+    ("tibet", "티베트고원", 33.0, 88.0),  # 고지대 - ps로 얇은 대기(≈0.65)를 보여줄 수 있다
+    ("arctic", "북극", 78.0, 15.0),  # 해빙 극지 - 남극(고지대 육빙)과 대비된다
+    ("gobi", "고비 사막", 42.0, 103.0),  # 온대 사막 - 사하라와 기온대가 다르다
+    ("australia", "호주 내륙", -24.0, 133.0),  # 남반구 사막
 ]
 
 # 기온·구름용: 조회 구간 전체에 12일 균등 분산.
@@ -62,8 +70,12 @@ TEMP_DATES = [
 ]
 TEMP_HOURS = [0, 6, 12, 18]  # 하루 안의 변화를 고르게 담는다(경도에 무관하게)
 
-# 알베도·기압용: 남극에 태양이 남아 있는 2~3월.
+# 알베도·기압용. 단파복사는 낮이어야 하는데 두 극지가 요구하는 시기가 반대다.
+#   남극(-75.3도)  2/17 27.3도 → 3/21 15.1도 → 4/7 8.3도   (늦을수록 나빠짐)
+#   북극( 78.0도)  2/17 해 없음 → 3/21 11.6도 → 4/7 18.4도  (이를수록 나빠짐)
+# 3/21이 둘 다 되는 유일한 날이라, 북극만 4/7을 더해 표본 2개를 만든다.
 SUN_DATES = ["2026021700", "2026030500", "2026032100"]
+SUN_DATES_BY_POINT = {"arctic": ["2026032100", "2026040700"]}
 
 # 이보다 약한 일사는 알베도 분모로 쓰지 않는다(0/0 방지).
 MIN_DSWRSFC = 50.0
@@ -78,7 +90,10 @@ def check_dates_in_window():
     """날짜가 아직 조회 가능한지 확인한다. 벗어났으면 무엇을 어떻게 고쳐야 하는지 알린다."""
     today = date.today()
     stale = []
-    for tmfc in sorted(set(TEMP_DATES + SUN_DATES)):
+    every = set(TEMP_DATES) | set(SUN_DATES)
+    for extra in SUN_DATES_BY_POINT.values():
+        every |= set(extra)
+    for tmfc in sorted(every):
         d = date(int(tmfc[:4]), int(tmfc[4:6]), int(tmfc[6:8]))
         age = (today - d).days
         if age > KIM_RETENTION_DAYS:
@@ -174,7 +189,7 @@ def plan():
                 for var in ("t2m", "tcld"):
                     jobs.append((pid, "temp", tmfc, str(hf), var, lat, lon))
         noon = local_noon_hf(lon)
-        for tmfc in SUN_DATES:
+        for tmfc in SUN_DATES_BY_POINT.get(pid, SUN_DATES):
             for var in ("dswrsfc", "rss"):
                 jobs.append((pid, "sun", tmfc, str(noon), var, lat, lon))
             jobs.append((pid, "sun", tmfc, "0", "ps", lat, lon))
