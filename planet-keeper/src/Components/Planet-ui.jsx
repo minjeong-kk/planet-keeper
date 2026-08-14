@@ -362,4 +362,63 @@ function PlanetUI({
   )
 }
 
+/* ═══════════════ 지점 사진용 작은 3D 액자 (PlanetLocationPicker 미리보기) ═══════════════ */
+/* 실제 지리 정보 없이(위경도 반영 없음), 기존 PlanetUI 구체와 같은 느낌으로
+   사진 한 장을 구체 표면에 입힌다 - PlanetBody와 같은 조명(ambient+directional)
+   구성, 같은 방식의 드래그 회전(OrbitControls)을 그대로 재사용해서 "작은
+   지구"처럼 보이게 한다. 텍스처 로드 실패해도 캔버스가 안 깨지도록
+   TextureErrorBoundary를 재사용한다. */
+const PhotoSphere = memo(function PhotoSphere({ imageUrl }) {
+  const map = useTexture(imageUrl)
+
+  useMemo(() => {
+    map.colorSpace = THREE.SRGBColorSpace
+    map.anisotropy = 8
+  }, [map])
+
+  return (
+    <mesh>
+      <sphereGeometry args={[R, 64, 64]} />
+      <meshStandardMaterial map={map} roughness={1} />
+    </mesh>
+  )
+})
+
+/**
+ * 지점 선택 미리보기용 - 사진을 구체에 입혀서 기존 3D 지구(PlanetUI)와 같은
+ * 조명·드래그 방식으로 보여준다. 실제 지리 정보는 없다(위경도 미반영) - 순수
+ * 시각 효과.
+ */
+export function LocationPhoto3D({ imageUrl }) {
+  return (
+    <div className="planet-viewport">
+      <Canvas
+        camera={{ position: [0, 0, 5], fov: 45 }}
+        frameloop="demand"
+        dpr={[1, 1.5]}
+        gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
+      >
+        <ambientLight intensity={0.65} />
+        <directionalLight position={[2, 1.2, 4]} intensity={2.4} />
+
+        <TextureErrorBoundary fallback={<BasicPlanet />}>
+          <Suspense fallback={<BasicPlanet color="#22314f" />}>
+            <PhotoSphere imageUrl={imageUrl} />
+          </Suspense>
+        </TextureErrorBoundary>
+
+        <OrbitControls
+          makeDefault
+          enableDamping
+          dampingFactor={0.08}
+          enablePan={false}
+          enableZoom={false}
+          minPolarAngle={0}
+          maxPolarAngle={Math.PI}
+        />
+      </Canvas>
+    </div>
+  )
+}
+
 export default PlanetUI
