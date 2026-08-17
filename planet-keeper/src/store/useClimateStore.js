@@ -155,7 +155,13 @@ const useClimateStore = create(
     // 여기 저장되는 값(슬라이더 0~100, 온도 K)은 ΔE 스케일과 무관해서 그대로 둬도
     // 되지만, useGameStore가 초기화되는데 조성만 남으면 "새 게임인데 이전 판의
     // 행성"이 되어 헷갈린다. 두 store의 version을 같이 올려 항상 함께 초기화한다.
-    { name: "planet-keeper-climate", version: 1, migrate: () => ({}) },
+    // version 2: 예전 저장본에는 "이전 판이 지구형 안정으로 끝난 조성 + 그
+    // 평형온도(≈288K)"가 그대로 남아 있어서, 새 게임이 시작부터 ΔE≈0 / 지구형
+    // 안정으로 뜨는 문제가 있었다(StartPage가 resetClimate를 부르지 않았음).
+    // 지금은 시작할 때 초기화하지만, 이미 그 상태로 저장된 브라우저를 한 번
+    // 비우기 위해 version을 올린다 - migrate가 빈 객체를 반환하면 초기 상태와
+    // 병합되어 사실상 초기화된다.
+    { name: "planet-keeper-climate", version: 2, migrate: () => ({}) },
   ),
 );
 

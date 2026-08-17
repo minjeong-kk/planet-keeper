@@ -145,6 +145,14 @@ function PlanetCreatePage() {
   const selectedLocation = useClimateStore((state) => state.selectedLocation);
   const isViewingLocationImage = useClimateStore((state) => state.isViewingLocationImage);
   const nextProblem = useGameStore((state) => state.nextProblem);
+  // "행성 만들기 완료"는 항상 새 판의 시작이다 - nextProblem은 currentStage가
+  // CREATOR가 아니면 아무것도 하지 않고 그냥 반환하므로(이중 실행 방지 가드),
+  // 이전 판이 진행 중이거나 끝난 상태로 이 페이지에 다시 들어온 경우(뒤로 가기,
+  // /planet-create 새로고침 등)에는 초기 물리 판정이 아예 다시 계산되지 않고
+  // 이전 판의 physicsResult 스냅샷이 그대로 화면에 남았다(온도·ΔE·판정 전부).
+  // 시작 직전에 게임 상태만 초기화해서 항상 CREATOR에서 출발하게 한다 - 방금
+  // 만든 슬라이더 값과 지점 선택은 useClimateStore 쪽이라 그대로 유지된다.
+  const resetGame = useGameStore((state) => state.resetGame);
 
   // 지금 만지고 있는(포커스/드래그 중인) 슬라이더 - 옆 설명 패널이 이걸 보고
   // SLIDER_GUIDE에서 문구를 골라 보여준다. 손을 떼도 마지막 설명은 그대로 둔다
@@ -258,6 +266,7 @@ function PlanetCreatePage() {
         <button
           className="btn-primary"
           onClick={() => {
+            resetGame();
             nextProblem();
             navigate("/game");
           }}

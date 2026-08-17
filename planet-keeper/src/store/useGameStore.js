@@ -75,7 +75,12 @@ const COOLING_EVENTS = [
 // (정확히 고정 주기로 오면 예측 가능해지므로 약간의 무작위성을 둔다). tickSecond가
 // elapsedSeconds(1초마다 증가하는 총 경과 시간)가 nextClimateEventAt을 넘을 때마다
 // triggerClimateEvent를 부른다(이미 응답 대기 중인 경고가 있으면 새로 뽑지 않는다).
-const CLIMATE_EVENT_INTERVAL_RANGE = [15, 25];
+//
+// 예전 [15, 25]초는 문제 하나를 푸는 시간(대략 15~25초)과 비슷해서 사실상 매
+// 문제마다 경보가 떴고, 그만큼 "사건이 터졌다"는 긴장감이 옅어졌다. 최소 쿨타임을
+// 45초로 두어 문제 2~3개당 한 번 정도만 오게 한다. 아이템/최종 확인 단계에서는
+// tickSecond가 경보를 미루므로 실제 체감 간격은 이보다 조금 더 길다.
+const CLIMATE_EVENT_INTERVAL_RANGE = [45, 75];
 function pickClimateEventInterval() {
   const [min, max] = CLIMATE_EVENT_INTERVAL_RANGE;
   return min + Math.floor(Math.random() * (max - min + 1));
@@ -616,7 +621,12 @@ const useGameStore = create(
       // 진행 중인 판의 ΔE를 일일이 환산하는 것보다 새로 시작하는 편이 안전하고,
       // 게임 한 판이 짧아 손실도 작다. 빈 객체를 반환하면 초기 상태와 병합되어
       // 사실상 초기화된다. 앞으로 저장 구조를 바꿀 때도 version을 올리면 된다.
-      version: 1,
+      //
+      // version 2: useClimateStore와 짝을 맞춰 함께 비운다(한쪽만 초기화되면
+      // "새 게임인데 이전 판의 행성"이 되어 헷갈린다). 이전 판의 physicsResult/
+      // mlResult 스냅샷이 남아 있으면 새 판 시작 화면에 그 온도·판정이 그대로
+      // 보이는 문제가 있었다.
+      version: 2,
       migrate: () => ({}),
       // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -
       // 저장해두면 새로고침 시 항상 "계산하는 중..."에서 멈춘 것처럼 보인다.

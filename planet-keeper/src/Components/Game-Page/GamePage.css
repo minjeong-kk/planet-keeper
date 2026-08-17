@@ -1,278 +1,1381 @@
+/* =========================================================================
+   Planet Keeper — 플레이 화면
+   구조: 상단 브리핑 바 / 좌(상태·격납고) · 중앙(행성) · 우(문제·진단) / 하단 바
+   원칙: 화면의 주인공은 "행성 + 현재 온도 + 지금 풀 문제"다. 게임 UI로 보이되
+        글자·카드는 1440px에서 확대 없이 읽히는 크기를 유지하고, 상태 정보는
+        문장 나열이 아니라 "항목 : 한 줄" 상태창 형태로 압축해서 다시 보여준다.
+   ========================================================================= */
 
+.hud {
+  /* 게임 화면은 시스템 라이트/다크 설정과 무관하게 항상 어두운 우주 톤이다
+     (StartPage의 다크 SF 패널과 같은 방침). 아래 하위 규칙은 전부 이 토큰만 쓴다. */
+  --void: #03060d;
+  --deep: #060d18;
+  --panel: rgba(11, 24, 38, 0.74);
+  --panel-solid: #0a1624;
+  --inset: rgba(3, 8, 15, 0.55);
+  --line: rgba(45, 212, 191, 0.18);
+  --line-strong: rgba(45, 212, 191, 0.45);
+  --cyan: #2dd4bf;
+  --cyan-soft: #5eead4;
+  --ink: #eaf1fb;
+  --dim: #a8bdd6;
+  --faint: #7c93ad;
+  --ok: #34d399;
+  --warn: #fb923c;
+  --danger: #f87171;
+  --cold: #38bdf8;
+  --gold: #fbbf24;
 
-.game-page__modal {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 20px;
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 16px;
+  height: 100svh;
+  padding: 18px 20px;
+  box-sizing: border-box;
+  overflow: hidden;
   text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: var(--shadow);
+  color: var(--ink);
+  font-size: 0.95rem;
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 178, 0.15) 0%, transparent 55%),
+    radial-gradient(80% 60% at 50% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+    linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+}
+
+/* 미세한 별 - 개수를 늘리지 않고 밝기도 낮게(배경이 복잡해 보이면 행성이 죽는다) */
+.hud__starfield {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.55;
+  background-image:
+    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 27% 62%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 41% 12%, rgba(190, 240, 255, 0.6), transparent),
+    radial-gradient(1px 1px at 56% 78%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 68% 26%, rgba(255, 255, 255, 0.55), transparent),
+    radial-gradient(1px 1px at 79% 58%, rgba(190, 240, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 88% 14%, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 33% 88%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 94% 74%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 6% 46%, rgba(255, 255, 255, 0.3), transparent);
+}
+
+/* 이상기후 경보 중 화면 가장자리 경고 - 세 번만 맥동한 뒤 은은하게 유지된다
+   (계속 번쩍이면 슬라이더 조작에 방해가 된다). */
+.hud__alert-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 40;
+  box-shadow: inset 0 0 140px rgba(248, 113, 113, 0.3);
+  animation: alertPulse 1.1s ease-in-out 3;
+}
+
+/* ── 공통 패널 ─────────────────────────────────────────────────────── */
+.panel,
+.mission,
+.hud__topbar,
+.hud__actionbar {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  backdrop-filter: blur(6px);
   box-sizing: border-box;
 }
 
-.game-page__modal h3 {
-  margin: 0;
-  text-align: left; /* "아이템 선택" 제목은 좌상단 유지 */
-}
-
-.game-page__modal button {
-  align-self: flex-end;
-}
-
-.game-page__recovery {
+.panel {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 12px;
-  padding: 20px;
+  padding: 16px 18px;
 }
 
-/* 2단계 안정화 진행 체크(빨간 체크) - 채워질수록 붉게, 아직이면 회색 */
-.game-page__final-check {
-  font-size: 1.2rem;
-  color: var(--border);
-  margin-right: 4px;
+.panel__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.game-page__final-check--filled {
-  color: var(--danger);
+.panel__title {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--cyan-soft);
 }
 
-.game-page__info-panel {
-  flex: 3;
+.panel__count {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--faint);
 }
 
-.info-panel__section {
-  margin-bottom: 14px;
+.panel__placeholder {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--faint);
+  word-break: keep-all;
 }
 
-.info-panel__title {
+/* ── 상단 브리핑 바 ────────────────────────────────────────────────── */
+.hud__topbar {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 28px;
+  padding: 12px 20px;
+}
+
+.hud__brief {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.hud__stage-tag {
+  flex-shrink: 0;
+  padding: 5px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: rgba(45, 212, 191, 0.12);
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+}
+
+.hud__objective {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hud__progress {
+  width: 200px;
+}
+
+.hud__progress-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.hud__progress-label {
+  font-size: 0.76rem;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
+
+.hud__progress-count {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--cyan);
+}
+
+.hud__progress-track {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--inset);
+  overflow: hidden;
+}
+
+.hud__progress-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, var(--cyan), var(--cyan-soft));
+  box-shadow: 0 0 10px rgba(45, 212, 191, 0.55);
+  transition: width 0.5s ease;
+}
+
+.hud__vitals {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.hud__vital {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.hud__vital-label {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+.hud__vital-value {
+  font-family: var(--mono);
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--text-h);
-  margin-bottom: 8px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
-/* Planet Summary 내 서브 리스트 정돈 */
-.game-page__summary-block {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
+.hud__pips {
+  display: inline-flex;
+  gap: 5px;
 }
 
-.game-page__summary-title {
+.hud__pip {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  background: transparent;
+  transition: background 0.3s ease, box-shadow 0.3s ease;
+}
+
+.hud__pip--on {
+  background: var(--danger);
+  box-shadow: 0 0 9px rgba(248, 113, 113, 0.6);
+}
+
+/* ── 본체 3열 ──────────────────────────────────────────────────────── */
+.hud__body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr) 400px;
+  gap: 16px;
+  min-height: 0;
+}
+
+.hud__column {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.hud__column::-webkit-scrollbar {
+  width: 6px;
+}
+
+.hud__column::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+}
+
+/* ── 좌: 행성 상태 수치 ────────────────────────────────────────────── */
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.8rem;
   font-weight: 700;
-  font-size: 0.85rem;
-  color: var(--accent);
-  margin-bottom: 4px;
+  cursor: help;
+  white-space: nowrap;
 }
 
-.game-page__summary-list {
+.status-tag--neutral {
+  background: rgba(139, 161, 189, 0.12);
+  border: 1px solid rgba(139, 161, 189, 0.3);
+  color: var(--dim);
+}
+
+.status-tag--earth {
+  background: rgba(52, 211, 153, 0.14);
+  border: 1px solid rgba(52, 211, 153, 0.42);
+  color: var(--ok);
+}
+
+.status-tag--warm {
+  background: rgba(251, 146, 60, 0.14);
+  border: 1px solid rgba(251, 146, 60, 0.42);
+  color: var(--warn);
+}
+
+.status-tag--cold {
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.42);
+  color: var(--cold);
+}
+
+.status-list {
+  list-style: none;
   margin: 0;
-  padding-left: 16px;
-  font-size: 0.83rem;
-  color: var(--text-muted);
-  line-height: 1.45;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-/* 행성 상태 판정 카드 형태 디자인 */
-.info-panel__ml-card {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+.status-row {
+  display: grid;
+  grid-template-columns: 22px 1fr auto;
+  align-items: center;
+  gap: 10px;
   padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--inset);
+}
+
+.status-row__icon {
+  font-size: 0.95rem;
+  text-align: center;
+  opacity: 0.9;
+}
+
+.status-row__label {
+  font-size: 0.85rem;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
+.status-row__value {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.status-row__value--ok {
+  color: var(--ok);
+}
+
+/* 상태 행 안의 개념 용어(Term) - 점선 밑줄만 남기고 색은 주변 라벨과 맞춘다 */
+.hud .concept-term {
+  color: inherit;
+  text-decoration-color: var(--line-strong);
+}
+
+/* ── 우 하단: 행성 진단(현재 상태 / 원인 / 해결 방향) ─────────────── */
+.diagnosis-list {
+  margin: 0;
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
-.info-panel__ml-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 0.85rem;
+.diagnosis-row {
+  display: grid;
+  grid-template-columns: 72px 1fr;
+  gap: 10px;
+  align-items: baseline;
+  padding: 9px 12px;
+  border-radius: 9px;
+  background: var(--inset);
 }
 
-.info-panel__label {
-  font-weight: 600;
-  color: var(--text);
-}
-
-.info-panel__value {
+.diagnosis-row dt {
+  font-size: 0.78rem;
   font-weight: 700;
-  font-size: 1rem;
-  color: var(--text-h);
-  font-variant-numeric: tabular-nums;
+  color: var(--cyan-soft);
+  white-space: nowrap;
 }
 
-/* 상태가 바뀔 때마다 색까지 함께 바뀌어야 "라벨이 바뀌었다"는 게 눈에 들어온다 -
-   기본(teal 강조색) 하나로 통일하지 않고 labelTone()이 고른 톤(--earth/--warm/
-   --cold/--neutral)마다 배경/글자/테두리를 통째로 바꾼다. */
-.info-panel__badge {
-  padding: 4px 13px;
-  border-radius: 12px;
-  font-size: 1.05rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
+.diagnosis-row dd {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  color: var(--dim);
+  word-break: keep-all;
 }
 
-.info-panel__badge--neutral {
-  background: var(--accent-bg);
-  color: var(--accent);
-  border: 1px solid var(--accent-border);
-}
-
-.info-panel__badge--earth {
-  background: var(--success-bg);
-  color: var(--success);
-  border: 1px solid var(--success-border);
-}
-
-.info-panel__badge--warm {
-  background: var(--warm-bg);
-  color: var(--warm);
-  border: 1px solid var(--warm-border);
-}
-
-.info-panel__badge--cold {
-  background: var(--info-bg);
-  color: var(--info);
-  border: 1px solid var(--info-border);
-}
-
-.info-panel__divider {
-  border: none;
-  border-top: 1px dashed var(--border);
-  margin: 14px 0;
-}
-
-.game-page__info-panel hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 12px 0;
-}
-
-/* 아이템 선택 카드 */
-.item-card-grid {
-  width: 100%;
-  list-style: none;
-  margin: 0 auto;
-  padding: 0;
-  
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center; /* 핵심: 카드가 몇 개든 가로 중앙 정렬 */
-  align-items: center;
-  gap: 16px;
-}
-
-/* 이상기후 경고 응답 중에는 아이템 선택/문제 풀이 카드를 통째로 잠근다 -
-   pointer-events:none이라 하위의 버튼/라디오를 개별로 disabled 처리하지 않아도
-   클릭이 전부 막힌다(각 컴포넌트가 접근성을 위해 버튼 disabled도 별도로 준다). */
-.item-card-grid.is-locked,
-.game-quiz-card.is-locked {
+/* ── 좌: 장비 격납고 ───────────────────────────────────────────────── */
+.panel--inventory.is-locked {
   opacity: 0.45;
   pointer-events: none;
 }
 
-.item-card {
-  background: var(--bg);
-  position: relative;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 12px 12px;
-  font-size: 0.95rem;
+.inventory-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
 
-  
+.inventory-grid > li {
+  position: relative;
+}
+
+.inventory-card {
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between; /* 내부 요소들을 위/아래 균등 배치 */
-  
-  width: 180px;
-  height: 175px; /* 모든 아이템 카드의 높이를 일정하게 고정 */
-  flex-shrink: 0;
-  text-align: center;
-  box-shadow: var(--shadow);
-  box-sizing: border-box;
+  gap: 5px;
+  padding: 14px 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--inset);
+  color: var(--ink);
+  cursor: pointer;
+  transition: transform 0.15s ease, border-color 0.15s ease, background 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.item-card__info-btn {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border-radius: 50%;
-  font-size: 0.85rem;
-  line-height: 1;
+.inventory-card:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: var(--cyan);
+  background: rgba(45, 212, 191, 0.12);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.35), 0 10px 24px rgba(3, 8, 15, 0.55);
 }
 
-.item-card__emoji {
-  font-size: 1.8rem;
+.inventory-card:active:not(:disabled) {
+  transform: translateY(-1px) scale(0.98);
 }
 
-.item-card__name {
-  margin: 0;
-  font-weight: 600;
-}
-
-.item-card__effect {
-  margin: 0;
-  font-size: 0.85rem;
-  color: var(--text);
-}
-
-.item-card__use-btn {
-  width: 100%;
-  margin-top: 4px;
-  padding: 8px;
-}
-
-/* 아이템 정보 모달(원인->결과 미리보기) */
-.item-info-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
+.inventory-card--empty {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 10;
+  min-height: 104px;
+  border-style: dashed;
+  opacity: 0.4;
 }
 
-.item-info-modal {
-  background: var(--bg);
-  color: var(--text-h);
-  padding: 28px;
-  border-radius: 12px;
-  max-width: 420px;
-  width: 90%;
+.inventory-card__emoji {
+  font-size: 1.9rem;
+  line-height: 1.15;
+  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.35));
+}
+
+.inventory-card__name {
+  font-size: 0.82rem;
+  font-weight: 600;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.inventory-card__effect {
+  font-size: 0.72rem;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+/* 평소엔 옅게, hover 시 또렷하게 - "누르면 바로 투입된다"를 알려주는 표시 */
+.inventory-card__use {
+  margin-top: 2px;
+  padding: 2px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--faint);
+  transition: all 0.15s ease;
+}
+
+.inventory-card:hover:not(:disabled) .inventory-card__use {
+  border-color: transparent;
+  background: var(--cyan);
+  color: #04121f;
+}
+
+.inventory-card__info {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--panel-solid);
+  color: var(--dim);
+  font-size: 0.72rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.inventory-card__info:hover {
+  transform: none;
+  border-color: var(--line-strong);
+  color: var(--cyan);
+  box-shadow: none;
+}
+
+/* ── 중앙: 행성 무대 ───────────────────────────────────────────────── */
+.hud__stage {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  min-height: 0;
+}
+
+.hud__planet-frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(260px, 38vh, 400px);
+  aspect-ratio: 1 / 1;
+  flex-shrink: 1;
+}
+
+.hud__planet-glow {
+  position: absolute;
+  inset: -22%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(45, 212, 191, 0.22) 0%,
+    rgba(56, 189, 248, 0.1) 42%,
+    transparent 68%
+  );
+  filter: blur(6px);
+  animation: hudBreathe 9s ease-in-out infinite;
+}
+
+.hud__planet {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+.hud__planet-badge {
+  position: absolute;
+  top: 6px;
+  right: -10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 13px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+  backdrop-filter: blur(4px);
+}
+
+.hud__planet-badge--earth {
+  background: rgba(52, 211, 153, 0.16);
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  color: var(--ok);
+}
+
+.hud__planet-badge--warm {
+  background: rgba(251, 146, 60, 0.16);
+  border: 1px solid rgba(251, 146, 60, 0.45);
+  color: var(--warn);
+}
+
+.hud__planet-badge--cold {
+  background: rgba(56, 189, 248, 0.16);
+  border: 1px solid rgba(56, 189, 248, 0.45);
+  color: var(--cold);
+}
+
+/* 정답/오답은 행성 위에 한 번만 떠올랐다 사라진다 */
+.hud__flash {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-size: 1.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  animation: hudFlash 1.6s ease forwards;
+}
+
+.hud__flash--correct {
+  color: var(--ok);
+  background: radial-gradient(circle, rgba(52, 211, 153, 0.3) 0%, transparent 65%);
+}
+
+.hud__flash--wrong {
+  color: var(--danger);
+  background: radial-gradient(circle, rgba(248, 113, 113, 0.3) 0%, transparent 65%);
+}
+
+/* 현재 온도 - 이 화면에서 가장 큰 숫자 */
+.hud__readout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.hud__readout-label {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  color: var(--dim);
+}
+
+.hud__readout-value {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 4rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 0 30px rgba(45, 212, 191, 0.45);
+}
+
+.hud__readout-unit {
+  margin-left: 8px;
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--cyan);
+}
+
+/* 온도 게이지 */
+.hud__gauge {
+  width: min(520px, 100%);
+  margin-top: 8px;
+}
+
+.hud__gauge-track {
+  position: relative;
+  height: 10px;
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.55) 0%,
+    rgba(56, 189, 248, 0.2) 32%,
+    rgba(45, 212, 191, 0.25) 47%,
+    rgba(251, 146, 60, 0.2) 66%,
+    rgba(248, 113, 113, 0.55) 100%
+  );
+  border: 1px solid var(--line);
+}
+
+.hud__gauge-safe {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  border-radius: 5px;
+  background: rgba(45, 212, 191, 0.32);
+  box-shadow: inset 0 0 0 1px var(--line-strong), 0 0 16px rgba(45, 212, 191, 0.3);
+}
+
+.hud__gauge-marker {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 24px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #ffffff;
+  transform: translateY(-50%);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.85);
+  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hud__gauge-marker-value {
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 2px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  background: var(--panel-solid);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.hud__gauge-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 10px;
+  font-size: 0.76rem;
+  color: var(--faint);
+}
+
+.hud__gauge-scale--safe {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+/* 보조 물리 수치 - 현재 온도보다 확실히 작게 */
+.hud__substats {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.hud__substat {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--inset);
+}
+
+.hud__substat-label {
+  font-size: 0.76rem;
+  color: var(--faint);
+  white-space: nowrap;
+}
+
+.hud__substat-value {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--dim);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.hud__substat-value--ok {
+  color: var(--ok);
+}
+
+/* ── 우: 문제 카드 ─────────────────────────────────────────────────── */
+.mission {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px;
+}
+
+.mission.is-locked {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.mission__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.mission__eyebrow {
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--cyan);
+}
+
+.mission__retry {
+  padding: 3px 10px;
+  border: 1px solid rgba(251, 146, 60, 0.42);
+  border-radius: 20px;
+  background: rgba(251, 146, 60, 0.12);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--warn);
+}
+
+.mission__question {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.5;
+  color: #ffffff;
+  word-break: keep-all;
+}
+
+.mission__choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.choice {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--inset);
+  color: var(--dim);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.14s ease, background 0.14s ease,
+    color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.choice:hover:not(:disabled) {
+  transform: translateX(3px);
+  border-color: var(--cyan);
+  background: rgba(45, 212, 191, 0.13);
+  color: #ffffff;
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.32);
+}
+
+.choice:active:not(:disabled) {
+  transform: translateX(1px) scale(0.995);
+}
+
+.choice__mark {
+  flex-shrink: 0;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--cyan);
+  line-height: 1.45;
+}
+
+.choice__text {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+/* 힌트 / 보상 카드 */
+.mission__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mission__card {
+  border-radius: 10px;
+  padding: 10px 13px;
+  font-size: 0.85rem;
+  line-height: 1.55;
+}
+
+.mission__card p {
+  margin: 7px 0 0;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
+.mission__card--hint {
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  background: rgba(45, 212, 191, 0.07);
+}
+
+.mission__card--reward {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.09);
+}
+
+.mission__card--reward .mission__card-title {
+  color: var(--gold);
+}
+
+.mission__card--reward p {
+  margin: 0;
+  color: #fde68a;
+  font-weight: 700;
+}
+
+.mission__card-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cyan-soft);
+}
+
+.mission__card-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.mission__card-toggle:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.mission__card-chevron {
+  font-size: 0.74rem;
+  color: var(--faint);
+}
+
+/* 해설 카드(문제를 푼 직후 문제창 자리에 뜬다) */
+.mission--result {
+  animation: resultIn 0.28s ease-out;
+}
+
+.mission--result-correct {
+  border-color: rgba(52, 211, 153, 0.45);
+  box-shadow: 0 0 0 1px rgba(52, 211, 153, 0.2), 0 0 34px rgba(52, 211, 153, 0.14);
+}
+
+.mission--result-wrong {
+  border-color: rgba(248, 113, 113, 0.45);
+  box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.2), 0 0 34px rgba(248, 113, 113, 0.14);
+}
+
+.mission__verdict {
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.mission--result-correct .mission__verdict {
+  color: var(--ok);
+}
+
+.mission--result-wrong .mission__verdict {
+  color: var(--danger);
+}
+
+.mission__close {
+  padding: 6px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cyan);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.mission__close:hover {
+  transform: none;
+  background: rgba(45, 212, 191, 0.12);
+  box-shadow: none;
+}
+
+.mission__explanation {
+  margin: 0;
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--ink);
+  word-break: keep-all;
+}
+
+.mission__concepts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.mission__concept {
+  padding: 3px 10px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  font-size: 0.74rem;
+  color: var(--cyan-soft);
+}
+
+/* 안내용 패널(장비 투입 안내 / 계산 중 / 데이터 없음) */
+.mission__notice-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.65;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
+.mission__notice-text strong {
+  color: var(--cyan-soft);
+}
+
+/* ── 하단 바 ───────────────────────────────────────────────────────── */
+.hud__actionbar {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 28px;
+  padding: 12px 20px;
+}
+
+.actionbar__block {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.actionbar__label {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  color: var(--faint);
+}
+
+.actionbar__log-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.actionbar__log-toggle:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+.actionbar__log-toggle:hover .actionbar__label {
+  color: var(--cyan);
+}
+
+.actionbar__log-chevron {
+  font-size: 0.7rem;
+  color: var(--cyan);
+}
+
+.actionbar__log-summary {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.actionbar__log--open {
+  max-height: 132px;
+  overflow-y: auto;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.actionbar__log--open::-webkit-scrollbar {
+  width: 5px;
+}
+
+.actionbar__log--open::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 3px;
+}
+
+.actionbar__log-entry {
+  padding: 7px 10px;
+  margin-bottom: 6px;
+  border-left: 2px solid var(--line-strong);
+  border-radius: 0 8px 8px 0;
+  background: var(--inset);
+}
+
+.actionbar__log-entry p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
+.actionbar__log-entry.is-ok {
+  border-left-color: var(--ok);
+}
+
+.actionbar__log-entry.is-warn {
+  border-left-color: var(--warn);
+}
+
+.actionbar__log-entry.is-event {
+  border-left-color: var(--danger);
+}
+
+.actionbar__log-summary.is-ok {
+  color: var(--ok);
+}
+
+.actionbar__log-summary.is-warn {
+  color: var(--warn);
+}
+
+.actionbar__log-summary.is-event {
+  color: var(--danger);
+}
+
+.actionbar__log-empty {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--faint);
+}
+
+.actionbar__slots {
+  display: flex;
+  gap: 8px;
+}
+
+.actionbar__slot {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+  background: var(--inset);
+  color: var(--faint);
+  font-size: 0.95rem;
+}
+
+.actionbar__slot--filled {
+  border-style: solid;
+  border-color: var(--line-strong);
+  background: rgba(45, 212, 191, 0.1);
+}
+
+.actionbar__slot-icon {
+  font-size: 1.25rem;
+}
+
+.actionbar__slot-count {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: var(--cyan);
+  color: #04121f;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 800;
+}
+
+.actionbar__block--hint {
+  align-items: flex-end;
+  text-align: right;
+  max-width: 260px;
+}
+
+.actionbar__hint {
+  margin: 0;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--cyan-soft);
+  word-break: keep-all;
+}
+
+.hud-btn {
+  align-self: flex-start;
+  padding: 12px 26px;
+  border: 1px solid rgba(94, 234, 212, 0.55);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(13, 148, 136, 0.95));
+  color: #04121f;
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  box-shadow: 0 0 22px rgba(45, 212, 191, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.hud-btn:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 0 30px rgba(45, 212, 191, 0.45);
+}
+
+/* ── 이상기후 긴급 이벤트(화면 중앙) ──────────────────────────────── */
+.climate-event {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(4, 7, 14, 0.6);
+  backdrop-filter: blur(5px);
+  animation: eventFadeIn 0.2s ease-out;
+}
+
+.climate-event__card {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 30px;
+  border: 1px solid rgba(248, 113, 113, 0.55);
+  border-radius: 18px;
+  background: linear-gradient(165deg, rgba(48, 16, 20, 0.96), rgba(10, 8, 16, 0.97));
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 60px rgba(248, 113, 113, 0.2);
+  box-sizing: border-box;
+  text-align: center;
+  animation: eventPop 0.32s cubic-bezier(0.2, 1.1, 0.4, 1);
+}
+
+.climate-event__tag {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: var(--danger);
+}
+
+.climate-event__message {
+  margin: 0;
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: #ffffff;
+  word-break: keep-all;
+  text-shadow: 0 0 26px rgba(248, 113, 113, 0.45);
+}
+
+.climate-event__sub {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #fecaca;
+  word-break: keep-all;
+}
+
+.climate-event__sub strong {
+  font-family: var(--mono);
+  font-size: 1.1rem;
+  color: #ffffff;
+}
+
+.climate-event__timer-track {
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(248, 113, 113, 0.18);
+  overflow: hidden;
+}
+
+.climate-event__timer-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #f87171, #fbbf24);
+  box-shadow: 0 0 12px rgba(248, 113, 113, 0.6);
+  transition: width 1s linear;
+}
+
+.climate-event__sliders {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  border: 1px solid var(--border);
-  box-shadow: var(--shadow);
+  padding-top: 16px;
+  margin-top: 4px;
+  border-top: 1px solid rgba(248, 113, 113, 0.24);
+}
+
+.climate-event__slider-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 48px;
+  align-items: center;
+  gap: 12px;
+}
+
+.climate-event__slider-label {
+  font-size: 0.85rem;
+  color: #fecaca;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.climate-event__slider {
+  width: 100%;
+  height: 20px;
+  accent-color: var(--danger);
+  cursor: pointer;
+}
+
+.climate-event__slider-value {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #ffffff;
+  text-align: right;
+}
+
+/* ── 장비 상세 모달(격납고 카드의 ? 버튼) ─────────────────────────── */
+.item-info-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(3, 6, 13, 0.72);
+  backdrop-filter: blur(4px);
+}
+
+.item-info-modal {
+  width: 90%;
+  max-width: 440px;
+  max-height: 80vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px 26px;
+  border: 1px solid rgba(45, 212, 191, 0.35);
+  border-radius: 16px;
+  background: linear-gradient(160deg, #0d1c2c 0%, #060d18 100%);
+  color: #eaf1fb;
+  text-align: left;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+}
+
+.item-info-modal h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #ffffff;
 }
 
 .item-info-modal button {
   align-self: flex-end;
+  border: 1px solid rgba(94, 234, 212, 0.5);
+  background: rgba(45, 212, 191, 0.9);
+  color: #04121f;
+  font-weight: 700;
 }
 
 .item-info-section h3 {
-  margin: 0 0 6px;
-  font-size: 0.92rem;
+  margin: 0 0 7px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #5eead4;
 }
 
 .item-info-section p {
-  margin: 2px 0;
-  font-size: 0.88rem;
-  color: var(--text-p, var(--text));
+  margin: 3px 0;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: #a8bdd6;
+  word-break: keep-all;
 }
 
 /* 원인->과정->결과 사슬 - 각 단계를 줄바꿈해서 세로로 쌓고, 화살표는 그
@@ -286,696 +1389,148 @@
 }
 
 .item-step {
-  font-size: 0.88rem;
-  line-height: 1.25;
+  font-size: 0.85rem;
+  line-height: 1.35;
   text-align: center;
+  color: #cfe0f0;
 }
 
 .item-arrow {
-  color: var(--text-p, var(--text));
-  font-size: 0.85rem;
+  color: #2dd4bf;
+  font-size: 0.82rem;
   line-height: 1;
 }
 
-.game-page__used-items-empty {
-  font-size: 0.83rem;
-  color: var(--text-muted);
-  margin: 0;
-}
-
-/* 경고 문구 토스트 팝업 */
-.game-page__event-toast {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger-border);
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 20px;
-  box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
-  animation: toastPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-  white-space: nowrap;
-}
-
-.game-page {
-  display: flex;
-  gap: 20px;
-  padding: 20px;
-  /* 우측 상단 floating-stack(타이머+행성 라벨)이 fixed로 이 위에 겹쳐 뜨므로,
-     본문이 그 아래에서 시작하도록 위쪽만 여유를 더 준다. */
-  padding-top: 132px;
-  flex: 1;
-  min-height: 100vh;
-  box-sizing: border-box;
-}
-
-/* 다크 모드: 시작 페이지보다 더 어둡고, 그린을 유지하되 블루 쪽으로 기운 패널
-   톤을 쓴다(게임/리포트 전용 - StartPage/PlanetCreatePage는 원래 블루 쪽 톤을
-   유지). var(--bg) 등을 여기서 다시 정의하면 이 페이지 안의 모든 하위
-   규칙(이미 전부 var()로 되어 있다)이 그대로 새 값을 물려받아서 개별 규칙은
-   하나도 안 건드려도 된다. */
-@media (prefers-color-scheme: dark) {
-  .game-page {
-    --bg: #0f2027;
-    --text: var(--panel-ink-dim);
-    --text-h: #ffffff;
-    --text-muted: var(--panel-ink-dim);
-    --border: rgba(8, 145, 178, 0.26);
-    --code-bg: rgba(255, 255, 255, 0.05);
-    --shadow: 0 14px 32px rgba(3, 7, 16, 0.45);
-    --accent: #22b8cf;
-    --accent-bg: rgba(8, 145, 178, 0.16);
-    --accent-border: rgba(8, 145, 178, 0.48);
-
-    --info: #38bdf8;
-    --info-bg: rgba(56, 189, 248, 0.15);
-    --info-border: rgba(56, 189, 248, 0.4);
-    /* 형광 라임그린 대신 페이지 전체 톤과 맞는 청록(teal) - index.css의 --neon과 같은 계열 */
-    --success: #2dd4bf;
-    --success-bg: rgba(45, 212, 191, 0.15);
-    --success-border: rgba(45, 212, 191, 0.4);
-    --danger: #f87171;
-    --danger-bg: rgba(248, 113, 113, 0.15);
-    --danger-border: rgba(248, 113, 113, 0.4);
-    --warm: #fb923c;
-    --warm-bg: rgba(251, 146, 60, 0.15);
-    --warm-border: rgba(251, 146, 60, 0.4);
-
-    background: linear-gradient(160deg, #11242c 0%, #060e12 100%);
-    color: var(--panel-ink);
+/* ── 애니메이션 ────────────────────────────────────────────────────── */
+@keyframes hudBreathe {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
   }
-
-  /* .btn-primary는 전역에서 --accent(위에서 그린으로 바뀜)를 배경으로 쓰는데,
-     전역 텍스트색(#052e16, 라이트 초록 배경 기준)은 이 어두운 패널 배경과
-     어울리지 않는다 - 시작 페이지 CTA와 같은 남색 텍스트로 맞춘다. */
-  .game-page .btn-primary {
-    color: #04121f;
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
   }
 }
 
-.game-page__main {
-  flex: 2.4;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  min-height: 0;
-}
-
-.game-page__stats-bar {
-  /* 라이트/다크 모두 살짝 accent 색을 얹어 - 밋밋한 var(--bg) 단색 대신 위쪽에서
-     은은하게 색이 도는 느낌을 준다(index.css 바디 배경과 같은 방식). */
-  background: linear-gradient(180deg, var(--accent-bg), transparent 140px), var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: var(--shadow);
-}
-
-.game-page__stats-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  margin-top: 10px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
-  font-size: 0.88rem;
-  color: var(--text-muted);
-  background: var(--code-bg);
-  border-radius: 8px;
-  padding: 8px 12px;
-  line-height: 1.5;
-}
-
-.game-page__stats-row--physics {
-  margin-top: 6px;
-  padding-top: 6px;
-}
-
-.game-page__stats-note {
-  margin: 0;
-  font-size: 0.9rem;
-  color: var(--text);
-}
-
-.game-page__arena {
-  background: linear-gradient(180deg, var(--accent-bg), transparent 160px), var(--bg);
-  flex: 1;
-  min-height: 0;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  overflow-y: auto;
-  box-shadow: var(--shadow);
-}
-
-.game-page__planet-placeholder {
-  width: 260px;
-  height: 260px;
-  border-radius: 50%;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-/* 퀴즈 카드/피드백 박스와 같은 900px 폭으로 맞춰서, 카드 위 안내 문구만
-   화면 끝까지 넓게 퍼져 보이지 않게 한다. */
-.game-page__stage-label {
-  width: 100%;
-  max-width: 900px;
-  margin: 0 auto;
-  font-size: 1rem;
-  color: var(--text);
-}
-
-/* 이상기후 경고 + 대응용 미니 슬라이더 */
-.game-page__climate-alert {
-  width: 300px;
-  border-radius: 10px;
-  padding: 12px 16px;
-  background: var(--warm-bg);
-  border: 1px solid var(--warm-border);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(8px);
-  box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.game-page__climate-alert-message {
-  margin: 0;
-  font-size: 0.9rem;
-  font-weight: 700;
-  color: var(--warm);
-}
-
-.game-page__climate-alert-timer {
-  margin: 0;
-  font-size: 0.78rem;
-  color: var(--text-muted);
-}
-
-.game-page__climate-alert-slider-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.game-page__climate-alert-slider-label {
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--text);
-  min-width: 48px;
-}
-
-.game-page__climate-alert-slider {
-  flex: 1;
-  accent-color: var(--warm);
-}
-
-.game-page__climate-alert-slider-value {
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--text);
-  min-width: 32px;
-  text-align: right;
-}
-
-/* =========================================
-   행성 변화 과정/피드백 컴팩트 스타일 (세로 길이 대폭 축소)
-   ========================================= */
-.game-page__feedback {
-  width: 100%;
-  /* 문제 카드(.game-quiz-card)/스테이지 라벨과 같은 폭으로 맞춘다. */
-  max-width: 900px;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 0.88rem;
-  line-height: 1.4;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  text-align: center;
-  box-sizing: border-box;
-  font-weight: 500;
-}
-
-.game-page__feedback p {
-  margin: 1px 0;
-}
-
-.game-page__feedback--correct {
-  background: var(--success-bg);
-  border: 1px solid var(--success-border);
-  color: var(--success);
-}
-
-.game-page__feedback--wrong {
-  background: var(--danger-bg);
-  border: 1px solid var(--danger-border);
-  color: var(--danger);
-}
-
-.game-page__stable-badge {
-  width: 100%;
-  max-width: 680px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  box-sizing: border-box;
-
-  box-shadow: var(--shadow);
-}
-
-.game-page__stable-badge-icon {
-  font-size: 1.2rem;
-}
-
-.game-page__stable-badge--earth {
-  background: var(--success-bg);
-  color: var(--success);
-  border: 1px solid var(--success-border);
-}
-
-.game-page__stable-badge--warm {
-  background: var(--warm-bg);
-  color: var(--warm);
-  border: 1px solid var(--warm-border);
-}
-
-.game-page__stable-badge--cold {
-  background: var(--info-bg);
-  color: var(--info);
-  border: 1px solid var(--info-border);
-}
-
-/* =========================================
-   개선된 문제 카드 (가로로 길고 세로로 슬림한 컴팩트 형태)
-   ========================================= */
-.game-quiz-card {
-  width: 100%;
-  max-width: 900px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 20px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  box-sizing: border-box;
-  text-align: left;
-}
-
-.game-quiz-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 24px;
-}
-
-.game-quiz-card__tags {
-  display: flex;
-  gap: 8px;
-}
-
-.game-quiz-card__retry-badge {
-  background: var(--danger-bg);
-  color: var(--danger);
-  border: 1px solid var(--danger-border);
-  font-size: 0.78rem;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 12px;
-}
-
-.game-quiz-card__hint-btn {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  width: 30px;
-  height: 30px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1rem;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  padding: 0;
-  margin-left: auto;
-}
-
-.game-quiz-card__hint-btn:hover {
-  background: var(--border);
-  transform: scale(1.08);
-}
-
-/* 문제 제목 및 번호 표시 */
-.game-quiz-card__title {
-  margin: 0;
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--text-h);
-  line-height: 1.4;
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.game-quiz-card__title-num {
-  color: var(--info);
-  font-size: 1.1rem;
-  font-weight: 800;
-}
-
-/* 선택지 목록 (컴팩트 세로 높이) */
-.game-quiz-card__choices {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.game-quiz-card__choice-item {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 12px;
-  cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-  background: var(--bg);
-}
-
-.game-quiz-card__choice-item:hover {
-  background: var(--code-bg);
-  border-color: var(--border);
-}
-
-.game-quiz-card__choice-item--selected {
-  border-color: var(--info);
-  background: var(--info-bg);
-}
-
-.game-quiz-card__choice-label {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  width: 100%;
-}
-
-.game-quiz-card__choice-label input[type="radio"] {
-  cursor: pointer;
-  accent-color: var(--info);
-}
-
-.game-quiz-card__choice-text {
-  font-size: 0.9rem;
-  color: var(--text);
-  line-height: 1.35;
-}
-
-.game-quiz-card__submit-btn {
-  align-self: flex-end;
-  padding: 6px 18px;
-  font-size: 0.88rem;
-  font-weight: 600;
-  margin-top: 2px;
-}
-
-/* =========================================
-   💡 전구 해설 모달
-   ========================================= */
-.game-quiz-modal-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  backdrop-filter: blur(3px);
-}
-
-.game-quiz-modal {
-  background: var(--bg);
-  border-radius: 14px;
-  width: 90%;
-  max-width: 480px;
-  padding: 20px 24px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  border: 1px solid var(--border);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  text-align: left;
-}
-
-.game-quiz-modal__header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.game-quiz-modal__header h4 {
-  margin: 0;
-  font-size: 1.05rem;
-  color: var(--text-h);
-}
-
-.game-quiz-modal__icon {
-  font-size: 1.1rem;
-}
-
-.game-quiz-modal__question {
-  margin: 0;
-  font-weight: 700;
-  font-size: 0.92rem;
-  color: var(--text);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.game-quiz-modal__content {
-  background: var(--code-bg);
-  padding: 10px 12px;
-  border-radius: 8px;
-  border-left: 3px solid var(--info);
-  font-size: 0.88rem;
-  line-height: 1.5;
-  color: var(--text);
-}
-
-.game-quiz-modal__content p {
-  margin: 0;
-}
-
-.game-quiz-modal__concepts h5 {
-  margin: 0 0 4px 0;
-  font-size: 0.85rem;
-  color: var(--text-muted);
-}
-
-.game-quiz-modal__concepts ul {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 0.85rem;
-  color: var(--info);
-  font-weight: 600;
-}
-
-.game-quiz-modal__close-btn {
-  align-self: flex-end;
-  padding: 6px 16px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg);
-  color: var(--text);
-  cursor: pointer;
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.game-quiz-modal__close-btn:hover {
-  background: var(--code-bg);
-}
-
-/* 우측 사이드 영역 */
-.game-page__side {
-  background: linear-gradient(180deg, var(--accent-bg), transparent 160px), var(--bg);
-  flex: 1;
-  min-height: 0;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  box-shadow: var(--shadow);
-}
-
-.game-page__side-box {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  text-align: left;
-  flex: 1;
-}
-
-/* 주요 카드 3개 */
-.game-page__key-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-.game-page__key-card {
-  background: var(--code-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.game-page__key-card-label {
-  font-size: 0.85rem;
-  color: var(--text);
-}
-
-.game-page__key-card-value {
-  font-size: 1.3rem;
-  font-weight: 700;
-}
-
-/* ΔE 카드에만 붙는 보조 문구(평형 판정 기준선). 숫자만 보면 이 값이 평형에
-   가까운지 판단할 근거가 화면에 없어서 기준선을 같이 노출한다.
-   word-break: keep-all - 한국어가 어절 중간에서 잘리지 않게. */
-.game-page__key-card-note {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  word-break: keep-all;
-}
-
-/* 평형 허용범위 안이면 초록으로 표시해 "지금 균형에 들어와 있다"를 즉시 알린다. */
-.game-page__key-card-value--balanced {
-  color: var(--success);
-}
-
-/* 화면 우측 상단에 고정되는 타이머 + 이상기후 경고 패널 묶음 - 경고 패널이
-   뜨면 타이머 바로 아래에 이어붙는다. */
-.game-page__floating-stack {
-  position: fixed;
-  top: 20px;
-  right: 24px;
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 10px;
-}
-
-.game-page__floating-timer {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 6px;
-  padding: 8px 14px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  box-shadow: var(--shadow);
-
-  backdrop-filter: blur(8px);
-  transition: all 0.2s ease;
-}
-
-.game-page__floating-timer-label {
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  color: var(--text-muted);
-}
-
-.game-page__floating-timer .game-page__stats-note {
-  margin: 0;
-  font-weight: 700;
-  color: var(--text-h);
-  font-size: 1.05rem;
-  font-variant-numeric: tabular-nums;
-}
-
-.game-page__used-items-container {
-  margin-top: 10px;
-  border-top: 1px dashed var(--border);
-  padding-top: 8px;
-}
-
-.game-page__used-items-label {
-  font-weight: 600;
-  font-size: 0.85rem;
-  margin-bottom: 6px;
-
-  color: var(--text-h);
-}
-
-.game-page__used-items-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.game-page__used-item-row {
-  font-size: 0.83rem;
-  color: var(--text-muted);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  background: var(--code-bg);
-  padding: 4px 8px;
-  border-radius: 4px;
-  border: 1px solid var(--border);
-}
-
-/* 살짝 확대되며 올라오는 통통 튀는 애니메이션 */
-@keyframes toastPop {
+@keyframes hudFlash {
   0% {
     opacity: 0;
-    transform: translateY(-4px) scale(0.9);
+    transform: scale(0.94);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
   }
   100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    opacity: 0;
   }
 }
 
-@media (max-width: 900px) {
-  .game-page {
-    flex-direction: column;
+@keyframes resultIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes eventFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes eventPop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes alertPulse {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 움직임을 줄이도록 설정한 사용자에게는 은은한 반복 애니메이션을 끈다. */
+@media (prefers-reduced-motion: reduce) {
+  .hud__planet-glow,
+  .hud__alert-vignette {
+    animation: none;
+  }
+  .hud__gauge-marker,
+  .hud__progress-fill {
+    transition: none;
+  }
+}
+
+/* ── 반응형 ────────────────────────────────────────────────────────── */
+@media (max-width: 1360px) {
+  .hud__body {
+    grid-template-columns: 300px minmax(0, 1fr) 360px;
+  }
+}
+
+@media (max-width: 1120px) {
+  .hud {
+    height: auto;
+    min-height: 100svh;
+    overflow: visible;
   }
 
-  .game-page__side {
-    flex-direction: row;
+  .hud__body {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .hud__stage {
+    order: -1;
+    grid-column: 1 / -1;
+    padding: 14px 0;
+  }
+
+  .hud__column {
+    overflow: visible;
+  }
+}
+
+@media (max-width: 760px) {
+  .hud {
+    padding: 12px;
+  }
+
+  .hud__topbar,
+  .hud__actionbar {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .hud__body {
+    grid-template-columns: 1fr;
+  }
+
+  .actionbar__block--hint {
+    align-items: flex-start;
+    text-align: left;
+    max-width: none;
   }
 }

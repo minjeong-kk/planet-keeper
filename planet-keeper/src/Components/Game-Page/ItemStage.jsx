@@ -2,52 +2,70 @@ import { useState } from "react";
 import ItemInfoModal from "./ItemInfoModal";
 import { shortSliderChangeLabel } from "../../utils/planetAnalysis.js";
 
-// 정답 후 아이템 선택 단계. 매번 useGameStore.pickVisibleItems가 무작위로 고른
-// 일부만 받는다(9개 전부가 아님) - 어떤 아이템이 보일지는 GamePage/store 쪽 책임.
-// 고른 아이템이 실제로 에너지 평형에 도움이 되는지는 여기서 판정하지 않는다 -
-// 재계산된 물리엔진/ML 결과로 자연스럽게 드러난다. 카드에는 긴 설명 대신 짧은
-// 효과 라벨만 두고, 원인->결과 설명은 (❓) 버튼 또는 이모지 클릭 시 뜨는 모달에서 보여준다.
-// disabled: 이상기후 경고에 응답하는 중(pendingClimateEvent)에는 true - 카드
-// 선택과 슬라이더 대응이 동시에 가능하면 어느 쪽에 반응해야 할지 헷갈리므로,
-// 경고가 해소될 때까지 이 단계 전체를 잠근다.
-function ItemStage({ items, onSelect, disabled = false }) {
+// 왼쪽 HUD 아래쪽의 "장비 격납고". 정답 후 아이템 선택 단계에서 useGameStore.
+// pickVisibleItems가 무작위로 고른 일부만 받는다(9개 전부가 아님) - 어떤 아이템이
+// 보일지는 GamePage/store 쪽 책임. 고른 아이템이 실제로 에너지 평형에 도움이 되는지는
+// 여기서 판정하지 않는다 - 재계산된 물리엔진 결과로 자연스럽게 드러난다.
+//
+// 카드를 누르면 곧바로 투입된다(onSelect -> GamePage가 useGameStore.useItem 호출).
+// 긴 설명은 카드에 상시 노출하지 않고 (?) 버튼 모달에만 둔다.
+//
+// disabled: 이상기후 경고에 응답하는 중(pendingClimateEvent)에는 true.
+// locked: 지금은 장비를 쓸 수 있는 단계가 아님(문제 풀이 중) - 잠긴 슬롯만 보여준다.
+const LOCKED_SLOT_COUNT = 4;
+
+function ItemStage({ items, onSelect, disabled = false, locked = false }) {
   const [infoItem, setInfoItem] = useState(null);
 
   return (
-    <div className="game-page__modal">
-      <h3>아이템 선택</h3>
-      <ul className={`item-card-grid ${disabled ? "is-locked" : ""}`}>
-        {items.map((item) => (
-          <li key={item.id} className="item-card">
-            <button
-              type="button"
-              className="item-card__info-btn"
-              aria-label={`${item.name} 설명 보기`}
-              onClick={() => setInfoItem(item)}
-            >
-              ❓
-            </button>
+    <section className={`panel panel--inventory${disabled ? " is-locked" : ""}`}>
+      <header className="panel__head">
+        <h2 className="panel__title">장비 격납고</h2>
+        <span className="panel__count">{locked ? "잠김" : `${items.length}개 보유`}</span>
+      </header>
 
-            {/* 이모지를 눌러도 ❓ 버튼과 동일하게 설명 모달이 열린다 */}
-            <span
-              className="item-card__emoji"
-              role="button"
-              tabIndex={0}
+      {locked ? (
+        <>
+          <ul className="inventory-grid">
+            {Array.from({ length: LOCKED_SLOT_COUNT }, (_, i) => (
+              <li key={i} className="inventory-card inventory-card--empty" aria-hidden="true">
+                <span className="inventory-card__emoji">🔒</span>
+              </li>
+            ))}
+          </ul>
+          <p className="panel__placeholder">임무에 성공하면 장비가 지급됩니다.</p>
+        </>
+      ) : (
+        <ul className="inventory-grid">
+          {items.map((item) => (
+            <li key={item.id}>
+              <button
+                type="button"
+                className="inventory-card"
+                onClick={() => onSelect(item)}
+                disabled={disabled}
+                title={item.description}
               >
-              {item.emoji}
-            </span>
-
-            <p className="item-card__name">{item.name}</p>
-            <p className="item-card__effect">{shortSliderChangeLabel(item.key, item.delta)}</p>
-            <button className="btn-primary item-card__use-btn" onClick={() => onSelect(item)} disabled={disabled}>
-              사용
-            </button>
-          </li>
-        ))}
-      </ul>
+                <span className="inventory-card__emoji">{item.emoji}</span>
+                <span className="inventory-card__name">{item.name}</span>
+                <span className="inventory-card__effect">{shortSliderChangeLabel(item.key, item.delta)}</span>
+                <span className="inventory-card__use">투입</span>
+              </button>
+              <button
+                type="button"
+                className="inventory-card__info"
+                aria-label={`${item.name} 설명 보기`}
+                onClick={() => setInfoItem(item)}
+              >
+                ?
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
 
       {infoItem && <ItemInfoModal item={infoItem} onClose={() => setInfoItem(null)} />}
-    </div>
+    </section>
   );
 }
 
