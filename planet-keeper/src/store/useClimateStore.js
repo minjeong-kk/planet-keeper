@@ -101,14 +101,16 @@ const useClimateStore = create(
   setValuesFromPoint: (point) =>
     set((state) => {
       const clamp = (v) => Math.min(100, Math.max(0, v));
-      const iceThickness = clamp(point.values.iceThickness);
-      // 빙하+바다 상호제약(applyIceOceanCoupling)도 여기서 그대로 쓴다 - 이제
-      // 어느 진입점이든 같은 규칙 하나만 쓴다.
-      const withIce = { ...state.values, iceThickness, ocean: clamp(point.values.ocean) };
 
       return {
         values: {
-          ...applyIceOceanCoupling(withIce, "iceThickness"),
+          ...state.values,
+          // 지점 프리셋의 iceThickness/ocean은 이미 지리적으로 유효한 조합(합≤100)이라
+          // applyIceOceanCoupling을 거치지 않고 그대로 쓴다 - 거치면 항상 ocean이
+          // 밀려나서(커플링 기준 키가 "iceThickness"로 고정) 빙하+바다가 둘 다 높은
+          // 지점(예: 북극)에서 실측 ocean 값이 조용히 달라질 수 있다.
+          iceThickness: clamp(point.values.iceThickness),
+          ocean: clamp(point.values.ocean),
           cloud: clamp(point.values.cloud),
           atmThickness: atmThicknessToSlider(point.values.atmThickness),
           co2: co2PpmToSlider(point.values.co2),
@@ -155,7 +157,11 @@ const useClimateStore = create(
     // 여기 저장되는 값(슬라이더 0~100, 온도 K)은 ΔE 스케일과 무관해서 그대로 둬도
     // 되지만, useGameStore가 초기화되는데 조성만 남으면 "새 게임인데 이전 판의
     // 행성"이 되어 헷갈린다. 두 store의 version을 같이 올려 항상 함께 초기화한다.
-    { name: "planet-keeper-climate", version: 1, migrate: () => ({}) },
+    //
+    // version 2: 빙하+바다 상호제약(applyIceOceanCoupling) 도입 당시 버전을 안
+    // 올려서, 그 이전 저장본(예: {iceThickness:80, ocean:80} 같은 합>100 조합)이
+    // migrate로 안 걸러지고 있었다. 방어적으로 지금 올린다.
+    { name: "planet-keeper-climate", version: 2, migrate: () => ({}) },
   ),
 );
 
