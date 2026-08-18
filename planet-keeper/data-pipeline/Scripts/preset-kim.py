@@ -1,6 +1,6 @@
 # 행성 만들기의 "지점 선택"에 쓸 지점별 실측값을 KIM에서 수집한다.
 #
-# 결과는 build_presets.py가 src/data/climatePoints.js 로 변환한다(지금은 목데이터).
+# 결과는 build_presets.py가 src/data/climatePoints.js 로 변환한다(지금은 KIM 실측값).
 # 변수 이름은 probe-kim-vars.py로 확인한 것들이다.
 #
 # ------------------------------------------------------------------
@@ -201,8 +201,6 @@ def main():
         print("❌ .env에서 API_KEY(또는 authKey)를 찾지 못했습니다.")
         return
 
-    check_dates_in_window()
-
     print("지점별 현지 정오 UTC 시각")
     for pid, name, _, lon in POINTS:
         print(f"  {name:<10} 경도 {lon:>7.1f}  →  hf={local_noon_hf(lon)}")
@@ -215,6 +213,11 @@ def main():
     if not todo:
         print("모두 수집 완료 - build_presets.py 를 실행하세요.")
         return
+
+    # 캐시에 없는 값을 실제로 새로 받아야 할 때만 날짜 유효성을 따진다 - 이미 다
+    # 캐시에 있으면(위에서 return) API를 부르지 않으니 조회 창이 지났어도 상관없다.
+    check_dates_in_window()
+
     print(f"예상 소요 약 {len(todo) * 1.1 / 60:.0f}분\n")
 
     is_new = not os.path.exists(CACHE_FILE)

@@ -8,6 +8,7 @@ import csv
 import os
 import re
 import time
+from datetime import date
 import requests
 import numpy as np
 from dotenv import load_dotenv
@@ -41,6 +42,11 @@ DATASETS_DIR = "../Datasets"
 os.makedirs(DATASETS_DIR, exist_ok=True)
 CACHE_FILE = os.path.join(DATASETS_DIR, "physics_kim_monthly_cache.csv")
 OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_kim_dataset.csv")
+
+# KIM이 보관하는 기간(대략). 위 TMFC_LIST는 고정 절대 날짜라 시간이 지나면 조회
+# 창을 벗어난다. 그때 그냥 fetch하면 크래시는 안 나지만 빈 값이 조용히 들어가므로,
+# 캐시에 없는 날짜에 한해 fetch 전에 걸러서 눈에 띄는 경고를 남긴다.
+KIM_RETENTION_DAYS = 180
 
 
 def fetch_variable(var_name, tmfc):
@@ -109,6 +115,12 @@ with open(CACHE_FILE, "a", newline="") as f:
     for tmfc in TMFC_LIST:
         if tmfc in cache:
             print(f"=== {tmfc} (캐시에 이미 있음, 건너뜀) ===")
+            continue
+
+        tmfc_date = date(int(tmfc[:4]), int(tmfc[4:6]), int(tmfc[6:8]))
+        age = (date.today() - tmfc_date).days
+        if age > KIM_RETENTION_DAYS:
+            print(f"⚠️ {tmfc}: 조회 창(약 {KIM_RETENTION_DAYS}일)을 벗어나({age}일 전) 건너뜁니다 - TMFC_LIST를 최근 날짜로 갱신하세요.")
             continue
 
         print(f"=== {tmfc} ===")
