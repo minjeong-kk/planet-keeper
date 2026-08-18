@@ -20,6 +20,8 @@ pip install -r requirements.txt
 
 ```bash
 # 1. 실측 수집 (API 키 필요, .env 참고)
+# → data-pipeline/.env.example을 .env로 복사하고 기상청 API 허브
+#   (https://apihub.kma.go.kr)에서 발급받은 개인 키를 API_KEY에 넣으세요.
 cd data-pipeline/Scripts
 python3 observed-gk2a.py       # 천리안 산출물 + 좌표 앵커 → observed_gk2a_dataset.csv
 python3 observed-kim.py        # 같은 좌표의 KIM t2m/psl → observed_kim_dataset.csv
