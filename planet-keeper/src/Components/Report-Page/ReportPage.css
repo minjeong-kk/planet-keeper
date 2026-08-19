@@ -21,32 +21,36 @@
    하나도 안 건드려도 된다. */
 @media (prefers-color-scheme: dark) {
   .report-page {
-    --bg: #0f2027;
+    --bg: #060d18;
     --text: var(--panel-ink-dim);
     --text-h: #ffffff;
     --text-muted: var(--panel-ink-dim);
-    --border: rgba(8, 145, 178, 0.26);
+    /* GamePage(HUD)의 --line/--line-strong과 같은 cyan 계열로 통일 */
+    --border: rgba(45, 212, 191, 0.2);
     --code-bg: rgba(255, 255, 255, 0.05);
     --shadow: 0 14px 32px rgba(3, 7, 16, 0.45);
-    --accent: #22b8cf;
-    --accent-bg: rgba(8, 145, 178, 0.16);
-    --accent-border: rgba(8, 145, 178, 0.48);
+    /* GamePage --cyan과 정확히 같은 값 */
+    --accent: #2dd4bf;
+    --accent-bg: rgba(45, 212, 191, 0.16);
+    --accent-border: rgba(45, 212, 191, 0.45);
 
     --info: #38bdf8;
     --info-bg: rgba(56, 189, 248, 0.15);
     --info-border: rgba(56, 189, 248, 0.4);
-    /* 형광 라임그린 대신 페이지 전체 톤과 맞는 청록(teal) - index.css의 --neon과 같은 계열 */
-    --success: #2dd4bf;
-    --success-bg: rgba(45, 212, 191, 0.15);
-    --success-border: rgba(45, 212, 191, 0.4);
+    /* GamePage --ok와 정확히 같은 값(accent와 겹치던 cyan을 success에서 분리) */
+    --success: #34d399;
+    --success-bg: rgba(52, 211, 153, 0.15);
+    --success-border: rgba(52, 211, 153, 0.4);
     --danger: #f87171;
     --danger-bg: rgba(248, 113, 113, 0.15);
     --danger-border: rgba(248, 113, 113, 0.4);
     --warm: #fb923c;
     --warm-bg: rgba(251, 146, 60, 0.15);
     --warm-border: rgba(251, 146, 60, 0.4);
+    /* GamePage .item-result__step--greenhouse와 같은 값(다크 배경에서 더 밝은 violet) */
+    --violet: #a78bfa;
 
-    background: linear-gradient(160deg, #11242c 0%, #060e12 100%);
+    background: linear-gradient(160deg, #060d18 0%, #03060d 100%);
     color: var(--panel-ink);
   }
 

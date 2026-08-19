@@ -118,6 +118,10 @@ function ReportPage() {
     detail: "",
     statusClass: "",
   };
+  
+// 최종 결과 배너("최종 행성 상태" 등)에서 쓰는 마지막 타임라인 스냅샷.
+  const final = timeline[timeline.length - 1] ?? null;
+  const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
 
   // "핵심 개념 정리"에서 9개 전부가 아니라 이번 판에 실제로 나타난 개념만 고른다.
   const quizConceptKeys = useMemo(() => {
