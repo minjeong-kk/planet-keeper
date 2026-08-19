@@ -1899,3 +1899,23 @@
   width: 0;
   height: 0;
 }
+
+/* 장비 사용 결과 - |ΔE|가 줄었는지 늘었는지. 쓰기 전에 정답을 알려주는 대신
+   쓴 뒤의 결과로 방향을 배우게 하는 자리다. */
+.use-effect__trend {
+  margin-top: 3px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.use-effect__trend.is-good {
+  color: var(--ok);
+}
+
+.use-effect__trend.is-bad {
+  color: var(--warn);
+}
+
+.use-effect__trend.is-same {
+  color: var(--faint);
+}

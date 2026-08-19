@@ -16,6 +16,7 @@ import useGameStore, {
   CLIMATE_EVENT_RESPONSE_SECONDS,
   MAX_EQUIPMENT_CAPACITY,
   equipmentTotalCount,
+  ITEM_EFFECT_EPSILON,
 } from "../../store/useGameStore";
 import { slidersToVisual } from "../../utils/climateVisual.js";
 import {
@@ -343,6 +344,7 @@ function GamePage() {
   // 보유 장비 총 수량 - 하단 안내 문구에서 "지금 쓸 게 있는지"를 알려주는 데 쓴다.
   const heldEquipmentCount = useMemo(() => equipmentTotalCount(equipment), [equipment]);
 
+
   // 장비 사용 효과 카드는 잠깐 보여준 뒤 사라진다.
   useEffect(() => {
     if (!useEffectCard) return undefined;
@@ -504,6 +506,21 @@ function GamePage() {
                   <em>→</em>
                   {formatSigned(useEffectCard.after.deltaEnergy)} W/m²
                 </span>
+                {/* 어떤 장비가 맞는 선택인지 미리 알려주지 않고, 쓴 뒤의 결과로
+                    알려준다 - 방향을 스스로 판단하고 결과로 확인하는 흐름이다. */}
+                {(() => {
+                  const gap = Math.abs(useEffectCard.after.deltaEnergy) - Math.abs(useEffectCard.before.deltaEnergy);
+                  const tone = gap < -ITEM_EFFECT_EPSILON ? "good" : gap > ITEM_EFFECT_EPSILON ? "bad" : "same";
+                  return (
+                    <span className={`use-effect__trend is-${tone}`}>
+                      {tone === "good"
+                        ? "↘ 균형에 가까워졌습니다"
+                        : tone === "bad"
+                          ? "↗ 균형에서 멀어졌습니다"
+                          : "· 거의 변화가 없습니다"}
+                    </span>
+                  );
+                })()}
               </div>
             )}
           </div>

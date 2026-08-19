@@ -121,6 +121,28 @@ function pickClimateEventInterval() {
   const [min, max] = CLIMATE_EVENT_INTERVAL_RANGE;
   return min + Math.floor(Math.random() * (max - min + 1));
 }
+// 경고가 지목한 변수를 플레이어가 "막는 방향"으로 이만큼은 움직일 수 있어야 후보로
+// 쓴다. 예를 들어 빙하가 0%인 행성(사하라 등)에 "빙하가 늘어나려 합니다"가 뜨면
+// 막는 방향(빙하 감소)으로 갈 자리가 없어서, 화면은 ↓를 가리키는데 슬라이더는
+// 내려가지 않는 모순이 생긴다.
+const CLIMATE_EVENT_COUNTER_ROOM = 5;
+
+// 이 이벤트를 지금 조성에 띄울 수 있는지.
+//   1) 악화 방향으로 실제로 값이 움직일 수 있어야 한다 - 빙하 0%에서 "빙하가
+//      녹으려 합니다"는 clamp에 걸려 아무 일도 일어나지 않는 빈 경고가 된다.
+//   2) 막는 방향(악화의 반대)으로도 최소한의 여유가 있어야 한다 - 안 그러면
+//      대응 자체가 불가능한 경고가 된다.
+function isUsableClimateEvent(event, values) {
+  const value = values[event.key];
+  if (typeof value !== "number") return false;
+  const canWorsen = event.delta > 0 ? value < 100 : value > 0;
+  const canRespond =
+    event.delta > 0
+      ? value >= CLIMATE_EVENT_COUNTER_ROOM
+      : value <= 100 - CLIMATE_EVENT_COUNTER_ROOM;
+  return canWorsen && canRespond;
+}
+
 // 경고가 뜬 뒤 플레이어가 슬라이더(행성 만들기와 같은 5개 전부를 보여준다)로
 // 대응할 수 있는 시간(초). 이 안에 손대지 않으면 resolveClimateEvent가 경고에
 // 걸린 그대로(기존 자동 악화와 동일하게) 적용한다.
@@ -383,8 +405,14 @@ const useGameStore = create(
       deltaEnergy > ENERGY_BALANCE_EPSILON ? WARMING_EVENTS : deltaEnergy < -ENERGY_BALANCE_EPSILON ? COOLING_EVENTS : null;
     if (!pool) return;
 
-    const event = pickRandom(pool);
     const { values } = useClimateStore.getState();
+    // 지금 조성에서 의미가 있는(악화도 가능하고 대응도 가능한) 후보만 남긴다 -
+    // 빙하가 없는 행성에 빙하 경고가 뜨는 문제를 여기서 막는다. 남는 후보가
+    // 없으면 이번에는 경고를 띄우지 않고 다음 검토 시각을 기다린다.
+    const usable = pool.filter((event) => isUsableClimateEvent(event, values));
+    if (usable.length === 0) return;
+
+    const event = pickRandom(usable);
     set({
       pendingClimateEvent: {
         ...event,
@@ -459,6 +487,19 @@ const useGameStore = create(
 
     get().pushTimeline("이상기후", resultMessage, physics, null);
     set({ physicsResult: physics, climateEvent: resultMessage, pendingClimateEvent: null });
+
+    // 대응 결과로 에너지가 균형에 들어왔다면 여기서 바로 2단계로 넘긴다 - 예전에는
+    // 단계 판정을 applyEquipment에서만 해서, 이상기후로 우연히 평형이 되면 장비를
+    // 한 번 더 쓸 때까지 1단계 문제만 계속 도는 구간이 있었다. mlResult도 같이
+    // 갱신해야 화면 배지가 "불평형"인데 2단계로 넘어가는 모순이 생기지 않는다.
+    const ml = classifyPlanetState(physics);
+    if (STABLE_LABELS.has(ml.label) && get().currentStage === GAME_STAGES.PROBLEM1) {
+      set({
+        mlResult: ml,
+        currentStage: GAME_STAGES.FINAL,
+        currentProblem: get().pickNextProblem(STAGE4_QUESTIONS),
+      });
+    }
   },
 
   // GamePage가 1초마다 부르는 심장박동 - 경과 시간을 늘리고, 펜딩 경고의 응답
