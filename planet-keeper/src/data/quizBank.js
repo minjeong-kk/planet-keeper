@@ -4,7 +4,7 @@
 // CO2_BASELINE_PPM/ENERGY_BALANCE_EPSILON)와 src/data/climateThresholds.js
 // (COLD_STABLE_MAX_K, EARTH_LIKE_MAX_K)에서 실제 쓰는 값을 그대로 가져왔다.
 //
-// 아이템은 문제별 고정 정답이 없다 - useGameStore.js의 useItem()이 실제로 적용한 뒤
+// 아이템은 문제별 고정 정답이 없다 - useGameStore.js의 applyEquipment()가 실제로 적용한 뒤
 // 물리엔진으로 재계산해서 평형 온도가 지구형 범위(Earth-like Stable)에 들어오는지를
 // 그때그때 판정한다. 그래서 여기 문제 데이터에는 정답 아이템을 두지 않는다.
 

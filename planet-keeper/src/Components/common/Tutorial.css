@@ -1,0 +1,246 @@
+/* 첫 플레이 온보딩 - 실제 게임 UI 위에 스포트라이트를 얹고 옆에 말풍선을 띄운다.
+   GamePage.css의 HUD 토큰과 같은 우주 다크톤/청록 포인트를 쓴다.
+   글자 크기는 1440px에서 확대 없이 읽히는 선을 기준으로 잡는다(본문 0.95rem 이상). */
+
+.tour {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  animation: tourFadeIn 0.2s ease-out;
+}
+
+/* 대상이 없는 단계(인사말 등)는 화면 전체를 덮는다 */
+.tour__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 6, 13, 0.8);
+  backdrop-filter: blur(3px);
+}
+
+/* 강조 영역만 남기고 나머지를 덮는 구멍 - 큰 box-shadow 하나로 처리해서
+   레이어를 4개 쌓지 않아도 된다. */
+.tour__spotlight {
+  position: absolute;
+  border-radius: 16px;
+  box-shadow:
+    0 0 0 9999px rgba(3, 6, 13, 0.78),
+    0 0 0 2px rgba(45, 212, 191, 0.9),
+    0 0 34px rgba(45, 212, 191, 0.45);
+  transition: top 0.28s ease, left 0.28s ease, width 0.28s ease, height 0.28s ease;
+  pointer-events: none;
+}
+
+.tour__card {
+  position: absolute;
+  /* 312px(=360-패딩)에는 한 줄에 18자 정도만 들어가 줄바꿈이 잦았다.
+     Tutorial.jsx의 CARD_WIDTH와 같은 값을 유지해야 위치 계산이 맞는다. */
+  width: 400px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 24px;
+  border: 1px solid rgba(45, 212, 191, 0.45);
+  border-radius: 16px;
+  background: linear-gradient(160deg, rgba(13, 28, 44, 0.98), rgba(6, 13, 24, 0.98));
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(45, 212, 191, 0.14);
+  color: #eaf1fb;
+  text-align: left;
+  transition: top 0.28s ease, left 0.28s ease;
+}
+
+/* 강조할 UI 없이 혼자 뜨는 단계 - 화면 가운데에서 확실히 존재감이 있어야 한다 */
+.tour__card--center {
+  width: min(560px, calc(100vw - 48px));
+  gap: 16px;
+  padding: 36px 40px;
+  border-radius: 20px;
+  border-color: rgba(45, 212, 191, 0.55);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.7), 0 0 70px rgba(45, 212, 191, 0.18);
+}
+
+.tour__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tour__step-count {
+  font-family: var(--mono, ui-monospace, Consolas, monospace);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: #2dd4bf;
+}
+
+.tour__step-total {
+  color: #5f7590;
+}
+
+.tour__progress {
+  display: flex;
+  gap: 5px;
+}
+
+.tour__dot {
+  width: 18px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(45, 212, 191, 0.22);
+}
+
+.tour__dot--on {
+  background: #2dd4bf;
+  box-shadow: 0 0 8px rgba(45, 212, 191, 0.6);
+}
+
+.tour__title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 800;
+  line-height: 1.45;
+  color: #ffffff;
+  word-break: keep-all;
+  /* 두 줄이 될 때 한쪽만 길어지지 않게 줄 길이를 고르게 나눈다. */
+  text-wrap: balance;
+}
+
+.tour__card--center .tour__title {
+  font-size: 1.6rem;
+  line-height: 1.4;
+}
+
+/* 가독성: 본문을 키우고 대비를 올린다(예전 0.88rem/#a8bdd6 → 아래 값).
+   정렬은 왼쪽으로 둔다 - text-align: justify를 쓰면 word-break: keep-all(한글을
+   어절 단위로만 끊는 규칙)과 겹쳐서, 한 줄에 어절이 2~3개뿐인 좁은 카드에서
+   그 공백들만 늘어나 "화면 가운데가    당신의    행성입니다"처럼 벌어진다.
+   한글은 좌측 정렬이 기본 가독성이 더 좋다. */
+.tour__body {
+  margin: 0;
+  font-size: 0.98rem;
+  line-height: 1.75;
+  color: #d7e5f5;
+  text-align: left;
+  /* 어절 중간에서 끊기지 않게 하되(keep-all), URL처럼 공백 없는 긴 토큰이
+     들어오면 카드를 넘치는 대신 그때만 강제로 줄바꿈한다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  hyphens: none;
+  /* 지원 브라우저에서는 마지막 줄에 한 단어만 남는 것(고아 줄)을 줄여준다. */
+  text-wrap: pretty;
+}
+
+.tour__card--center .tour__body {
+  font-size: 1.08rem;
+  line-height: 1.8;
+  color: #e4eefb;
+}
+
+.tour__actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.tour__nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tour__skip {
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: #8ba1bd;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.tour__skip:hover {
+  transform: none;
+  box-shadow: none;
+  color: #d7e5f5;
+}
+
+.tour__prev {
+  padding: 10px 18px;
+  border: 1px solid rgba(45, 212, 191, 0.4);
+  border-radius: 10px;
+  background: transparent;
+  color: #5eead4;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tour__prev:hover:not(:disabled) {
+  transform: none;
+  background: rgba(45, 212, 191, 0.12);
+  box-shadow: none;
+}
+
+.tour__prev:disabled {
+  border-color: rgba(139, 161, 189, 0.2);
+  color: #5f7590;
+  cursor: not-allowed;
+}
+
+.tour__next {
+  padding: 11px 24px;
+  border: 1px solid rgba(94, 234, 212, 0.55);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(13, 148, 136, 0.95));
+  color: #04121f;
+  font-size: 0.92rem;
+  font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 0 20px rgba(45, 212, 191, 0.28);
+}
+
+.tour__next:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 0 28px rgba(45, 212, 191, 0.45);
+}
+
+.tour__card--center .tour__next {
+  padding: 13px 30px;
+  font-size: 1rem;
+}
+
+.tour__card--center .tour__prev {
+  padding: 12px 22px;
+  font-size: 0.95rem;
+}
+
+@keyframes tourFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour__spotlight,
+  .tour__card {
+    transition: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .tour__card {
+    width: calc(100vw - 24px);
+    left: 12px !important;
+  }
+
+  .tour__card--center {
+    left: 50% !important;
+  }
+}
