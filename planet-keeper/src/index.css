@@ -37,6 +37,11 @@
   --warm-bg: #fff7ed;
   --warm-border: #ffedd5;
 
+  /* 인과 설명에서 "온실효과 계열"(온실효과/OLR) 줄을 구분하는 색 - "알베도 계열"
+     (알베도/ASR)은 --accent를 재사용하고, 겹치지 않는 색이 하나 더 필요해 추가했다. */
+  --violet: #7c3aed;
+  --violet-bg: #f5f3ff;
+
   /* 시작 페이지(StartPage)의 다크 SF 패널 톤 - 다른 페이지도 같은 느낌을 쓸 때
      이 토큰들을 재사용한다. 라이트/다크 시스템 설정과 무관하게 항상 같은
      값이다(스타 패드가 늘 어두운 패널인 것과 동일). StartPage.css 자체는
@@ -103,6 +108,9 @@
     --warm: #fb923c;
     --warm-bg: rgba(251, 146, 60, 0.15);
     --warm-border: rgba(251, 146, 60, 0.4);
+
+    --violet: #a78bfa;
+    --violet-bg: rgba(167, 139, 250, 0.15);
   }
 
   #social .button-icon {

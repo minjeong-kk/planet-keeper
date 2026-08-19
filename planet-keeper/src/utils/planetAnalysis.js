@@ -97,6 +97,15 @@ export function deltaEnergyLines(deltaEnergy) {
   ];
 }
 
+// describeItemJudgment/describeTransition처럼 before/after를 둘 다 아는 곳에서만
+// 쓴다 - ΔE 숫자 줄만 "이전 -> 이후"로 바꿔서 이 조작 하나가 ΔE를 얼마나 움직였는지
+// 바로 보이게 한다. 방향 설명 문장은 항상 지금(after) 상태 기준이어야 하므로
+// deltaEnergyLines(after)가 만든 것을 그대로 쓴다.
+function deltaEnergyTransitionLines(before, after) {
+  const [, directionLine] = deltaEnergyLines(after);
+  return [`에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(after)} W/m²`, directionLine];
+}
+
 function energyProblemLines(deltaEnergy, direction) {
   return [
     ...deltaEnergyLines(deltaEnergy),
@@ -295,12 +304,14 @@ function netAlbedoGreenhouseEffectLine(before, after) {
 // 동시에 바뀌는 경우(이상기후 대응 등, itemKey 없음)는 원인을 하나로 특정할 수
 // 없으므로 여기서 걸러지고(physicsChangeBlocks가 itemKey 없이 부르면 아예 추가
 // 안 함), 잘못된 인과를 덧붙이지 않는다.
-const ALBEDO_REASON = {
+// ReportPage가 타임라인 설명에서 이 문장들을 "알베도 계열"/"온실효과 계열"로
+// 색 구분할 때도 그대로 참조한다(문구를 중복해서 따로 들고 있지 않기 위해 export).
+export const ALBEDO_REASON = {
   iceThickness: "빙하는 태양빛을 강하게 반사하는 밝은 표면이라, 비율이 바뀌면 알베도도 함께 움직입니다.",
   cloud: "구름은 태양빛을 반사하는 밝은 표면 역할을 합니다.",
 };
 
-const GREENHOUSE_REASON = {
+export const GREENHOUSE_REASON = {
   cloud: "구름은 지표 복사를 가두는 온실 역할도 동시에 합니다.",
   co2: "CO₂는 대표적인 온실기체로, 지표 복사를 흡수해 대기 중에 가둡니다.",
   atmThickness: "대기가 두꺼워질수록 열을 가두는 능력(온실효과)이 커집니다.",
@@ -419,8 +430,8 @@ function describeImbalanceChange(before, after, label) {
   }
   return [
     warming
-      ? "🔥 방향은 맞지만 아직 에너지가 과다합니다 - 냉각 아이템이 더 필요합니다."
-      : "❄️ 방향은 맞지만 아직 에너지가 부족합니다 - 온난화 아이템이 더 필요합니다.",
+      ? "🔥 방향은 맞아 에너지 과다가 줄었지만, 아직 남아있어 행성은 계속 더워지는 중입니다 - 냉각 아이템이 더 필요합니다."
+      : "❄️ 방향은 맞아 에너지 부족이 줄었지만, 아직 남아있어 행성은 계속 차가워지는 중입니다 - 온난화 아이템이 더 필요합니다.",
   ];
 }
 
@@ -444,7 +455,7 @@ export function describeItemJudgment(item, before, after, label) {
     ...physicsChangeBlocks(before, after, item.key),
   ];
 
-  blocks.push(deltaEnergyLines(after.deltaEnergy));
+  blocks.push(deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy));
   blocks.push(["물리엔진이 최종 기후 상태를 분석합니다."]);
   blocks.push(
     label === "Energy Surplus" || label === "Energy Deficit"
@@ -488,14 +499,26 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
 export function describeTransition(before, after, label, itemKey) {
   const blocks = physicsChangeBlocks(before, after, itemKey);
 
-  blocks.push(deltaEnergyLines(after.deltaEnergy));
-
-  if (blocks.length === 1) {
-    // 변화가 전혀 없던 단계(예: 이미 평형이라 문제/아이템 없이 최종 확인만 반복한 경우).
+  if (blocks.length === 0) {
+    // 변화가 전혀 없던 단계(예: 이미 평형이라 문제/아이템 없이 최종 확인만 반복한 경우) -
+    // before와 after가 사실상 같으므로 "이전 -> 이후"를 보여줄 이유가 없다.
     return deltaEnergyLines(after.deltaEnergy);
   }
 
-  if (label) blocks.push(describeStableLabel(label));
+  blocks.push(deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy));
+
+  // 아직 불평형(Energy Surplus/Deficit)이면 describeItemJudgment와 같은 기준으로
+  // "그래서 이 선택이 왜 문제인지"(방향이 반대라 더 나빠졌는지, 방향은 맞는데
+  // 아직 부족한지)를 마저 설명한다 - describeStableLabel은 이 두 라벨에서 빈
+  // 배열을 돌려주므로(안정 상태 전용), 그 경우 걸러내지 않으면 withArrows가 빈
+  // 블록 앞에도 "↓"를 넣어 마지막 줄이 화살표로 끝나고 아무것도 안 이어진다.
+  const closingLines =
+    label === "Energy Surplus" || label === "Energy Deficit"
+      ? describeImbalanceChange(before, after, label)
+      : label
+        ? describeStableLabel(label)
+        : [];
+  if (closingLines.length) blocks.push(closingLines);
 
   return withArrows(blocks);
 }

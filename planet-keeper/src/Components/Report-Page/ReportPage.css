@@ -183,15 +183,66 @@
 }
 
 /* =========================================
-   행성 타임라인: 가로 2열 컴팩트 그리드 레이아웃
+   행성 타임라인: ΔE 추이 그래프 하나로 통합
    ========================================= */
-.report-page__timeline-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 14px;
+.report-page__timeline-chart {
+  width: 100%;
+  height: auto;
+  margin: 8px 0 14px;
 }
 
-.report-page__timeline-card {
+.report-page__timeline-chart-band {
+  fill: var(--success-bg);
+}
+
+.report-page__timeline-chart-zero {
+  stroke: var(--border);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+}
+
+.report-page__timeline-chart-line {
+  fill: none;
+  stroke: var(--info);
+  stroke-width: 2;
+}
+
+.report-page__timeline-chart-point {
+  cursor: pointer;
+}
+
+.report-page__timeline-chart-dot {
+  stroke: var(--bg);
+  stroke-width: 2;
+  transition: r 0.1s ease;
+}
+
+.report-page__timeline-chart-dot--neutral {
+  fill: var(--text-muted);
+}
+
+.report-page__timeline-chart-dot--earth {
+  fill: var(--success);
+}
+
+.report-page__timeline-chart-dot--warm {
+  fill: var(--warm);
+}
+
+.report-page__timeline-chart-dot--cold {
+  fill: var(--info);
+}
+
+.report-page__timeline-chart-dot.is-active {
+  stroke: var(--text-h);
+}
+
+.report-page__timeline-chart-emoji {
+  font-size: 14px;
+  text-anchor: middle;
+}
+
+.report-page__timeline-detail {
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -199,13 +250,6 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.report-page__timeline-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
 }
 
 .report-page__timeline-card-header {
@@ -230,13 +274,6 @@
   color: var(--text-h);
 }
 
-.report-page__timeline-chips {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-
 .report-page__timeline-chip {
   background: var(--code-bg);
   color: var(--text);
@@ -245,6 +282,7 @@
   border-radius: 10px;
   font-weight: 600;
   font-size: 0.8rem;
+  margin-left: auto;
 }
 
 .report-page__timeline-explain {
@@ -264,10 +302,28 @@
   margin: 0;
 }
 
-.report-page__timeline-metrics {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* 중요 용어 강조(알베도/온실효과/ΔE/OLR/ASR 등) - renderExplanationLine 참고.
+   계열 색이 없는 줄(ΔE 등)에서만 쓰인다 - 계열 색이 있으면 아래 규칙이 이긴다. */
+.report-page__timeline-explain strong {
+  color: var(--text-h);
+}
+
+/* 알베도->ASR 계열 / 온실효과->OLR 계열을 다른 색으로 구분한다 - 하나의 조작이
+   둘 다 움직일 때 어느 결과가 어느 원인 때문인지 색으로 바로 보이게 한다. 이유
+   문장("구름은 태양빛을 반사하는...")은 강조할 키워드가 없어 문장 전체를
+   물들인다 - strong도 같은 색으로 맞춰서 한 줄 안에서 색이 갈리지 않게 한다. */
+.report-page__timeline-explain-line--albedo {
+  color: var(--accent);
+}
+.report-page__timeline-explain-line--albedo strong {
+  color: var(--accent);
+}
+
+.report-page__timeline-explain-line--greenhouse {
+  color: var(--violet);
+}
+.report-page__timeline-explain-line--greenhouse strong {
+  color: var(--violet);
 }
 
 .report-page__metric-badge {
