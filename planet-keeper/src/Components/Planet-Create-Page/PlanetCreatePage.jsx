@@ -129,7 +129,7 @@ function Slider({ id, value, min, cap, onChange, onGrab }) {
 }
 
 // 지점 선택 직후(슬라이더를 아직 안 만졌을 때) 3D 지구 대신 보여주는 자리.
-// imageUrl이 있는 지점(지금은 사하라만)만 그 사진을 작은 3D 액자(LocationPhoto3D)에
+// imageUrl이 있는 지점(지금은 사하라·아마존)만 그 사진을 작은 3D 액자(LocationPhoto3D)에
 // 넣어 살짝 흔들리는 입체감을 준다 - 실제 지리 정보는 없는 순수 시각 효과다.
 // imageUrl이 없는 지점(아직 라이선스 확인 전)은 아무것도 덮지 않는다 - 이미
 // 밑에 항상 켜져 있는 PlanetUI가 그 지점의 슬라이더 값(빙하·바다·구름 등)을

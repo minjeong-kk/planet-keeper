@@ -476,3 +476,12 @@ All textures are bundled locally (not hot-linked) to avoid runtime/CORS dependen
   - 출처: https://science.nasa.gov/earth/earth-observatory/eroded-beauty-in-the-sahara-desert-150604/
   - 원본(5568×3712)을 프로젝트에서 960×640으로 리사이즈·재압축(용량 절감, 화질 손실 미미)해 로컬 번들
   - 사용처: 행성 만들기 페이지의 "특정 지점 선택" — 사하라 사막 선택 시 미리보기(`src/data/climatePoints.js`)
+
+- **아마존 지점 사진** (`public/assets/location-amazon.jpg`)
+  - 저작물명: "Rio Negro, Amazonia, Brazil" (원본 파일명 `ISS013-E-74843_lrg.jpg`)
+  - 우주비행사 사진(Astronaut Photograph) ISS013-E-74843, 2006년 9월 2일 국제우주정거장에서 Kodak 760C(180mm)로 촬영
+  - 제공: **NASA** (ISS Crew Earth Observations Facility / Earth Science and Remote Sensing Unit, Johnson Space Center)
+  - 라이선스: **Public Domain** (미국 정부 저작물)
+  - 출처: https://science.nasa.gov/earth/earth-observatory/rio-negro-amazonia-brazil-7169/
+  - 원본(1000×662)을 프로젝트에서 960×636으로 리사이즈·재압축(용량 절감, 화질 손실 미미)해 로컬 번들
+  - 사용처: 행성 만들기 페이지의 "특정 지점 선택" — 아마존 선택 시 미리보기(`src/data/climatePoints.js`)

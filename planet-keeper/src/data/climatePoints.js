@@ -64,6 +64,6 @@ export const CLIMATE_POINTS = [
     values: { iceThickness: 0, ocean: 10, cloud: 87, atmThickness: 0.993, co2: 429.53 },
     t2m: 299.2,
     surfaceAlbedo: 0.144,
-    imageUrl: null,
+    imageUrl: "/assets/location-amazon.jpg",
   },
 ];
