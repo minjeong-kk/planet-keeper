@@ -49,6 +49,10 @@ const ACTIVITY_LOG_LIMIT = 8;
 // 장비 사용 직후 행성 옆에 뜨는 효과 카드가 유지되는 시간(ms).
 const USE_EFFECT_DISPLAY_MS = 3200;
 
+// 조성·온도가 바뀔 때 행성 외형이 그 값으로 옮겨가는 시간(ms). 즉시 바꾸면 한 프레임
+// 만에 끝나서 "변했다"는 게 눈에 안 들어온다 - 장비 효과가 보이도록 천천히 모습을 바꾼다.
+const VISUAL_TWEEN_MS = 900;
+
 // 온도 게이지가 그리는 전체 구간(K). 안정 구간(COLD_STABLE_MAX_K ~ EARTH_LIKE_MAX_K)이
 // 게이지 한가운데 오도록 위아래로 비슷한 여유를 둔 표시 전용 값이다 - 판정 기준은
 // 그대로 물리엔진(planetStateOf)이 갖고 있고 여기서는 위치만 계산한다.
@@ -116,13 +120,47 @@ function useAnimatedNumber(target, duration = 700) {
   return value;
 }
 
+// 행성 3D 시각 props(0~1 수치들)를 목표값으로 부드럽게 옮긴다. 표시 전용이라
+// 물리 값(values/physicsResult)은 건드리지 않는다 - target은 useMemo로 안정된
+// 객체를 받아야 한다(매 렌더 새 객체면 effect가 계속 다시 돈다).
+function useAnimatedVisual(target, duration = VISUAL_TWEEN_MS) {
+  const [value, setValue] = useState(target);
+  const currentRef = useRef(target);
+
+  useEffect(() => {
+    const from = currentRef.current;
+    const keys = Object.keys(target);
+    if (keys.every((k) => Math.abs(from[k] - target[k]) < 0.002)) {
+      currentRef.current = target;
+      setValue(target);
+      return undefined;
+    }
+
+    let frame = 0;
+    let startTime = null;
+    const step = (now) => {
+      if (startTime === null) startTime = now;
+      const progress = Math.min(1, (now - startTime) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      const next = {};
+      for (const key of keys) next[key] = from[key] + (target[key] - from[key]) * eased;
+      currentRef.current = next;
+      setValue(next);
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [target, duration]);
+
+  return value;
+}
+
 function GamePage() {
   const navigate = useNavigate();
   // 행성 슬라이더 값(제작 페이지에서 만든 값)은 그대로 이어받아 보여주기만 한다.
   const values = useClimateStore((state) => state.values);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const resetClimate = useClimateStore((state) => state.resetClimate);
-  const visual = slidersToVisual(values);
   // 1초마다 도는 elapsedSeconds 틱에도 GamePage가 리렌더되므로, values/physicsResult/
   // inventory가 그대로인데 매번 다시 계산되지 않도록 메모이즈한다.
   const climateInputs = useMemo(() => mapSlidersToClimateInputs(values), [values]);
@@ -167,6 +205,14 @@ function GamePage() {
     () => (physicsResult ? equilibriumTemperatureOf(physicsResult) : null),
     [physicsResult],
   );
+
+  // 조성뿐 아니라 현재 온도까지 외형에 반영한다 - 장비로 온도가 움직이면 바다·빙하·
+  // 대기 색이 함께 변해서 "행성이 바뀌었다"가 보인다(표시 전용 보정).
+  const visualTarget = useMemo(
+    () => slidersToVisual(values, physicsResult?.currentTemperature ?? currentTemperature),
+    [values, physicsResult?.currentTemperature, currentTemperature],
+  );
+  const visual = useAnimatedVisual(visualTarget);
 
   // "🧊 빙하 해빙제" 같은 이름이 여러 번 쓰이면 나열하지 않고 x횟수로 묶어 보여준다.
   const inventoryCounts = useMemo(

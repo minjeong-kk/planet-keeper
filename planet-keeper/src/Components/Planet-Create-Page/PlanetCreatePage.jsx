@@ -148,6 +148,7 @@ function LocationPreview({ location }) {
 function PlanetCreatePage() {
   const navigate = useNavigate();
   const values = useClimateStore((state) => state.values);
+  const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const setValue = useClimateStore((state) => state.setValue);
   const selectedLocation = useClimateStore((state) => state.selectedLocation);
   const isViewingLocationImage = useClimateStore((state) => state.isViewingLocationImage);
@@ -183,7 +184,9 @@ function PlanetCreatePage() {
     dismissCreateTutorial();
   };
 
-  const visual = slidersToVisual(values);
+  // 지점을 고르면 그 지점의 실측 기온도 함께 반영된다 - 남극(230K)을 고르면
+  // 얼어붙은 행성, 사하라(300K)를 고르면 메마른 행성으로 보인다(표시 전용 보정).
+  const visual = slidersToVisual(values, currentTemperature);
 
   // Physics 결과는 store에 저장하지 않는다 - 슬라이더와 현재 온도만 있으면
   // 어디서든 다시 계산되는 순수 함수이므로, 쓰는 쪽(GamePage/ReportPage)에서
