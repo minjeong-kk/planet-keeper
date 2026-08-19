@@ -1,8 +1,10 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Waves, Snowflake, Cloud, Wind, Factory } from "lucide-react";
 import PlanetUI, { LocationPhoto3D } from "../Planet-ui.jsx";
 import PlanetLocationPicker from "./PlanetLocationPicker.jsx";
+import Tutorial from "../common/Tutorial.jsx";
+import { CREATE_TOUR_STEPS } from "../common/tourSteps.js";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
@@ -44,21 +46,28 @@ function couplingCapFor(key, values) {
   return Math.max(SLIDER_RANGE.min, Math.min(SLIDER_RANGE.max, 100 - values[coupledKey]));
 }
 
-// 슬라이더를 만졌을 때(포커스/드래그 시작) 옆에 띄우는 짧은 설명. 빙하/바다는
-// 왜 가능 범위가 서로 달라지는지(커플링)를, 나머지는 각 변수가 물리엔진에서
-// 실제로 어떤 역할을 하는지를 한 줄로 설명한다.
+// 슬라이더를 만졌을 때(포커스/드래그 시작) 설정 패널 아래에 뜨는 짧은 설명.
+// 빙하/바다는 왜 가능 범위가 서로 달라지는지(커플링)를, 나머지는 각 변수가
+// 물리엔진에서 실제로 어떤 역할을 하는지를 한 줄로 설명한다. 같은 문구를
+// "? 도움말" 패널에서도 그대로 목록으로 보여준다.
 const SLIDER_GUIDE = {
-  iceThickness:
-    "🧊 빙하와 바다는 합쳐서 100%를 넘을 수 없어요. 빙하를 늘리면 바다의 최대치가 줄어듭니다.",
-  ocean:
-    "🌊 바다와 빙하는 합쳐서 100%를 넘을 수 없어요. 바다를 늘리면 빙하의 최대치가 줄어듭니다.",
-  cloud:
-    "☁️ 구름은 태양빛을 반사해 식히면서도 열을 가둬 데웁니다. 알베도와 온실효과 모두에 영향을 줘요.",
-  atmThickness:
-    "💨 대기가 두꺼울수록 열을 더 오래 가둬 온실효과가 강해집니다.",
-  co2:
-    "🏭 CO₂가 늘수록 온실효과가 강해지지만, 늘어날수록 증가폭은 점점 줄어들어요.",
+  iceThickness: "🧊 빙하와 바다는 합쳐서 100%를 넘을 수 없어요.",
+  ocean: "🌊 바다와 빙하는 합쳐서 100%를 넘을 수 없어요.",
+  cloud: "☁️ 구름은 햇빛을 반사해 식히고, 열도 가둬 데웁니다.",
+  atmThickness: "💨 대기가 두꺼울수록 열을 더 오래 가둡니다.",
+  co2: "🏭 CO₂가 늘수록 온실효과가 강해집니다.",
 };
+
+// 위 한 줄 설명의 전문 - 마우스를 올리면(title) 보인다. 패널 안 문구가 두 줄로
+// 늘어나면 그만큼 페이지가 길어져 한 화면에 안 들어오므로 화면에는 한 줄만 둔다.
+const SLIDER_GUIDE_FULL = {
+  iceThickness: "빙하와 바다는 합쳐서 100%를 넘을 수 없어요. 빙하를 늘리면 바다의 최대치가 줄어듭니다.",
+  ocean: "바다와 빙하는 합쳐서 100%를 넘을 수 없어요. 바다를 늘리면 빙하의 최대치가 줄어듭니다.",
+  cloud: "구름은 태양빛을 반사해 식히면서도 열을 가둬 데웁니다. 알베도와 온실효과 모두에 영향을 줘요.",
+  atmThickness: "대기가 두꺼울수록 열을 더 오래 가둬 온실효과가 강해집니다.",
+  co2: "CO₂가 늘수록 온실효과가 강해지지만, 늘어날수록 증가폭은 점점 줄어들어요.",
+};
+
 
 // 빙하/바다에만 쓰는 커스텀 슬라이더 - 트랙은 항상 0~100 스케일로 그리고(그래서
 // 두 슬라이더가 같은 칸 크기로 보인다), 실제로 손잡이가 갈 수 있는 값은
@@ -100,7 +109,7 @@ function Slider({ id, value, min, cap, onChange, onGrab }) {
     <div
       id={id}
       ref={trackRef}
-      className="planet-create-page__slider-track"
+      className="create-slider create-slider--custom"
       role="slider"
       tabIndex={0}
       aria-valuemin={min}
@@ -111,12 +120,10 @@ function Slider({ id, value, min, cap, onChange, onGrab }) {
       onFocus={onGrab}
       onKeyDown={handleKeyDown}
     >
-      <span
-        className="planet-create-page__slider-usable"
-        style={{ left: `${min}%`, width: `${cap - min}%` }}
-      />
-      <span className="planet-create-page__slider-fill" style={{ width: `${value}%` }} />
-      <span className="planet-create-page__slider-thumb" style={{ left: `${value}%` }} />
+      {/* 지금 이 슬라이더가 갈 수 있는 구간(빙하+바다 상호제약 결과) */}
+      <span className="create-slider__usable" style={{ left: `${min}%`, width: `${cap - min}%` }} />
+      <span className="create-slider__fill" style={{ width: `${value}%` }} />
+      <span className="create-slider__thumb" style={{ left: `${value}%` }} />
     </div>
   );
 }
@@ -132,7 +139,7 @@ function Slider({ id, value, min, cap, onChange, onGrab }) {
 function LocationPreview({ location }) {
   if (!location.imageUrl) return null;
   return (
-    <div className="planet-create-page__location-preview" role="img" aria-label={location.name}>
+    <div className="create__planet-photo" role="img" aria-label={location.name}>
       <LocationPhoto3D imageUrl={location.imageUrl} />
     </div>
   );
@@ -154,10 +161,27 @@ function PlanetCreatePage() {
   // 만든 슬라이더 값과 지점 선택은 useClimateStore 쪽이라 그대로 유지된다.
   const resetGame = useGameStore((state) => state.resetGame);
 
-  // 지금 만지고 있는(포커스/드래그 중인) 슬라이더 - 옆 설명 패널이 이걸 보고
-  // SLIDER_GUIDE에서 문구를 골라 보여준다. 손을 떼도 마지막 설명은 그대로 둔다
+  // 지금 만지고 있는(포커스/드래그 중인) 슬라이더 - 설정 패널 맨 아래 한 줄 설명이
+  // 이걸 보고 SLIDER_GUIDE에서 문구를 고른다. 손을 떼도 마지막 설명은 그대로 둔다
   // (다음 슬라이더를 만질 때까지 사라지면 오히려 읽을 시간이 부족하다).
   const [activeKey, setActiveKey] = useState(null);
+  // 온보딩(첫 진입 시 자동, 이후에는 "? 도움말" 버튼으로 언제든). 예전 도움말
+  // 드롭다운은 슬라이더별 설명 목록이었는데, 그건 패널 아래 한 줄 설명과 내용이
+  // 같아서 중복이라 온보딩으로 대체했다.
+  const [tourOpen, setTourOpen] = useState(false);
+  const createTutorialPending = useGameStore((state) => state.createTutorialPending);
+  const dismissCreateTutorial = useGameStore((state) => state.dismissCreateTutorial);
+
+  // 시작 페이지를 거쳐 새로 들어온 경우에만 자동으로 열린다(리포트에서 "행성 다시
+  // 만들기"로 온 경우에는 skipTutorials가 이미 꺼 둔다).
+  useEffect(() => {
+    if (createTutorialPending) setTourOpen(true);
+  }, [createTutorialPending]);
+
+  const handleTourFinish = () => {
+    setTourOpen(false);
+    dismissCreateTutorial();
+  };
 
   const visual = slidersToVisual(values);
 
@@ -167,66 +191,72 @@ function PlanetCreatePage() {
 
   // 대시보드 수치 표시(단위 포함). CO₂ 는 실제 ppm 으로 환산해 보여준다.
   const displayValue = (v) =>
-    v.key === "co2" ? `${co2Ppm(values.co2)} ${v.unit}` : `${values[v.key]}${v.unit}`;
+    v.key === "co2" ? `${co2Ppm(values.co2)}` : `${values[v.key]}`;
+
+  const handleComplete = () => {
+    resetGame();
+    nextProblem();
+    navigate("/game");
+  };
 
   return (
-    <>
-      {/* GamePage 우측 상단 플로팅 타이머와 같은 자리/스타일 - 슬라이더를 만지면
-          그 변수 설명이 뜬다. */}
-      <div className="planet-create-page__guide">
-        <span className="planet-create-page__guide-eyebrow">GUIDE</span>
-        <p className="planet-create-page__guide-text">
-          {activeKey ? SLIDER_GUIDE[activeKey] : "슬라이더를 움직이면 여기에 설명이 표시됩니다."}
-        </p>
-      </div>
+    <div className="create">
+      <div className="create__starfield" aria-hidden="true" />
 
-      <div className="planet-create-page">
-        <div className="planet-create-page__planet">
+      {/* ── 헤더: 단계 / 제목 / 도움말 ── */}
+      <header className="create__header">
+        <div className="create__heading">
+          <span className="create__step">STEP 01</span>
+          <h1 className="create__title">나만의 행성 만들기</h1>
+          <p className="create__subtitle">행성의 특성을 설정하고 나만의 행성을 만들어보세요.</p>
+        </div>
+        {/* 도움말 = 온보딩 다시 보기. 예전 드롭다운(슬라이더별 설명 목록)은 패널
+            아래 한 줄 설명과 내용이 겹쳐서 없애고 이 버튼에 온보딩을 연결했다. */}
+        <button type="button" className="create__help-btn" onClick={() => setTourOpen(true)}>
+          ? 도움말
+        </button>
+      </header>
+
+      {/* ── 본체: 큰 행성 + 오른쪽 특성 설정(2열) ── */}
+      <main className="create__body">
+        <div className="create__preview">
           {/* 3D 지구(PlanetUI)는 항상 마운트해둔다 - 이미지 모드에서 언마운트했다가
               슬라이더 조작 시 다시 마운트하면, 텍스처 로딩(Suspense)이 매번 새로
               걸려서 "이미지 → 빈 화면 → 지구" 처럼 한 박자 빈다. 대신 이미지는 그
               위에 겹쳐서 보여주고, 이미지 모드가 끝나면 그냥 덮개만 치운다 -
               지구는 밑에서 계속 준비된 상태라 즉시 나타난다. */}
-          <div className="planet-create-page__planet-placeholder">
-            <PlanetUI {...visual} />
-            {isViewingLocationImage && selectedLocation && (
-              <LocationPreview location={selectedLocation} />
-            )}
+          <div className="create__planet-frame" data-tour="create-planet">
+            <div className="create__planet-glow" aria-hidden="true" />
+            <div className="create__planet">
+              <PlanetUI {...visual} />
+              {isViewingLocationImage && selectedLocation && (
+                <LocationPreview location={selectedLocation} />
+              )}
+            </div>
           </div>
-          <PlanetLocationPicker />
+          <p className="create__preview-note">슬라이더를 조절하면 행성이 실시간으로 변합니다.</p>
         </div>
 
-        <div className="planet-create-page__controls">
-          {/* ── 타이틀 영역 ── */}
-          <div className="planet-create-page__titlebar">
-            <span className="planet-create-page__step">
-              STEP 01 · PLANET INITIALIZATION
-            </span>
-            <h2 className="planet-create-page__title">
-              <span className="planet-create-page__title-accent" />
-              나만의 행성 만들기
-            </h2>
-          </div>
+        <aside className="create__panel" data-tour="create-panel">
+          <h2 className="create__panel-title">행성 특성 설정</h2>
 
-          {/* ── 슬라이더 컨트롤 ── */}
-          <div className="planet-create-page__sliders">
+          <div className="create__controls">
             {VARIABLES.map((v) => {
               const Icon = v.Icon;
               const coupled = Boolean(COUPLED_KEYS[v.key]);
               return (
-                <div key={v.key} className="planet-create-page__control">
-                  <div className="planet-create-page__control-header">
-                    <label
-                      htmlFor={v.key}
-                      className="planet-create-page__control-label"
-                    >
-                      <Icon size={16} aria-hidden className="planet-create-page__control-icon" />
+                <div key={v.key} className="create__control">
+                  <div className="create__control-head">
+                    <label htmlFor={v.key} className="create__control-label">
+                      <Icon size={17} aria-hidden className="create__control-icon" />
                       {v.label}
                     </label>
-                    <span className="planet-create-page__control-value">
+                    <span className="create__control-value">
                       {displayValue(v)}
+                      <em>{v.unit}</em>
                     </span>
                   </div>
+
                   {coupled ? (
                     // 빙하/바다만 커스텀 슬라이더 - 서로 캡을 실시간으로 밀어내야 해서.
                     <Slider
@@ -241,7 +271,7 @@ function PlanetCreatePage() {
                     // 나머지는 서로 얽힐 일이 없어 네이티브 슬라이더 그대로 - 더 가볍고 매끄럽다.
                     <input
                       id={v.key}
-                      className="planet-create-page__slider"
+                      className="create-slider create-slider--native"
                       type="range"
                       min={SLIDER_RANGE.min}
                       max={SLIDER_RANGE.max}
@@ -258,23 +288,31 @@ function PlanetCreatePage() {
               );
             })}
           </div>
-        </div>
-      </div>
 
-      <div className="planet-create-page__actions">
-        <button onClick={() => navigate("/")}>맨 처음 페이지로 가기</button>
-        <button
-          className="btn-primary"
-          onClick={() => {
-            resetGame();
-            nextProblem();
-            navigate("/game");
-          }}
-        >
-          행성 만들기 완료
+          {/* 방금 만진 변수의 짧은 설명 - 떠 있는 창이 아니라 패널 안에 붙는다 */}
+          <p className="create__panel-hint" title={activeKey ? SLIDER_GUIDE_FULL[activeKey] : undefined}>
+            {activeKey ? SLIDER_GUIDE[activeKey] : "각 항목을 조절하면 여기에 설명이 표시됩니다."}
+          </p>
+        </aside>
+      </main>
+
+      {/* ── 지점 선택: 아래쪽 넓은 카드 하나(지도 + 선택 정보) ──
+          카드 안의 "이 지점으로 시작"은 "행성 만들기 완료"와 같은 동작이라
+          같은 핸들러를 그대로 넘긴다. */}
+      <PlanetLocationPicker onStart={handleComplete} />
+
+      {/* ── 하단 액션 ── */}
+      <footer className="create__actions">
+        <button type="button" className="create__back" onClick={() => navigate("/")}>
+          ← 처음으로
         </button>
-      </div>
-    </>
+        <button type="button" className="create__cta" onClick={handleComplete} data-tour="create-cta">
+          행성 만들기 완료 →
+        </button>
+      </footer>
+
+      {tourOpen && <Tutorial steps={CREATE_TOUR_STEPS} onFinish={handleTourFinish} />}
+    </div>
   );
 }
 

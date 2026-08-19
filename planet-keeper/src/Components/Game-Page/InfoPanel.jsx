@@ -38,7 +38,7 @@ function InfoPanel({ physicsResult, co2Ppm }) {
     : [];
 
   return (
-    <section className="panel panel--status">
+    <section className="panel panel--status" data-tour="status">
       <header className="panel__head">
         <h2 className="panel__title">행성 상태</h2>
       </header>

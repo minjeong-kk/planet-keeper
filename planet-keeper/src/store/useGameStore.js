@@ -22,7 +22,9 @@ import { describeItemJudgment, describeFinalizeJudgment } from "../utils/planetA
 // 들고 있고, 여기서는 아이템 사용 시 그 값을 바꾸고 물리엔진을 재계산한다.
 //
 // 전체 흐름: 행성 생성 -> Physics(초기 판정 - 조성이 우연히 이미 Earth-like
-// Stable이면 1단계/아이템 없이 2단계로 직행) -> 1단계 문제 -> 아이템 사용(완전히
+// Stable이면 1단계/장비 없이 2단계로 직행) -> 1단계 문제 -> 정답 시 장비 확보
+// (claimEquipment - 이때는 물리 상태가 변하지 않는다) -> 플레이어가 원하는 시점에
+// 장비 사용(applyEquipment. 완전히
 // 평형까지 settle하지 않고 딱 한 걸음만 진행 - computeItemStepResult 참고. 맞는
 // 방향 아이템이면 ΔE가 조금씩 0에 가까워지고, 틀린 방향이면 ΔE가 커지고 평형온도가
 // 더 극단으로 이동해서 몇 번 더 골라야 할 수 있다) -> 에너지가 균형(Cold/Earth-like/
@@ -61,14 +63,48 @@ export const MAX_FINAL_ATTEMPTS = 3;
 // 이 현상이 일어난다"가 항상 실제 ΔE와 맞아떨어지게 하려는 것이다. warning은 경고
 // 단계(triggerClimateEvent)에서, message는 응답 시간이 끝나 실제로 적용될 때
 // (resolveClimateEvent가 플레이어 대응이 없었을 때의 fallback으로) 보여준다.
+//
+// hint는 경보 화면에서 "왜 그 방향으로 생각해야 하는지"만 알려주는 문장이다.
+// 정답값(몇 %로 맞춰야 하는지)은 알려주지 않는다 - 어느 슬라이더를 어느 쪽으로
+// 움직여야 하는지는 UI가 delta 부호에서 유도한다(막으려면 delta의 반대 방향).
 const WARMING_EVENTS = [
-  { key: "co2", delta: 1, warning: "🌡️ CO₂가 배출되려 합니다!", message: "🌡️ CO₂가 배출되었습니다." },
-  { key: "iceThickness", delta: -1, warning: "🧊 빙하가 녹으려 합니다!", message: "🧊 빙하가 녹았습니다." },
-  { key: "cloud", delta: -1, warning: "☁️ 구름이 옅어지려 합니다!", message: "☁️ 구름이 옅어졌습니다." },
+  {
+    key: "co2",
+    delta: 1,
+    warning: "🌡️ CO₂가 배출되려 합니다!",
+    message: "🌡️ CO₂가 배출되었습니다.",
+    hint: "CO₂가 늘어나면 온실효과가 강해져서 우주로 빠져나가는 에너지가 줄어듭니다.",
+  },
+  {
+    key: "iceThickness",
+    delta: -1,
+    warning: "🧊 빙하가 녹으려 합니다!",
+    message: "🧊 빙하가 녹았습니다.",
+    hint: "빙하는 햇빛을 강하게 반사합니다. 빙하가 줄면 반사되지 못한 태양에너지를 그만큼 더 흡수합니다.",
+  },
+  {
+    key: "cloud",
+    delta: -1,
+    warning: "☁️ 구름이 옅어지려 합니다!",
+    message: "☁️ 구름이 옅어졌습니다.",
+    hint: "구름도 햇빛을 반사하는 밝은 표면입니다. 구름이 옅어지면 지표가 받는 태양에너지가 늘어납니다.",
+  },
 ];
 const COOLING_EVENTS = [
-  { key: "iceThickness", delta: 1, warning: "🧊 빙하가 늘어나려 합니다!", message: "🧊 빙하가 늘어났습니다." },
-  { key: "co2", delta: -1, warning: "🌡️ CO₂가 줄어들려 합니다!", message: "🌡️ CO₂가 줄어들었습니다." },
+  {
+    key: "iceThickness",
+    delta: 1,
+    warning: "🧊 빙하가 늘어나려 합니다!",
+    message: "🧊 빙하가 늘어났습니다.",
+    hint: "빙하가 늘어나면 반사율(알베도)이 커져서 흡수하는 태양에너지가 줄어듭니다.",
+  },
+  {
+    key: "co2",
+    delta: -1,
+    warning: "🌡️ CO₂가 줄어들려 합니다!",
+    message: "🌡️ CO₂가 줄어들었습니다.",
+    hint: "CO₂가 줄면 온실효과가 약해져서 지표의 열이 우주로 더 많이 빠져나갑니다.",
+  },
 ];
 
 // 이상기후 경고 사이 간격(초) - 매번 이 범위에서 무작위로 다음 시각을 정한다
@@ -88,7 +124,16 @@ function pickClimateEventInterval() {
 // 경고가 뜬 뒤 플레이어가 슬라이더(행성 만들기와 같은 5개 전부를 보여준다)로
 // 대응할 수 있는 시간(초). 이 안에 손대지 않으면 resolveClimateEvent가 경고에
 // 걸린 그대로(기존 자동 악화와 동일하게) 적용한다.
-export const CLIMATE_EVENT_RESPONSE_SECONDS = 5;
+//
+// 5초는 상황을 읽기도 전에 끝나버려서 20초로 늘렸다. 게다가 카운트다운은 경보가
+// 뜨는 순간이 아니라 플레이어가 브리핑을 읽고 "대응 시작"을 누른 시점부터
+// 흐른다(triggerClimateEvent가 expiresAt을 null로 두고 beginClimateResponse가
+// 그때 채운다) - 상황 설명을 읽는 동안에는 시간이 전혀 소모되지 않는다.
+export const CLIMATE_EVENT_RESPONSE_SECONDS = 20;
+
+// 슬라이더를 움직이는 동안에는 남은 시간이 이 값 아래로 내려가지 않게 계속
+// 밀어준다(extendClimateResponse). 조절하는 중에 판정이 나버리는 걸 막는 유예다.
+export const CLIMATE_EVENT_ADJUST_GRACE_SECONDS = 8;
 
 const pickRandom = (list) => list[Math.floor(Math.random() * list.length)];
 
@@ -102,8 +147,23 @@ function shuffled(list) {
   return arr;
 }
 
-// ITEM 단계에 보여줄 아이템은 9개 전부가 아니라 이 개수만 무작위로 고른다.
+// ITEM 단계(장비 보급)에 보여줄 후보는 9개 전부가 아니라 이 개수만 무작위로 고른다.
 const ITEM_CHOICES_SHOWN = 4;
+
+// 한 번에 보유할 수 있는 장비 총 개수(같은 장비를 여러 개 가진 것도 각각 1개로
+// 센다 - 중복 포함). 상한을 "슬롯 종류 수"가 아니라 "총 개수"로 두는 이유: 모아두고
+// 안 쓰는 플레이를 막고 "얻었으면 쓴다"는 흐름을 유지하려는 것이다. 화면의 빈 슬롯
+// 개수도 이 상한에서 지금 보유 개수를 뺀 값이라, 빈 슬롯이 보이면 항상 그만큼 더
+// 받을 수 있다는 뜻이 된다.
+//
+// 상한이 가득 찬 상태에서 문제를 맞히면 보급 단계를 건너뛰고 다음 문제로 넘어간다
+// (solveProblem 참고) - 버리기/교체 UI 없이도 진행이 막히지 않는다.
+export const MAX_EQUIPMENT_CAPACITY = 4;
+
+// 보유 장비 총 개수 - equipment는 { [itemId]: 수량 } 평범한 객체다
+// (persist에 그대로 저장되도록 Map을 쓰지 않는다).
+export const equipmentTotalCount = (equipment) =>
+  Object.values(equipment).reduce((sum, count) => sum + count, 0);
 
 // 이보다 작은 ΔE 변화는 "효과 없음"으로 본다 - co2/atmThickness가 이미
 // greenhouseStrength 상한(GREENHOUSE_MAX)에 걸린 경우 등, 슬라이더를 움직여도 실제로는
@@ -129,21 +189,23 @@ export function itemDeltaEnergyChange(item, values, currentTemperature) {
 // 안 그러면 무작위로 고른 4개가 전부 틀린 방향(또는 전부 효과 없는 아이템)이라
 // 이번 라운드에 답이 없는 경우가 생길 수 있다.
 function pickVisibleItems(deltaEnergy, values, currentTemperature) {
+  const pool = MOCK_ITEMS;
+
   const neededDirection =
     deltaEnergy > ENERGY_BALANCE_EPSILON ? "cooling" : deltaEnergy < -ENERGY_BALANCE_EPSILON ? "warming" : null;
 
-  if (!neededDirection) return shuffled(MOCK_ITEMS).slice(0, ITEM_CHOICES_SHOWN);
+  if (!neededDirection) return shuffled(pool).slice(0, ITEM_CHOICES_SHOWN);
 
-  const working = MOCK_ITEMS.filter((item) => {
+  const working = pool.filter((item) => {
     const change = itemDeltaEnergyChange(item, values, currentTemperature);
     return neededDirection === "cooling" ? change < -ITEM_EFFECT_EPSILON : change > ITEM_EFFECT_EPSILON;
   });
-  // 극단적으로 9개 전부 clamp에 걸려 효과가 없는 경우(사실상 거의 불가능한
+  // 극단적으로 후보 전부가 clamp에 걸려 효과가 없는 경우(사실상 거의 불가능한
   // 안전망) 보장 없이 무작위로만 채운다.
-  if (working.length === 0) return shuffled(MOCK_ITEMS).slice(0, ITEM_CHOICES_SHOWN);
+  if (working.length === 0) return shuffled(pool).slice(0, ITEM_CHOICES_SHOWN);
 
   const guaranteed = pickRandom(working);
-  const rest = shuffled(MOCK_ITEMS.filter((item) => item.id !== guaranteed.id)).slice(0, ITEM_CHOICES_SHOWN - 1);
+  const rest = shuffled(pool.filter((item) => item.id !== guaranteed.id)).slice(0, ITEM_CHOICES_SHOWN - 1);
   return shuffled([guaranteed, ...rest]);
 }
 
@@ -213,9 +275,14 @@ const useGameStore = create(
   persist(
     (set, get) => ({
   currentStage: GAME_STAGES.CREATOR,
+  // 지금까지 "사용한" 장비 기록(`${emoji} ${name}` 문자열 나열) - 리포트와 하단
+  // 사용 슬롯이 쓴다. 보유 중인 장비는 아래 equipment가 따로 들고 있다.
   inventory: [],
-  // ITEM 단계에 보여줄 무작위 후보(ITEM_CHOICES_SHOWN개) - solveProblem이 ITEM으로
-  // 넘어갈 때마다 pickVisibleItems로 새로 채운다.
+  // 보유 장비 - { [itemId]: 수량 }. 문제를 맞히면 claimEquipment로 여기에 쌓이고,
+  // 실제로 행성을 바꾸는 건 플레이어가 applyEquipment를 부를 때다(획득과 사용 분리).
+  equipment: {},
+  // ITEM 단계(장비 보급)에 보여줄 무작위 후보(ITEM_CHOICES_SHOWN개) - solveProblem이
+  // ITEM으로 넘어갈 때마다 pickVisibleItems로 새로 채운다.
   visibleItems: [],
   // 행성 생성 시점의 슬라이더 조성 스냅샷 - replayGame이 "같은 행성으로 다시
   // 시작"할 때 이 값으로 되돌린다. nextProblem이 채운다.
@@ -260,6 +327,24 @@ const useGameStore = create(
   //   "life_over"         실패 - 오답 3회
   //   null                진행 중
   gameOverReason: null,
+  // 화면별 온보딩을 띄울지 - 행성 생성 화면(createTutorialPending)과 플레이 화면
+  // (tutorialPending)을 따로 둔다. 새 게임마다 다시 보여주는 것이 기본이지만,
+  // 리포트에서 "행성 다시 만들기"/"다시 플레이"로 이어서 하는 경우엔 이미 게임을
+  // 아는 사람이므로 그 진입점이 skipTutorials로 둘 다 끈다. resetGame은 이 값들을
+  // 건드리지 않는다 - 안 그러면 행성 만들기 완료 시점의 resetGame이 그 의도를
+  // 지워버린다(각 화면의 도움말 버튼으로는 언제든 다시 볼 수 있다).
+  createTutorialPending: true,
+  tutorialPending: true,
+
+  // 시작 페이지에서 새 게임을 시작할 때 두 화면 모두 예약한다.
+  queueTutorials: () => set({ createTutorialPending: true, tutorialPending: true }),
+
+  // 리포트에서 이어서 시작하는 경우 - 두 화면 모두 띄우지 않는다.
+  skipTutorials: () => set({ createTutorialPending: false, tutorialPending: false }),
+
+  // 각 화면에서 온보딩을 다 봤거나 건너뛴 경우.
+  dismissCreateTutorial: () => set({ createTutorialPending: false }),
+  dismissTutorial: () => set({ tutorialPending: false }),
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
 
@@ -304,10 +389,34 @@ const useGameStore = create(
       pendingClimateEvent: {
         ...event,
         startValues: { ...values },
-        expiresAt: elapsedSeconds + CLIMATE_EVENT_RESPONSE_SECONDS,
+        // null = 아직 브리핑(상황 설명) 단계. beginClimateResponse가 대응 단계로
+        // 넘어갈 때 채운다 - 그 전까지 tickSecond는 만료를 검사하지 않는다.
+        expiresAt: null,
       },
       climateEvent: event.warning,
     });
+  },
+
+  // 브리핑을 다 읽고 "대응 시작"을 누른 시점 - 여기서부터 카운트다운이 흐른다.
+  beginClimateResponse: () => {
+    const { pendingClimateEvent, elapsedSeconds } = get();
+    if (!pendingClimateEvent || pendingClimateEvent.expiresAt != null) return;
+    set({
+      pendingClimateEvent: {
+        ...pendingClimateEvent,
+        expiresAt: elapsedSeconds + CLIMATE_EVENT_RESPONSE_SECONDS,
+      },
+    });
+  },
+
+  // 슬라이더를 움직일 때마다 GamePage가 부른다 - 남은 시간이 유예 시간보다 짧아졌으면
+  // 그만큼 다시 밀어준다(이미 더 남아 있으면 아무것도 하지 않는다).
+  extendClimateResponse: () => {
+    const { pendingClimateEvent, elapsedSeconds } = get();
+    if (!pendingClimateEvent || pendingClimateEvent.expiresAt == null) return;
+    const floor = elapsedSeconds + CLIMATE_EVENT_ADJUST_GRACE_SECONDS;
+    if (pendingClimateEvent.expiresAt >= floor) return;
+    set({ pendingClimateEvent: { ...pendingClimateEvent, expiresAt: floor } });
   },
 
   // pendingClimateEvent의 응답 시간이 끝나면 tickSecond가 부른다. 플레이어가 미니
@@ -361,7 +470,9 @@ const useGameStore = create(
 
     const { pendingClimateEvent, nextClimateEventAt, currentStage } = get();
     if (pendingClimateEvent) {
-      if (elapsedSeconds >= pendingClimateEvent.expiresAt) {
+      // expiresAt이 null이면 아직 브리핑 단계 - 플레이어가 "대응 시작"을 누를
+      // 때까지 시간 압박 없이 상황을 읽을 수 있게 기다린다.
+      if (pendingClimateEvent.expiresAt != null && elapsedSeconds >= pendingClimateEvent.expiresAt) {
         get().resolveClimateEvent();
       }
       return;
@@ -403,27 +514,63 @@ const useGameStore = create(
     }
   },
 
-  // 아이템 효과는 정답/오답 판정 없이 항상 실제로 슬라이더에 적용한 뒤,
-  // computeItemStepResult로 딱 한 걸음만 진행한다(완전히 settle하지 않음) - 맞는
-  // 방향 아이템이면 ΔE가 조금씩 0에 가까워지고 온도도 조금 개선되며, 틀린 방향이면
-  // ΔE가 더 커지고 평형온도가 더 극단으로 이동한다. 한 번에 끝나지 않을 수 있으므로
-  // (특히 틀린 아이템을 고른 뒤에는) 아직 지구형 범위 밖(Energy Surplus/Deficit
-  // 포함)이면 새 1단계 문제로 돌아가 아이템을 다시 고른다(그 1단계 문제 자체를
-  // 틀리면 solveProblem이 목숨을 깎는다 - 아이템을 잘못 고른 것 자체는 목숨을
-  // 깎지 않음). 에너지가 균형에 도달했다면(Cold/Earth-like/Warm Stable 중 하나)
-  // 2단계로 넘어가고, 지구형 범위 밖이면 2단계(finalizeGame)의 CO2 자동 조정이
-  // 마무리를 담당한다.
-  useItem: async (item) => {
-    const { physicsResult } = get();
+  // ── 장비 보급(획득) ──────────────────────────────────────────────
+  // 1단계 문제를 맞히면 ITEM 단계에서 후보 4개 중 하나를 고른다. 예전에는 고르는
+  // 순간 바로 사용돼서 온도가 즉시 변했는데, 이제는 "확보"만 하고 물리 상태는
+  // 전혀 건드리지 않는다 - 실제 사용은 플레이어가 원하는 시점에 applyEquipment로
+  // 한다. 그래서 여기서는 수량만 올리고 다음 1단계 문제로 넘어간다.
+  claimEquipment: (item) => {
+    const { equipment, currentStage } = get();
+    if (currentStage !== GAME_STAGES.ITEM) return;
+
+    // 보유 한도(중복 포함 총 개수)가 가득 차면 받지 않는다 - solveProblem이 그 상황에서
+    // 보급 단계로 넘어가지 않으므로 정상 플레이에서는 여기 걸리지 않는다.
+    if (equipmentTotalCount(equipment) >= MAX_EQUIPMENT_CAPACITY) return;
+    const owned = equipment[item.id] ?? 0;
+
+    const nextCount = owned + 1;
+    set({
+      equipment: { ...equipment, [item.id]: nextCount },
+      notice: {
+        ok: true,
+        lines: [
+          `✅ ${item.emoji} ${item.name} ×${nextCount} 확보`,
+          "장비를 확보했습니다. 필요한 순간에 '기후 제어 장비'에서 사용할 수 있습니다.",
+        ],
+      },
+      currentStage: GAME_STAGES.PROBLEM1,
+      currentProblem: get().pickNextProblem(STAGE3_QUESTIONS),
+    });
+  },
+
+  // ── 장비 사용 ────────────────────────────────────────────────────
+  // 보유 장비를 실제로 써서 슬라이더를 바꾸고 computeItemStepResult로 딱 한 걸음만
+  // 진행한다(완전히 settle하지 않음) - 맞는 방향 장비면 ΔE가 조금씩 0에 가까워지고
+  // 온도도 조금 개선되며, 틀린 방향이면 ΔE가 더 커지고 평형온도가 더 극단으로
+  // 이동한다(효과 수치·물리 계산은 예전 useItem과 완전히 동일하다).
+  //
+  // 달라진 점은 단계 전환이다. 예전에는 사용 직후 무조건 다음 문제로 넘어갔지만,
+  // 이제 장비 사용은 문제 진행과 분리돼 있으므로 지금 풀고 있는 문제를 그대로 둔다.
+  // 에너지가 균형에 도달했을 때(Cold/Earth-like/Warm Stable)만 2단계로 넘어간다.
+  applyEquipment: async (item) => {
+    const { physicsResult, equipment, currentStage } = get();
     const { values, setValue } = useClimateStore.getState();
 
     if (!physicsResult) return;
+    if ((equipment[item.id] ?? 0) <= 0) return; // 보유하지 않은 장비
+    // 보상 선택 중에는 사용하지 않는다 - 고르는 중에 사용까지 겹치면 어느 쪽에
+    // 반응한 건지 헷갈린다(호출부도 이 단계에서는 카드를 잠근다).
+    if (currentStage === GAME_STAGES.ITEM) return;
 
-    get().addItem(`${item.emoji} ${item.name}`);
+    const nextEquipment = { ...equipment };
+    if (nextEquipment[item.id] > 1) nextEquipment[item.id] -= 1;
+    else delete nextEquipment[item.id];
+
+    get().addItem(`${item.emoji} ${item.name}`); // 사용 기록(리포트/하단 사용 슬롯)
     const nextValues = nextSliderValues(values, item);
     setValue(item.key, nextValues[item.key]);
 
-    set({ isComputing: true });
+    set({ isComputing: true, equipment: nextEquipment });
     try {
       const { physics, ml } = computeItemStepResult(nextValues);
       const balanced = STABLE_LABELS.has(ml.label);
@@ -433,11 +580,12 @@ const useGameStore = create(
         physicsResult: physics,
         mlResult: ml,
         notice: { ok: balanced, lines },
-        currentStage: balanced ? GAME_STAGES.FINAL : GAME_STAGES.PROBLEM1,
-        currentProblem: get().pickNextProblem(balanced ? STAGE4_QUESTIONS : STAGE3_QUESTIONS),
+        ...(balanced && currentStage !== GAME_STAGES.FINAL
+          ? { currentStage: GAME_STAGES.FINAL, currentProblem: get().pickNextProblem(STAGE4_QUESTIONS) }
+          : {}),
       });
     } catch (err) {
-      console.error("[useGameStore] 아이템 효과 재계산 실패:", err);
+      console.error("[useGameStore] 장비 효과 재계산 실패:", err);
     } finally {
       set({ isComputing: false });
     }
@@ -483,8 +631,23 @@ const useGameStore = create(
       // Final 문제는 게임을 끝내는 문제가 아니라 최종 확인 단계다.
       get().finalizeGame();
     } else {
-      const { physicsResult } = get();
+      const { physicsResult, equipment } = get();
       const { values, currentTemperature } = useClimateStore.getState();
+      // 보유 한도가 가득 찼으면 보급 단계를 건너뛰고 바로 다음 문제로 간다 - 받을
+      // 자리가 없는데 보상 화면을 띄우면 고를 수 없는 카드만 보여주게 된다.
+      if (equipmentTotalCount(equipment) >= MAX_EQUIPMENT_CAPACITY) {
+        set({
+          notice: {
+            ok: true,
+            lines: [
+              "⚠️ 장비를 최대 " + MAX_EQUIPMENT_CAPACITY + "개까지만 보유할 수 있습니다.",
+              "보유한 장비를 먼저 사용하면 다음 정답에서 새 장비를 받을 수 있습니다.",
+            ],
+          },
+          currentProblem: get().pickNextProblem(STAGE3_QUESTIONS),
+        });
+        return true;
+      }
       set({
         currentStage: GAME_STAGES.ITEM,
         notice: null,
@@ -576,6 +739,7 @@ const useGameStore = create(
     set({
       currentStage: GAME_STAGES.CREATOR,
       inventory: [],
+      equipment: {},
       visibleItems: [],
       initialValues: null,
       timeline: [],

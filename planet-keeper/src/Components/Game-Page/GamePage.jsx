@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import QuizModal, { QuizResult } from "./QuizModal";
-import ItemStage from "./ItemStage";
+import EquipmentPanel from "./EquipmentPanel";
+import EquipmentReward from "./EquipmentReward";
 import InfoPanel from "./InfoPanel";
 import PlanetDiagnosis from "./PlanetDiagnosis";
+import Tutorial from "../common/Tutorial";
+import { GAME_TOUR_STEPS } from "../common/tourSteps.js";
 import PlanetUI from "../Planet-ui.jsx";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore, {
@@ -11,11 +14,14 @@ import useGameStore, {
   MAX_WRONG_COUNT,
   MAX_FINAL_ATTEMPTS,
   CLIMATE_EVENT_RESPONSE_SECONDS,
+  MAX_EQUIPMENT_CAPACITY,
+  equipmentTotalCount,
 } from "../../store/useGameStore";
 import { slidersToVisual } from "../../utils/climateVisual.js";
 import {
   mapSlidersToClimateInputs,
   equilibriumTemperatureOf,
+  computeClimateV2,
   ENERGY_BALANCE_EPSILON,
   COLD_STABLE_MAX_K,
   EARTH_LIKE_MAX_K,
@@ -40,6 +46,9 @@ const CLIMATE_TICK_ENABLED = true;
 // 하단 "최근 활동" 로그에 남겨두는 최대 항목 수.
 const ACTIVITY_LOG_LIMIT = 8;
 
+// 장비 사용 직후 행성 옆에 뜨는 효과 카드가 유지되는 시간(ms).
+const USE_EFFECT_DISPLAY_MS = 3200;
+
 // 온도 게이지가 그리는 전체 구간(K). 안정 구간(COLD_STABLE_MAX_K ~ EARTH_LIKE_MAX_K)이
 // 게이지 한가운데 오도록 위아래로 비슷한 여유를 둔 표시 전용 값이다 - 판정 기준은
 // 그대로 물리엔진(planetStateOf)이 갖고 있고 여기서는 위치만 계산한다.
@@ -55,7 +64,7 @@ const SAFE_BAND_END = gaugePercent(EARTH_LIKE_MAX_K);
 const STAGE_META = {
   [GAME_STAGES.CREATOR]: { tag: "STANDBY", objective: "행성 데이터를 불러오는 중" },
   [GAME_STAGES.PROBLEM1]: { tag: "MISSION 01", objective: "에너지 불균형의 원인을 찾아라" },
-  [GAME_STAGES.ITEM]: { tag: "MISSION 01", objective: "장비를 투입해 에너지 균형을 되찾아라" },
+  [GAME_STAGES.ITEM]: { tag: "MISSION 01", objective: "확보할 기후 제어 장비를 선택하라" },
   [GAME_STAGES.FINAL]: { tag: "MISSION 02", objective: "행성을 지구형 안정 상태로 확정하라" },
   [GAME_STAGES.REPORT]: { tag: "MISSION END", objective: "결과 보고서로 이동합니다" },
 };
@@ -111,6 +120,7 @@ function GamePage() {
   const navigate = useNavigate();
   // 행성 슬라이더 값(제작 페이지에서 만든 값)은 그대로 이어받아 보여주기만 한다.
   const values = useClimateStore((state) => state.values);
+  const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const resetClimate = useClimateStore((state) => state.resetClimate);
   const visual = slidersToVisual(values);
   // 1초마다 도는 elapsedSeconds 틱에도 GamePage가 리렌더되므로, values/physicsResult/
@@ -131,10 +141,15 @@ function GamePage() {
   const climateEvent = useGameStore((state) => state.climateEvent);
   const pendingClimateEvent = useGameStore((state) => state.pendingClimateEvent);
   const setClimateValue = useClimateStore((state) => state.setValue);
+  const beginClimateResponse = useGameStore((state) => state.beginClimateResponse);
+  const extendClimateResponse = useGameStore((state) => state.extendClimateResponse);
+  const resolveClimateEvent = useGameStore((state) => state.resolveClimateEvent);
+  const tutorialPending = useGameStore((state) => state.tutorialPending);
+  const dismissTutorial = useGameStore((state) => state.dismissTutorial);
   const solveProblem = useGameStore((state) => state.solveProblem);
-  // store 액션 useItem은 훅이 아니지만 이름이 use로 시작해서, 콜백 안에서 부르면
-  // 린트의 rules-of-hooks가 훅 호출로 오해한다 - 로컬 이름만 바꿔서 받는다.
-  const applyItem = useGameStore((state) => state.useItem);
+  const equipment = useGameStore((state) => state.equipment);
+  const claimEquipment = useGameStore((state) => state.claimEquipment);
+  const applyEquipment = useGameStore((state) => state.applyEquipment);
   const tickSecond = useGameStore((state) => state.tickSecond);
   const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
   const resetGame = useGameStore((state) => state.resetGame);
@@ -165,6 +180,13 @@ function GamePage() {
   const [result, setResult] = useState(null);
   const [logOpen, setLogOpen] = useState(false);
   const [activityLog, setActivityLog] = useState([]);
+  // 온보딩. 새 게임을 시작하면(tutorialPending) 자동으로 열리고, 리포트에서
+  // 이어서 시작한 경우엔 열리지 않는다. 언제든 상단 도움말(?) 버튼으로 다시 열 수
+  // 있다. 열려 있는 동안에는 아래 타이머 effect가 tickSecond를 돌리지 않으므로
+  // 이상기후가 끼어들지 않는다.
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  // 장비 사용 직후 행성 옆에 잠깐 뜨는 효과 카드 { item, before, after }.
+  const [useEffectCard, setUseEffect] = useState(null);
 
   const isLocked = !!pendingClimateEvent;
   const isItemStage = currentStage === GAME_STAGES.ITEM;
@@ -180,15 +202,31 @@ function GamePage() {
   useEffect(() => {
     if (!CLIMATE_TICK_ENABLED) return undefined;
     if (currentStage === GAME_STAGES.REPORT || currentStage === GAME_STAGES.CREATOR) return undefined;
+    // 온보딩 중에는 게임을 멈춘다 - 설명을 읽는 동안 경과 시간이 쌓이거나
+    // 이상기후가 터지면 튜토리얼의 의미가 없다.
+    if (tutorialOpen) return undefined;
     const timer = setInterval(tickSecond, 1000);
     return () => clearInterval(timer);
-  }, [currentStage, tickSecond]);
+  }, [currentStage, tickSecond, tutorialOpen]);
+
+  // 온보딩이 예약된 판에서 실제로 플레이 가능한 화면이 준비되면(문제/장비 단계 + 물리
+  // 결과가 채워짐) 한 번만 자동으로 연다.
+  useEffect(() => {
+    if (!tutorialPending || !physicsResult) return;
+    if (currentStage === GAME_STAGES.CREATOR || currentStage === GAME_STAGES.REPORT) return;
+    setTutorialOpen(true);
+  }, [tutorialPending, physicsResult, currentStage]);
+
+  const handleTutorialFinish = () => {
+    setTutorialOpen(false);
+    dismissTutorial();
+  };
 
   // 선택지를 누르면 곧바로 판정한다(별도 제출 버튼 없음).
   const handleAnswer = (answer) => {
     if (!currentProblem) return;
     const answered = currentProblem;
-    const rewardText = currentStage === GAME_STAGES.FINAL ? "행성 안정화 확인 ×1" : "장비 투입 기회 ×1";
+    const rewardText = currentStage === GAME_STAGES.FINAL ? "행성 안정화 확인 ×1" : "기후 제어 장비 ×1";
     const correct = solveProblem(answer);
     setFeedback(correct ? "correct" : "wrong");
     setResult({
@@ -199,10 +237,21 @@ function GamePage() {
     });
   };
 
-  // 아이템도 카드를 누르면 곧바로 투입된다.
-  const handleUseItem = (item) => {
+  // 보상 선택: 고른 장비를 인벤토리에 넣기만 한다(물리 상태는 그대로).
+  const handleClaimEquipment = (item) => {
     setResult(null);
-    applyItem(item);
+    claimEquipment(item);
+  };
+
+  // 장비 사용: 실제로 행성을 바꾼다. 사용 전/후 스냅샷을 비교해 짧은 효과 카드를
+  // 띄운다(온도·ΔE가 어떻게 움직였는지). applyEquipment는 await 하면 store 갱신이
+  // 끝난 상태이므로 그 뒤에 최신 physicsResult를 읽는다.
+  const handleUseEquipment = async (item) => {
+    const before = useGameStore.getState().physicsResult;
+    setResult(null);
+    await applyEquipment(item);
+    const after = useGameStore.getState().physicsResult;
+    if (before && after && after !== before) setUseEffect({ item, before, after });
   };
 
   // 피드백 플래시 / 해설 카드는 각자 정해진 시간 뒤 자동으로 사라진다.
@@ -245,13 +294,48 @@ function GamePage() {
     return () => clearTimeout(timer);
   }, [currentStage, navigate]);
 
+  // 보유 장비 총 수량 - 하단 안내 문구에서 "지금 쓸 게 있는지"를 알려주는 데 쓴다.
+  const heldEquipmentCount = useMemo(() => equipmentTotalCount(equipment), [equipment]);
+
+  // 장비 사용 효과 카드는 잠깐 보여준 뒤 사라진다.
+  useEffect(() => {
+    if (!useEffectCard) return undefined;
+    const timer = setTimeout(() => setUseEffect(null), USE_EFFECT_DISPLAY_MS);
+    return () => clearTimeout(timer);
+  }, [useEffectCard]);
+
   const displayTemperature = useAnimatedNumber(physicsResult?.currentTemperature ?? null);
   const markerPercent = gaugePercent(displayTemperature);
   const badge = STABLE_BADGES[mlResult?.label];
   const isBalanced = physicsResult ? Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON : false;
-  const remainingSeconds = pendingClimateEvent
-    ? Math.max(0, pendingClimateEvent.expiresAt - elapsedSeconds)
-    : 0;
+  // 브리핑 단계(expiresAt === null)에는 카운트다운이 아직 흐르지 않는다.
+  const isBriefing = !!pendingClimateEvent && pendingClimateEvent.expiresAt == null;
+  const remainingSeconds =
+    pendingClimateEvent && pendingClimateEvent.expiresAt != null
+      ? Math.max(0, pendingClimateEvent.expiresAt - elapsedSeconds)
+      : CLIMATE_EVENT_RESPONSE_SECONDS;
+
+  // 경보 대응 중에는 슬라이더를 움직일 때마다 지금 조성의 ΔE/평형 온도를 다시
+  // 계산해서 보여준다(표시 전용 - 실제 physicsResult는 resolveClimateEvent가
+  // 판정할 때만 갱신된다). 플레이어가 "지금 내가 맞는 방향으로 가고 있나"를
+  // 값 자체로 확인할 수 있게 하는 용도다.
+  const livePhysics = useMemo(
+    () => (pendingClimateEvent ? computeClimateV2({ ...climateInputs, currentTemperature }) : null),
+    [pendingClimateEvent, climateInputs, currentTemperature],
+  );
+  const startDeltaEnergy = physicsResult?.deltaEnergy ?? 0;
+  const liveTrend =
+    livePhysics == null
+      ? null
+      : Math.abs(livePhysics.deltaEnergy) < Math.abs(startDeltaEnergy) - 0.5
+        ? "good"
+        : Math.abs(livePhysics.deltaEnergy) > Math.abs(startDeltaEnergy) + 0.5
+          ? "bad"
+          : "same";
+
+  // 경보를 막으려면 이벤트가 미는 방향의 반대로 움직여야 한다 - 어느 슬라이더를
+  // 어느 쪽으로 볼지만 알려주고, 목표값(몇 %)은 알려주지 않는다.
+  const counterDirection = pendingClimateEvent ? (pendingClimateEvent.delta > 0 ? -1 : 1) : 0;
 
   // 지금 무엇을 해야 하는지 한 줄 안내 - 하단 바 오른쪽에 둔다.
   const actionHint = isComputing
@@ -259,9 +343,13 @@ function GamePage() {
     : isLocked
       ? "이상기후에 대응하세요"
       : isItemStage
-        ? "왼쪽 격납고에서 장비를 눌러 투입하세요"
+        ? "확보할 장비를 선택하세요"
         : isQuizStage
-          ? "선택지를 누르면 바로 응답됩니다"
+          ? heldEquipmentCount >= MAX_EQUIPMENT_CAPACITY
+            ? "장비 보유 한도 - 왼쪽에서 먼저 사용하세요"
+            : heldEquipmentCount > 0
+              ? "선택지를 누르면 응답됩니다 · 장비는 왼쪽에서 언제든 사용"
+              : "선택지를 누르면 바로 응답됩니다"
           : currentStage === GAME_STAGES.REPORT
             ? "임무 종료 - 결과 보고서로 이동합니다"
             : "";
@@ -311,6 +399,16 @@ function GamePage() {
               <span className="hud__vital-value">T+{elapsedSeconds}</span>
             </div>
           )}
+          {/* 온보딩은 최초 1회만 자동으로 뜨고, 그 뒤에는 여기서 다시 볼 수 있다. */}
+          <button
+            type="button"
+            className="hud__help"
+            title="게임 설명 다시 보기"
+            aria-label="게임 설명 다시 보기"
+            onClick={() => setTutorialOpen(true)}
+          >
+            ?
+          </button>
         </div>
       </header>
 
@@ -318,16 +416,16 @@ function GamePage() {
       <main className="hud__body">
         <aside className="hud__column hud__column--left">
           <InfoPanel physicsResult={physicsResult} co2Ppm={climateInputs.co2Ppm} />
-          <ItemStage
-            items={isItemStage ? visibleItems : []}
-            onSelect={handleUseItem}
-            disabled={isLocked}
-            locked={!isItemStage}
+          <EquipmentPanel
+            equipment={equipment}
+            onUse={handleUseEquipment}
+            disabled={isLocked || isItemStage || isComputing}
+            lockReason={isItemStage ? "먼저 확보할 장비를 선택하세요." : null}
           />
         </aside>
 
         <section className="hud__stage">
-          <div className="hud__planet-frame">
+          <div className="hud__planet-frame" data-tour="planet">
             <div className="hud__planet-glow" aria-hidden="true" />
             <div className="hud__planet">
               <PlanetUI {...visual} />
@@ -343,8 +441,29 @@ function GamePage() {
                 {feedback === "correct" ? "✅ 정답" : "❌ 오답"}
               </div>
             )}
+
+            {/* 장비 사용 직후 - 무엇을 썼고 온도/ΔE가 어떻게 움직였는지만 짧게 */}
+            {useEffectCard && (
+              <div className="use-effect">
+                <span className="use-effect__title">
+                  {useEffectCard.item.emoji} {useEffectCard.item.name} 사용
+                </span>
+                <span className="use-effect__row">
+                  현재 온도 {useEffectCard.before.currentTemperature.toFixed(1)} K
+                  <em>→</em>
+                  {useEffectCard.after.currentTemperature.toFixed(1)} K
+                </span>
+                <span className="use-effect__row">
+                  에너지 불균형 {formatSigned(useEffectCard.before.deltaEnergy)}
+                  <em>→</em>
+                  {formatSigned(useEffectCard.after.deltaEnergy)} W/m²
+                </span>
+              </div>
+            )}
           </div>
 
+          {/* 현재 온도 + 게이지는 튜토리얼에서 한 덩어리로 강조한다. */}
+          <div className="hud__temperature" data-tour="temperature">
           <div className="hud__readout">
             <span className="hud__readout-label">현재 온도</span>
             <p className="hud__readout-value">
@@ -370,6 +489,7 @@ function GamePage() {
               <span className="hud__gauge-scale--safe">안정</span>
               <span>너무 뜨거움</span>
             </div>
+          </div>
           </div>
 
           {/* 평형 온도/ΔE는 보조 정보 - 현재 온도보다 작게, 아래쪽에 둔다. */}
@@ -405,18 +525,12 @@ function GamePage() {
                   number={quizLog.length + 1}
                   onAnswer={handleAnswer}
                   disabled={isLocked}
-                  reward={currentStage === GAME_STAGES.FINAL ? "행성 안정화 확인 ×1" : "장비 투입 기회 ×1"}
+                  reward={currentStage === GAME_STAGES.FINAL ? "행성 안정화 확인 ×1" : "기후 제어 장비 ×1"}
                 />
               )}
 
               {isItemStage && !isComputing && (
-                <div className="mission mission--notice">
-                  <span className="mission__eyebrow">장비 투입</span>
-                  <p className="mission__notice-text">
-                    아래 <strong>행성 진단</strong>의 원인과 해결 방향을 보고, 왼쪽 격납고에서 장비를 눌러
-                    투입하세요.
-                  </p>
-                </div>
+                <EquipmentReward items={visibleItems} onClaim={handleClaimEquipment} disabled={isLocked} />
               )}
 
               {currentStage === GAME_STAGES.CREATOR && !isComputing && (
@@ -518,40 +632,103 @@ function GamePage() {
           <div className="climate-event__card">
             <span className="climate-event__tag">⚠ 이상기후 발생</span>
             <h2 className="climate-event__message">{pendingClimateEvent.warning}</h2>
-            <p className="climate-event__sub">
-              <strong>{remainingSeconds}초</strong> 안에 행성 조성을 조절해 막아보세요
-            </p>
-            <div className="climate-event__timer-track">
-              <div
-                className="climate-event__timer-fill"
-                style={{ width: `${(remainingSeconds / CLIMATE_EVENT_RESPONSE_SECONDS) * 100}%` }}
-              />
-            </div>
 
-            <div className="climate-event__sliders">
-              {CLIMATE_VARIABLES.map(({ key, label }) => {
-                const startValue = pendingClimateEvent.startValues[key];
-                const min = Math.max(0, startValue - CLIMATE_ALERT_SLIDER_RANGE);
-                const max = Math.min(100, startValue + CLIMATE_ALERT_SLIDER_RANGE);
-                return (
-                  <div key={key} className="climate-event__slider-row">
-                    <span className="climate-event__slider-label">{label}</span>
-                    <input
-                      type="range"
-                      min={min}
-                      max={max}
-                      value={values[key]}
-                      onChange={(e) => setClimateValue(key, Number(e.target.value))}
-                      className="climate-event__slider"
-                    />
-                    <span className="climate-event__slider-value">{values[key]}%</span>
+            {/* ① 발생 -> ② 상황 설명(브리핑). 여기서는 시간이 흐르지 않는다. */}
+            {isBriefing ? (
+              <>
+                <p className="climate-event__goal">
+                  <strong>목표</strong> 에너지 균형을 회복하세요 (ΔE를 0에 가깝게)
+                </p>
+                {pendingClimateEvent.hint && (
+                  <p className="climate-event__hint">💡 {pendingClimateEvent.hint}</p>
+                )}
+                <p className="climate-event__sub">
+                  다음 화면에서 행성 조성을 직접 조절할 수 있습니다. 조절하는 동안에는 시간이 넉넉하게
+                  주어집니다.
+                </p>
+                <button type="button" className="climate-event__cta" onClick={beginClimateResponse}>
+                  대응 시작
+                </button>
+              </>
+            ) : (
+              /* ③ 조절 -> ④ 확인 */
+              <>
+                {pendingClimateEvent.hint && (
+                  <p className="climate-event__hint">💡 {pendingClimateEvent.hint}</p>
+                )}
+
+                <div className="climate-event__timer-track">
+                  <div
+                    className="climate-event__timer-fill"
+                    style={{ width: `${(remainingSeconds / CLIMATE_EVENT_RESPONSE_SECONDS) * 100}%` }}
+                  />
+                </div>
+                <p className="climate-event__sub">
+                  남은 시간 <strong>{remainingSeconds}초</strong> · 슬라이더를 움직이는 동안에는 시간이 다시
+                  늘어납니다
+                </p>
+
+                {/* 조절하는 동안 지금 조성의 ΔE/평형 온도를 실시간으로 보여준다. */}
+                {livePhysics && (
+                  <div className={`climate-event__live climate-event__live--${liveTrend}`}>
+                    <div className="climate-event__live-item">
+                      <span>에너지 불균형</span>
+                      <strong>{formatSigned(livePhysics.deltaEnergy)} W/m²</strong>
+                    </div>
+                    <div className="climate-event__live-item">
+                      <span>평형 온도</span>
+                      <strong>{equilibriumTemperatureOf(livePhysics).toFixed(1)} K</strong>
+                    </div>
+                    <span className="climate-event__live-tag">
+                      {liveTrend === "good" ? "↘ 균형에 가까워지는 중" : liveTrend === "bad" ? "↗ 더 멀어지는 중" : "· 변화 없음"}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
+                )}
+
+                <div className="climate-event__sliders">
+                  {CLIMATE_VARIABLES.map(({ key, label }) => {
+                    const startValue = pendingClimateEvent.startValues[key];
+                    const min = Math.max(0, startValue - CLIMATE_ALERT_SLIDER_RANGE);
+                    const max = Math.min(100, startValue + CLIMATE_ALERT_SLIDER_RANGE);
+                    // 경보가 지목한 변수에만 방향 표시를 붙인다(정확한 목표값은 알려주지 않는다).
+                    const isTarget = key === pendingClimateEvent.key;
+                    return (
+                      <div
+                        key={key}
+                        className={`climate-event__slider-row${isTarget ? " climate-event__slider-row--target" : ""}`}
+                      >
+                        <span className="climate-event__slider-label">{label}</span>
+                        <input
+                          type="range"
+                          min={min}
+                          max={max}
+                          value={values[key]}
+                          onChange={(e) => {
+                            setClimateValue(key, Number(e.target.value));
+                            extendClimateResponse();
+                          }}
+                          className="climate-event__slider"
+                        />
+                        <span className="climate-event__slider-value">{values[key]}%</span>
+                        <span className="climate-event__slider-arrow">
+                          {isTarget ? (counterDirection > 0 ? "↑" : "↓") : ""}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button type="button" className="climate-event__cta" onClick={resolveClimateEvent}>
+                  대응 완료
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
+
+      {/* 첫 플레이 온보딩 - 실제 UI를 하나씩 짚어준다(data-tour 대상). */}
+      {tutorialOpen && <Tutorial steps={GAME_TOUR_STEPS} onFinish={handleTutorialFinish} />}
     </div>
   );
 }

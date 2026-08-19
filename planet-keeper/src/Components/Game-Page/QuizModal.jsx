@@ -23,7 +23,7 @@ function QuizModal({ problem, onAnswer, number, disabled = false, reward }) {
   const problemNumber = number ?? 1;
 
   return (
-    <div className={`mission${disabled ? " is-locked" : ""}`}>
+    <div className={`mission${disabled ? " is-locked" : ""}`} data-tour="mission">
       <div className="mission__head">
         <span className="mission__eyebrow">문제 {problemNumber}</span>
         {problem.isRetry && <span className="mission__retry">재도전</span>}

@@ -19,10 +19,15 @@ function StartPage() {
   // currentTemperature에 저장하기 때문에, 새 게임이 시작부터 ΔE≈0 / 지구형 안정으로
   // 떠서 1단계와 아이템 단계를 통째로 건너뛰는 문제가 있었다.
   const resetClimate = useClimateStore((state) => state.resetClimate);
+  // 시작 페이지를 거쳐 들어오는 건 항상 새 게임이므로 두 화면(행성 생성 / 플레이)
+  // 온보딩을 모두 예약한다 - 리포트의 "행성 다시 만들기"/"다시 플레이"로 이어서 하는
+  // 경우에는 그쪽에서 끈다.
+  const queueTutorials = useGameStore((state) => state.queueTutorials);
 
   const handleStart = () => {
     resetGame();
     resetClimate();
+    queueTutorials();
     navigate("/planet-create");
   };
 
