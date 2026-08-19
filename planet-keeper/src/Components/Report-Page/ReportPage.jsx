@@ -177,19 +177,38 @@ function ReportPage() {
     });
   }, [timeline]);
 
+  const displayTimeline = useMemo(() => {
+    const result = [];
+    uniqueTimeline.forEach((entry) => {
+      const last = result[result.length - 1];
+      if (entry.stage === "최종" && last?.stage === "최종") {
+        last.attempts += 1;
+        last.label = entry.label;
+        last.physics = entry.physics;
+        last.ml = entry.ml;
+      } else {
+        result.push({ ...entry, attempts: entry.stage === "최종" ? 1 : undefined });
+      }
+    });
+    return result;
+  }, [uniqueTimeline]);
+
   const chartPoints = useMemo(
     () =>
-      uniqueTimeline.map((entry, i) => ({
+      displayTimeline.map((entry, i) => ({
         index: i,
         stage: entry.stage,
-        label: entry.label,
+        label:
+          entry.stage === "최종" && entry.attempts > 1
+            ? `최종 확인 완료 (${entry.attempts}회 시도)`
+            : entry.label,
         temperature: entry.physics.currentTemperature,
         deltaEnergy: entry.physics.deltaEnergy,
         tone: labelTone(entry.ml?.label),
         mlLabel: entry.ml?.label ?? null,
         isItem: entry.stage === "아이템",
       })),
-    [uniqueTimeline],
+    [displayTimeline],
   );
 
   const [selectedStep, setSelectedStep] = useState(null);
@@ -200,12 +219,12 @@ function ReportPage() {
   // 그리드였을 때처럼 모든 스텝의 설명을 항상 들고 있을 필요가 없다.
   const activeExplanation = useMemo(() => {
     if (!activePoint) return null;
-    const entry = uniqueTimeline[activeStep];
-    const prev = activeStep > 0 ? uniqueTimeline[activeStep - 1] : null;
+    const entry = displayTimeline[activeStep];
+    const prev = activeStep > 0 ? displayTimeline[activeStep - 1] : null;
     return prev
       ? describeTransition(prev.physics, entry.physics, entry.ml?.label, ITEM_KEY_BY_LABEL.get(entry.label))
       : deltaEnergyLines(entry.physics.deltaEnergy);
-  }, [activeStep, activePoint, uniqueTimeline]);
+  }, [activeStep, activePoint, displayTimeline]);
 
   // 그래프 좌표 계산 - ΔE=0이 세로 가운데, 위쪽은 에너지 과다(온난화/양의
   // 되먹임), 아래쪽은 에너지 부족(냉각/음의 되먹임) 방향이다. 실제 데이터가

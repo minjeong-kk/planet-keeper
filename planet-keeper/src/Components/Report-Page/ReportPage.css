@@ -375,6 +375,27 @@
   margin-left: auto;
 }
 
+/* 라벨 변화 / ΔE 변화를 원인->과정->결과 설명보다 먼저, 더 눈에 띄게 보여준다 -
+   "무엇이 얼마나 바뀌었는지"를 숫자로 바로 확인시키는 용도. */
+.report-page__timeline-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.report-page__timeline-summary p {
+  margin: 0;
+}
+
+.report-page__timeline-summary strong {
+  color: var(--text-h);
+}
+
 .report-page__timeline-explain {
   display: flex;
   flex-direction: column;
@@ -396,6 +417,7 @@
    계열 색이 없는 줄(ΔE 등)에서만 쓰인다 - 계열 색이 있으면 아래 규칙이 이긴다. */
 .report-page__timeline-explain strong {
   color: var(--text-h);
+  font-weight: 500;
 }
 
 /* 알베도->ASR 계열 / 온실효과->OLR 계열을 다른 색으로 구분한다 - 하나의 조작이
@@ -407,6 +429,7 @@
 }
 .report-page__timeline-explain-line--albedo strong {
   color: var(--accent);
+  font-weight: 600;
 }
 
 .report-page__timeline-explain-line--greenhouse {
@@ -414,6 +437,7 @@
 }
 .report-page__timeline-explain-line--greenhouse strong {
   color: var(--violet);
+  font-weight: 600;
 }
 
 .report-page__metric-badge {
