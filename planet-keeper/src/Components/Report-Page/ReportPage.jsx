@@ -23,8 +23,9 @@ const ITEM_KEY_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${ite
 // 퀴즈 데이터의 concepts 태그(예: "피드백", "에너지 평형")를 용어집 항목에 연결한다.
 // 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
 const CONCEPT_ALIASES = {
-  피드백: "climateFeedback",
-  평균기온: "currentTemperature",
+  피드백: "climateFeedback",       // 태그 "피드백" vs term "기후 피드백" - 다름
+  "에너지 평형": "energyBalance",   // 이미 term과 동일하지만 있어도 무해
+  평균기온: "currentTemperature",   // 태그 "평균기온" vs term "현재 평균 온도" - 다름
 };
 
 // concept 태그(예: "피드백", "알베도")로부터 CLIMATE_CONCEPTS의 키(예: "climateFeedback")를
