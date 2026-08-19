@@ -11,7 +11,10 @@ import {
   ENERGY_BALANCE_EPSILON,
   ENERGY_SCALE,
   energyStateOf,
+  computeClimateV2,
+  mapSlidersToClimateInputs,
 } from "./physicsEngine.js";
+import { applyIceOceanCoupling } from "../store/useClimateStore.js";
 
 const COMPARE_TOLERANCE = 0.05; // 기준값 대비 ±5% 이내는 "정상"으로 본다
 
@@ -233,23 +236,87 @@ const SLIDER_KEY_LABELS = {
   co2: "CO₂",
 };
 
+// 아이템 적용 후 다음 슬라이더 값(0~100 범위로 clamp). 빙하/바다 상호제약도
+// useClimateStore.setValue와 똑같이 applyIceOceanCoupling을 쓴다 - useGameStore의
+// applyEquipment/pickVisibleItems, 아래 itemEffectKeyword가 전부 이 하나만 쓴다
+// (여기서 빠뜨리면 "예상 ΔE"와 "실제 저장된 값"이 서로 달라지는 문제가 생긴다).
+export function nextSliderValues(values, item) {
+  const nextValue = Math.min(100, Math.max(0, values[item.key] + item.delta));
+  return applyIceOceanCoupling({ ...values, [item.key]: nextValue }, item.key);
+}
+
+// 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
+// 차이). 정적 태그가 아니라 매번 물리엔진으로 직접 계산한다 - clamp에 걸려 효과가
+// 0인 아이템도, 구름처럼 표면 상태에 따라 방향 자체가 뒤집히는 아이템도 정적
+// 태그만 보면 틀리게 나오기 때문이다.
+export function itemDeltaEnergyChange(item, values, currentTemperature) {
+  const before = computeClimateV2({ ...mapSlidersToClimateInputs(values), currentTemperature }).deltaEnergy;
+  const after = computeClimateV2({ ...mapSlidersToClimateInputs(nextSliderValues(values, item)), currentTemperature }).deltaEnergy;
+  return after - before;
+}
+
 // 장비 카드에 붙이는 아주 짧은 효과 키워드 - "무엇을 바꾸는지 · 데워지는지/식는지"
-// 두 조각만 보여준다(예: "구름 증가 · 냉각"). 방향은 previewItemEffect의 사슬 마지막
-// 줄("예상 안정 온도 감소/증가")에서 그대로 읽는다 - 정적 표를 새로 만들면 아이템
-// 데이터와 어긋날 수 있어서, 이미 있는 설명 데이터 하나만 원본으로 쓴다.
-//
-// 표시 전용이다. "이 장비가 지금 실제로 도움이 되는가"는 clamp 때문에 정적으로
-// 판단할 수 없으므로 게임 로직은 여전히 물리엔진(itemDeltaEnergyChange)으로 판단한다.
-export function itemEffectKeyword(item) {
+// 두 조각만 보여준다(예: "구름 증가 · 냉각"). 방향은 매번 itemDeltaEnergyChange로
+// 지금 조성/온도 기준으로 다시 계산한다 - 예전에는 previewItemEffect의 고정된
+// 설명 문구 마지막 줄만 읽었는데, 구름 계열 아이템(cloud_seeder/cloud_clearer/
+// space_mirror)은 표면이 구름(알베도 0.5)보다 밝은지 어두운지에 따라 실제 방향이
+// 뒤집힐 수 있어서(예: 빙하가 아주 많은 행성에서는 "구름 증가"가 오히려 알베도를
+// 낮춰 가열 방향이 된다) 고정 문구가 실제 결과와 반대로 보이는 경우가 있었다.
+export function itemEffectKeyword(item, values, currentTemperature) {
   const change = shortSliderChangeLabel(item.key, item.delta);
-  const chain = previewItemEffect(item).chain ?? [];
-  const last = chain[chain.length - 1] ?? "";
-  const direction = last.includes("감소") ? "냉각" : last.includes("증가") ? "가열" : null;
+  if (values == null || currentTemperature == null) return change;
+  const delta = itemDeltaEnergyChange(item, values, currentTemperature);
+  const direction = Math.abs(delta) < ENERGY_EPSILON ? null : delta > 0 ? "가열" : "냉각";
   return direction ? `${change} · ${direction}` : change;
 }
 export function shortSliderChangeLabel(key, delta) {
   const label = SLIDER_KEY_LABELS[key] ?? "행성 조성";
   return `${label} ${delta > 0 ? "증가" : "감소"}`;
+}
+
+// mockItems.js의 구름 계열 아이템(cloud_seeder/cloud_clearer/space_mirror) 설명은
+// "구름을 늘리면 알베도가 오른다"는 통상적인 경우만 가정한 고정 문구였다 -
+// itemEffectKeyword와 같은 이유로, 표면이 구름(알베도 0.5)보다 밝은 행성(빙하가
+// 아주 많은 경우 등)에서는 실제로 반대가 된다. 카드 title 툴팁에 그대로 노출되는
+// 문구라 여기도 매번 지금 조성/온도로 다시 계산한다. 구름 이외의 아이템은 항상
+// 같은 방향(단조 증가/감소)이라 기존 고정 문구 그대로 둔다.
+export function itemDescriptionFor(item, values, currentTemperature) {
+  if (item.key !== "cloud" || values == null || currentTemperature == null) return item.description;
+
+  const before = computeClimateV2({ ...mapSlidersToClimateInputs(values), currentTemperature });
+  const after = computeClimateV2({
+    ...mapSlidersToClimateInputs(nextSliderValues(values, item)),
+    currentTemperature,
+  });
+  const albedoUp = after.albedo > before.albedo + RATIO_EPSILON;
+  const albedoDown = after.albedo < before.albedo - RATIO_EPSILON;
+  const reflect = albedoUp ? "높이고" : albedoDown ? "낮추고" : "거의 그대로 두고";
+  const absorb = albedoUp ? "줄입니다" : albedoDown ? "늘립니다" : "거의 바꾸지 않습니다";
+  const mechanism =
+    {
+      cloud_seeder: "대기 상층부에 구름을 형성해",
+      cloud_clearer: "대기 상층부의 구름을 흩어",
+      space_mirror: "행성 외곽의 궤도 반사경을 조절해",
+    }[item.id] ?? "구름 양을 조절해";
+
+  return `${mechanism} 지금 이 행성에서는 태양광 반사율(알베도)을 ${reflect} 흡수량을 ${absorb}.`;
+}
+
+// 이상기후 경보(useGameStore.js WARMING_EVENTS)의 구름 이벤트 hint도 같은 이유로
+// 고정 문구였다("옅어지면 흡수 에너지가 늘어난다") - 방금 고친 counterDirection
+// 화살표와 모순되게 보일 수 있어서 여기도 지금 조성/온도로 다시 계산한다. co2/
+// 빙하 이벤트는 단조 반응이라 원래 hint 그대로 둔다.
+export function climateEventHintFor(event, values, currentTemperature) {
+  if (event.key !== "cloud" || values == null || currentTemperature == null) return event.hint;
+
+  const before = computeClimateV2({ ...mapSlidersToClimateInputs(values), currentTemperature });
+  const after = computeClimateV2({
+    ...mapSlidersToClimateInputs(nextSliderValues(values, { key: "cloud", delta: event.delta })),
+    currentTemperature,
+  });
+  const absorbUp = after.absorbedRadiation > before.absorbedRadiation + ENERGY_EPSILON;
+  const verb = event.delta > 0 ? "짙어지면" : "옅어지면";
+  return `구름도 햇빛을 반사하는 밝은 표면입니다. 지금 이 행성에서는 구름이 ${verb} 지표가 받는 태양에너지가 ${absorbUp ? "늘어납니다" : "줄어듭니다"}.`;
 }
 
 // planetStateOf/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(상태 판정 배지)와
@@ -537,7 +604,45 @@ export function describeTransition(before, after, label, itemKey) {
   return withArrows(blocks);
 }
 
-export function previewItemEffect(item) {
+// 구름 계열 아이템(cloud_seeder/cloud_clearer/space_mirror)의 미리보기는 고정된
+// switch 케이스 대신 지금 조성/온도로 실제 before/after 물리값을 계산해서, 이미
+// describeItemJudgment/describeTransition이 쓰는 physicsChangeBlocks(알베도·
+// 온실효과 두 계열을 함께 보고 어느 쪽이 이겼는지까지 판정하는 로직)를 그대로
+// 재사용한다 - 구름은 알베도와 온실효과 둘 다 움직이는 유일한 변수라, 방향
+// 단어만 새로 만들면 이 둘의 "누가 이겼는지" 판정이 실제 사용 후 결과(ItemResultModal)
+// 와 어긋날 수 있다. 같은 함수를 쓰면 미리보기와 실제 결과가 항상 일치한다.
+function dynamicCloudPreview(item, values, currentTemperature) {
+  const before = computeClimateV2({ ...mapSlidersToClimateInputs(values), currentTemperature });
+  const after = computeClimateV2({
+    ...mapSlidersToClimateInputs(nextSliderValues(values, item)),
+    currentTemperature,
+  });
+  const blocks = physicsChangeBlocks(before, after, item.key);
+  const deltaEUp = after.deltaEnergy > before.deltaEnergy + ENERGY_EPSILON;
+  const deltaEDown = after.deltaEnergy < before.deltaEnergy - ENERGY_EPSILON;
+  const deltaEWord = deltaEUp ? "증가" : deltaEDown ? "감소" : "거의 변화 없음";
+  blocks.push([`에너지 불균형(ΔE) ${deltaEWord}`]);
+  blocks.push([`예상 안정 온도 ${deltaEWord}`]);
+
+  return {
+    concept: [
+      "📖 어떤 물리량을 바꾸나요?",
+      `• ${SLIDER_KEY_LABELS.cloud} ${item.delta > 0 ? "증가" : "감소"}`,
+      "• 실제 알베도·온실효과 변화 방향은 지금 행성의 표면 상태에 따라 달라집니다(아래 변화 과정 참고)",
+    ],
+    chain: withArrows(blocks),
+    science: [
+      "💡 지구과학 개념",
+      "구름은 태양빛을 반사하는 밝은 표면(알베도 약 0.5)이자, 지표 복사를 가두는 온실 역할도 동시에 합니다.",
+      "표면이 구름보다 밝은 행성(빙하가 아주 많은 경우 등)에서는 구름이 늘수록 오히려 알베도가 낮아져 더워지는 쪽으로 작용할 수 있습니다.",
+    ],
+  };
+}
+
+export function previewItemEffect(item, values, currentTemperature) {
+  if (item.key === "cloud" && values != null && currentTemperature != null) {
+    return dynamicCloudPreview(item, values, currentTemperature);
+  }
   switch (item.id) {
     case "ice_restorer":
       return {

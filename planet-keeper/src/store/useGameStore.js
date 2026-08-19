@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
-import useClimateStore, { CLIMATE_VARIABLES, applyIceOceanCoupling } from "./useClimateStore.js";
+import useClimateStore, { CLIMATE_VARIABLES } from "./useClimateStore.js";
 import {
   computeClimateV2,
   mapSlidersToClimateInputs,
@@ -16,7 +16,17 @@ import {
   ENERGY_BALANCE_EPSILON,
   ENERGY_SCALE,
 } from "../utils/physicsEngine.js";
-import { describeItemJudgment, describeFinalizeJudgment } from "../utils/planetAnalysis.js";
+import {
+  describeItemJudgment,
+  describeFinalizeJudgment,
+  nextSliderValues,
+  itemDeltaEnergyChange,
+} from "../utils/planetAnalysis.js";
+
+// ItemInfoModal.jsx가 이 경로(useGameStore.js)로 가져다 쓴다 - 실제 정의는
+// planetAnalysis.js(순수 물리 계산, EquipmentReward/Panel의 itemEffectKeyword와
+// 같은 함수를 공유)에 있다.
+export { itemDeltaEnergyChange };
 
 // 게임 진행(문제/아이템/오답 횟수) 전용 store. 행성 슬라이더 값은 useClimateStore가
 // 들고 있고, 여기서는 아이템 사용 시 그 값을 바꾸고 물리엔진을 재계산한다.
@@ -194,18 +204,6 @@ export const equipmentTotalCount = (equipment) =>
 // ItemInfoModal("지금 사용하면" 미리보기)도 같은 기준을 써야 판정이 어긋나지 않는다.
 export const ITEM_EFFECT_EPSILON = 0.01 * ENERGY_SCALE;
 
-// 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
-// 차이). 정적 태그가 아니라 매번 물리엔진으로 직접 계산한다 - 정적 태그만 보면
-// clamp에 걸려 효과가 0인 아이템도 "맞는 방향"으로 보이기 때문이다.
-export function itemDeltaEnergyChange(item, values, currentTemperature) {
-  const before = computeClimateV2({ ...mapSlidersToClimateInputs(values), currentTemperature }).deltaEnergy;
-  const after = computeClimateV2({
-    ...mapSlidersToClimateInputs(nextSliderValues(values, item)),
-    currentTemperature,
-  }).deltaEnergy;
-  return after - before;
-}
-
 // 지금 ΔE 방향에 실제로 도움이 되는(clamp에 걸려 무효화되지 않은) 아이템을 후보에
 // 최소 GUARANTEED_WORKING_CHOICES개 고정으로 넣은 뒤 나머지를 무작위로 채운다.
 //
@@ -298,15 +296,6 @@ function computeItemStepResult(nextValues) {
 
   const physics = computeClimateV2({ ...climateInputs, currentTemperature: nextTemperature });
   return { physics, ml: classifyPlanetState(physics) };
-}
-
-// 아이템 효과를 적용한 다음 슬라이더 값(0~100 범위로 clamp). 빙하/바다 상호제약도
-// useClimateStore.setValue와 똑같이 applyIceOceanCoupling을 쓴다 - 여기서
-// 빠뜨리면 "아이템 적용 예상 ΔE"(이 함수로 미리 계산)와 "실제 저장된 값"
-// (setValue가 따로 제약을 걸어 나온 값)이 서로 달라지는 문제가 생긴다.
-function nextSliderValues(values, item) {
-  const nextValue = Math.min(100, Math.max(0, values[item.key] + item.delta));
-  return applyIceOceanCoupling({ ...values, [item.key]: nextValue }, item.key);
 }
 
 const useGameStore = create(

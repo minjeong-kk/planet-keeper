@@ -4,15 +4,17 @@ import useClimateStore from "../../store/useClimateStore.js";
 import { previewItemEffect, formatSigned } from "../../utils/planetAnalysis.js";
 
 // 아이템 카드의 (ⓘ) 버튼/카드 클릭 시 뜨는 원인->과정->결과 설명 모달.
-// info.concept/chain/science는 실제 물리엔진 재계산 없이 슬라이더 방향만으로 만든
-// 고정 미리보기(previewItemEffect)라 아이템마다 항상 같은 문구다. 그 아래
-// "지금 사용하면" 문단만은 지금 행성의 실제 조성/온도로 itemDeltaEnergyChange를
-// 돌려서 이 판(play-through)에 한정된 실측 예측치를 보여준다.
+// info.concept/chain/science(previewItemEffect)는 빙하/CO2/대기두께 아이템은
+// 슬라이더 방향만으로 만든 고정 미리보기다(그 물리량들은 조성과 무관하게 항상
+// 같은 방향으로 반응하므로 고정이어도 틀릴 일이 없다). 구름 계열 아이템만은
+// previewItemEffect가 지금 조성/온도로 매번 다시 계산한다 - 표면이 구름(알베도
+// 0.5)보다 밝은 행성에서는 실제 방향이 반대가 될 수 있어서다. 아래 "지금 사용하면"
+// 문단은 어느 아이템이든 itemDeltaEnergyChange로 실측 예측치를 보여준다.
 function ItemInfoModal({ item, onClose }) {
-  const info = previewItemEffect(item);
   const values = useClimateStore((state) => state.values);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const physicsResult = useGameStore((state) => state.physicsResult);
+  const info = previewItemEffect(item, values, currentTemperature);
 
   const before = physicsResult?.deltaEnergy;
   const change = physicsResult ? itemDeltaEnergyChange(item, values, currentTemperature) : null;

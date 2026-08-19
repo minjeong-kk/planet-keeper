@@ -18,6 +18,7 @@ import useGameStore, {
   CLIMATE_EVENT_RESPONSE_SECONDS,
   MAX_EQUIPMENT_CAPACITY,
   equipmentTotalCount,
+  ITEM_EFFECT_EPSILON,
 } from "../../store/useGameStore";
 import { slidersToVisual } from "../../utils/climateVisual.js";
 import {
@@ -28,7 +29,7 @@ import {
   COLD_STABLE_MAX_K,
   EARTH_LIKE_MAX_K,
 } from "../../utils/physicsEngine.js";
-import { formatSigned } from "../../utils/planetAnalysis.js";
+import { formatSigned, itemDeltaEnergyChange, climateEventHintFor } from "../../utils/planetAnalysis.js";
 import "./GamePage.css";
 
 // 행성 위에 잠깐 뜨는 정답/오답 플래시가 유지되는 시간(ms).
@@ -435,9 +436,30 @@ function GamePage() {
           ? "bad"
           : "same";
 
-  // 경보를 막으려면 이벤트가 미는 방향의 반대로 움직여야 한다 - 어느 슬라이더를
-  // 어느 쪽으로 볼지만 알려주고, 목표값(몇 %)은 알려주지 않는다.
-  const counterDirection = pendingClimateEvent ? (pendingClimateEvent.delta > 0 ? -1 : 1) : 0;
+  // 경보를 막는 방향 - 예전에는 "이벤트 delta의 반대 부호"로 고정해서 정했는데,
+  // 구름 슬라이더는 itemEffectKeyword와 같은 이유로 실제 효과 방향이 조성에 따라
+  // 뒤집힐 수 있다(표면이 구름 알베도 0.5보다 밝은 빙하-heavy 행성에서는 구름을
+  // 늘리는 쪽이 오히려 온난화가 된다). 그래서 고정 부호 대신 지금 조성/온도로
+  // itemDeltaEnergyChange를 직접 돌려서 어느 쪽이 실제로 |ΔE|를 줄이는지 본다.
+  const counterDirection = useMemo(() => {
+    if (!pendingClimateEvent) return 0;
+    const fallback = pendingClimateEvent.delta > 0 ? -1 : 1;
+    if (!livePhysics) return fallback;
+    const needsCooling = livePhysics.deltaEnergy > ENERGY_BALANCE_EPSILON;
+    const needsWarming = livePhysics.deltaEnergy < -ENERGY_BALANCE_EPSILON;
+    if (!needsCooling && !needsWarming) return fallback;
+    const probeUp = itemDeltaEnergyChange({ key: pendingClimateEvent.key, delta: 1 }, values, currentTemperature);
+    if (Math.abs(probeUp) < ITEM_EFFECT_EPSILON) return fallback;
+    const upHelps = needsCooling ? probeUp < 0 : probeUp > 0;
+    return upHelps ? 1 : -1;
+  }, [pendingClimateEvent, livePhysics, values, currentTemperature]);
+
+  // 경보 브리핑/힌트 문구도 구름 이벤트는 counterDirection과 같은 이유로 지금
+  // 조성/온도에 맞게 다시 계산한다(climateEventHintFor - co2/빙하 이벤트는 원래
+  // hint 그대로 반환한다).
+  const climateEventHint = pendingClimateEvent
+    ? climateEventHintFor(pendingClimateEvent, values, currentTemperature)
+    : null;
 
   // 지금 무엇을 해야 하는지 한 줄 안내 - 하단 바 오른쪽에 둔다.
   const actionHint = isComputing
@@ -772,8 +794,8 @@ function GamePage() {
                 <p className="climate-event__goal">
                   <strong>목표</strong> 에너지 평형을 회복하세요 (ΔE를 0에 가깝게)
                 </p>
-                {pendingClimateEvent.hint && (
-                  <p className="climate-event__hint">💡 {pendingClimateEvent.hint}</p>
+                {climateEventHint && (
+                  <p className="climate-event__hint">💡 {climateEventHint}</p>
                 )}
                 <p className="climate-event__sub">
                   다음 화면에서 행성 조성을 직접 조절할 수 있습니다. 조절하는 동안에는 시간이 넉넉하게
@@ -786,8 +808,8 @@ function GamePage() {
             ) : (
               /* ③ 조절 -> ④ 확인 */
               <>
-                {pendingClimateEvent.hint && (
-                  <p className="climate-event__hint">💡 {pendingClimateEvent.hint}</p>
+                {climateEventHint && (
+                  <p className="climate-event__hint">💡 {climateEventHint}</p>
                 )}
 
                 <div className="climate-event__timer-track">

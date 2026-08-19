@@ -7,7 +7,6 @@ import {
   describeTransition,
   deltaEnergyLines,
   formatSigned,
-  relevantConceptKeys,
   labelTone,
 } from "../../utils/planetAnalysis.js";
 import { causeFamilyOf, renderHighlightedParts } from "../../utils/explanationHighlight.jsx";
@@ -119,17 +118,17 @@ function ReportPage() {
     statusClass: "",
   };
 
-  // timeline[0]=행성 생성 시점, 마지막=최종 상태. 정상 플레이라면 항상 최소 1개는
-  // 있지만(nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
-  const initial = timeline[0] ?? null;
-  const final = timeline[timeline.length - 1] ?? null;
-  const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
-
   // "핵심 개념 정리"에서 9개 전부가 아니라 이번 판에 실제로 나타난 개념만 고른다.
-  const relevantKeys = useMemo(
-    () => relevantConceptKeys({ initial, final, timeline, gameOverReason }),
-    [initial, final, timeline, gameOverReason],
-  );
+  const quizConceptKeys = useMemo(() => {
+    const keys = new Set();
+    quizLog.forEach((q) => {
+      (q.concepts ?? []).forEach((tag) => {
+        const key = conceptKeyOf(tag);
+        if (key) keys.add(key);
+      });
+    });
+    return keys;
+  }, [quizLog]);
 
   // 연속으로 동일한 상태나 행동이 중복 기록된 타임라인 제거
   const uniqueTimeline = useMemo(() => {
@@ -449,7 +448,7 @@ function ReportPage() {
           <div className="report-page__concept-col">
             <div className="report-page__concept-grid">
               {Object.entries(CLIMATE_CONCEPTS)
-                .filter(([key]) => relevantKeys.has(key))
+                .filter(([key]) => quizConceptKeys.has(key))
                 .map(([key, concept]) => (
                   <div
                     key={key}
