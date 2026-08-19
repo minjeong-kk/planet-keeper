@@ -3,6 +3,7 @@ import { ArrowRight } from "lucide-react";
 import MascotGuide from "./MascotGuide";
 import InfoSection from "./InfoSection";
 import useGameStore from "../../store/useGameStore";
+import useClimateStore from "../../store/useClimateStore";
 import "./StartPage.css";
 
 function StartPage() {
@@ -11,9 +12,22 @@ function StartPage() {
   // 되돌리면서 이전 플레이의 문제/아이템/목숨/판정 결과까지 함께 초기화한다
   // (리포트에서 시작 화면으로 돌아온 경우에도 깨끗한 상태로 진입).
   const resetGame = useGameStore((state) => state.resetGame);
+  // 행성 조성(슬라이더)과 현재 온도도 같이 초기화한다. 이 둘은 useClimateStore가
+  // localStorage에 persist하는데, 예전에는 여기서 되돌리지 않아 이전 판의 마지막
+  // 상태를 그대로 물려받았다 - 2단계 마지막 정답(finalizeGame의 forceStable)이
+  // CO2를 "288.15K에서 평형"이 되도록 강제 조정하고 그 평형온도(≈287.9~288.4K)를
+  // currentTemperature에 저장하기 때문에, 새 게임이 시작부터 ΔE≈0 / 지구형 안정으로
+  // 떠서 1단계와 아이템 단계를 통째로 건너뛰는 문제가 있었다.
+  const resetClimate = useClimateStore((state) => state.resetClimate);
+  // 시작 페이지를 거쳐 들어오는 건 항상 새 게임이므로 두 화면(행성 생성 / 플레이)
+  // 온보딩을 모두 예약한다 - 리포트의 "행성 다시 만들기"/"다시 플레이"로 이어서 하는
+  // 경우에는 그쪽에서 끈다.
+  const queueTutorials = useGameStore((state) => state.queueTutorials);
 
   const handleStart = () => {
     resetGame();
+    resetClimate();
+    queueTutorials();
     navigate("/planet-create");
   };
 

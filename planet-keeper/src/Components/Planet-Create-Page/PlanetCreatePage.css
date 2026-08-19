@@ -1,309 +1,502 @@
-/* GamePage 우측 상단 플로팅 타이머와 같은 자리/스타일 - 슬라이더를 만지면 그
-   변수 설명이 뜬다. 이 페이지는 라이트/다크 토글과 무관하게 항상 다크 글래스
-   톤이라(.planet-create-page__controls 참고) 별도 다크모드 분기가 필요 없다. */
-.planet-create-page__guide {
-  position: fixed;
-  top: 20px;
-  right: 24px;
-  z-index: 999;
-  max-width: 300px;
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(160deg, rgba(28, 36, 58, 0.94), rgba(14, 18, 30, 0.94));
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  color: #f3f5fa;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.32);
-}
+/* =========================================================================
+   Planet Keeper — 행성 생성 화면
+   구조: 헤더(단계·제목·도움말) / 무대(중앙 큰 행성 + 오른쪽 특성 설정) /
+        지점 선택 카드 / 하단 액션
+   원칙: 페이지 전체가 하나의 "행성 생성 콘솔"로 읽혀야 한다. 떠 있는 작은 창을
+        두지 않고, 중앙 행성이 가장 큰 시각 요소이며 오른쪽 패널은 그 행성을
+        만드는 도구다. 네온을 두르지 않고 어두운 남색 패널 + 제한적인 청록 포인트.
+   ========================================================================= */
 
-.planet-create-page__guide-eyebrow {
-  display: block;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  color: var(--neon);
-  margin-bottom: 6px;
-}
+.create {
+  /* 이 페이지는 시스템 라이트/다크 설정과 무관하게 항상 어두운 우주 톤이다
+     (게임 화면과 같은 방침). 아래 규칙은 전부 이 토큰만 쓴다. */
+  --void: #03060d;
+  --deep: #070d1a;
+  --panel: rgba(12, 24, 40, 0.72);
+  --panel-solid: #0b1725;
+  --inset: rgba(4, 9, 17, 0.5);
+  --line: rgba(94, 234, 212, 0.16);
+  --line-strong: rgba(45, 212, 191, 0.42);
+  --cyan: #2dd4bf;
+  --cyan-soft: #5eead4;
+  --ink: #eef3fb;
+  --dim: #a8bdd6;
+  --faint: #7b90ab;
 
-.planet-create-page__guide-text {
-  margin: 0;
-  font-size: 0.92rem;
-  font-weight: 500;
-  line-height: 1.65;
-  letter-spacing: -0.005em;
-}
-
-.planet-create-page {
+  position: relative;
+  flex: 1;
   display: flex;
-  align-items: center; /* 패널을 내용 높이로 수직 중앙 정렬 → 탭바 제거로 생긴 하단 공백 제거 */
-  justify-content: space-between;
-  gap: 20px;
-  padding: 20px;
-  flex: 1;
+  flex-direction: column;
+  /* 1440x900에서 [헤더 + (행성|특성설정) + 지점선택 + 액션]이 스크롤 없이 들어오도록
+     세로 여백과 각 카드 높이를 압축했다. overflow를 잠그지 않고 실제 콘텐츠 높이를
+     줄이는 방식이라, 화면이 더 낮으면 자연스럽게 스크롤될 뿐 잘리지는 않는다.
+     세로 예산(900px 기준): 패딩 32 + 헤더 50 + 간격 42 + 본체 420 + 지점 306 + 액션 50 */
+  gap: clamp(6px, 1.2vh, 13px);
+  padding: clamp(8px, 1.4vh, 15px) 24px clamp(8px, 1.4vh, 14px);
+  box-sizing: border-box;
+  min-height: 100svh;
+  text-align: left;
+  color: var(--ink);
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 178, 0.16) 0%, transparent 60%),
+    radial-gradient(70% 50% at 50% 100%, rgba(45, 212, 191, 0.06) 0%, transparent 60%),
+    linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
 }
 
-.planet-create-page__planet {
-  flex: 1;
+/* 아주 옅은 별 - 배경이 복잡해지면 행성이 죽으므로 개수·밝기 모두 낮게 */
+.create__starfield {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background-image:
+    radial-gradient(1px 1px at 14% 22%, rgba(255, 255, 255, 0.65), transparent),
+    radial-gradient(1px 1px at 31% 58%, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 47% 16%, rgba(190, 240, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 63% 40%, rgba(255, 255, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 78% 20%, rgba(255, 255, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 89% 52%, rgba(190, 240, 255, 0.35), transparent),
+    radial-gradient(1px 1px at 22% 80%, rgba(255, 255, 255, 0.3), transparent),
+    radial-gradient(1px 1px at 92% 84%, rgba(255, 255, 255, 0.3), transparent);
+}
+
+/* ── 헤더 ─────────────────────────────────────────────────────────── */
+.create__header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+/* STEP 01 + 제목은 한 줄에, 부제는 그 아래 줄로 내린다(flex-basis 100%) */
+.create__heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 12px;
+  min-width: 0;
+}
+
+.create__heading .create__subtitle {
+  flex-basis: 100%;
+}
+
+.create__step {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--cyan);
+}
+
+.create__title {
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #ffffff;
+  word-break: keep-all;
+}
+
+.create__subtitle {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.4;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
+.create__help-btn {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--inset);
+  color: var(--dim);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.create__help-btn:hover {
+  transform: none;
+  border-color: var(--line-strong);
+  color: var(--cyan-soft);
+  box-shadow: none;
+}
+
+/* ── 본체: 큰 행성 + 오른쪽 특성 설정(2열) ────────────────────────
+   가로폭은 그대로 유지하고(패널 약 530px, 슬라이더 트랙 480px) 세로 여백만 줄였다. */
+.create__body {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(430px, 37vw, 560px);
+  gap: 28px;
+  align-items: center;
+}
+
+.create__preview {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 14px;
+  min-width: 0;
+  min-height: 0;
 }
 
-.planet-create-page__planet-placeholder {
-  position: relative; /* 지점 이미지가 이 안에서 절대 위치로 3D 지구 위에 겹쳐짐 */
-  width: 320px;
-  height: 320px;
+/* 상단 행의 높이는 (더 높은) 특성 패널이 정하므로, 그 높이 안에서는 행성을 키워도
+   전체 높이가 늘어나지 않는다 - 그래서 42vh로 되돌렸다. */
+.create__planet-frame {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: min(100%, 40vh, 440px);
+  aspect-ratio: 1 / 1;
+  flex-shrink: 0;
+}
+
+/* 은은한 광원 하나만 - 여러 겹 쌓지 않는다 */
+.create__planet-glow {
+  position: absolute;
+  inset: -20%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(45, 212, 191, 0.18) 0%,
+    rgba(56, 189, 248, 0.09) 44%,
+    transparent 70%
+  );
+  filter: blur(8px);
+}
+
+.create__planet {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
   overflow: hidden;
 }
 
-/* 지점 사진(3D 액자) - imageUrl이 있는 지점만 3D 지구를 언마운트하지 않고
-   그 위에 겹쳐서 덮는다(inset:0). imageUrl이 없으면 렌더링 자체를 생략해
-   밑에 있는 PlanetUI가 그대로 보인다(PlanetCreatePage.jsx의 LocationPreview
-   참고). */
-.planet-create-page__location-preview {
+/* 지점 사진(3D 액자)은 행성 위에 겹쳐서 보여준다 - PlanetUI는 아래에서 계속
+   마운트된 채라 슬라이더를 만지는 순간 텍스처 재로딩 없이 즉시 드러난다. */
+.create__planet-photo {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
 }
 
-/* ── 글래스모피즘 다크 컨트롤 패널 ── */
-.planet-create-page__controls {
-  /* 전역 --neon(블루-그린 틸)을 그대로 쓴다 - 글로우 강도만 로컬로 조절 */
-  --neon-glow: rgba(45, 212, 191, 0.38);
-  flex: 1;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  padding: 26px;
-  text-align: left;
-  display: flex;
-  flex-direction: column;
-  gap: 22px;
-  background: linear-gradient(160deg, rgba(28, 36, 58, 0.72), rgba(14, 18, 30, 0.72));
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
-  color: #e8ecf5;
-  /* 슬라이더 드래그 중 텍스트 선택 개입(금지 커서/끊김) 차단 */
-  user-select: none;
-  -webkit-user-select: none;
-}
-
-/* ── 타이틀 영역 (STEP 서브텍스트 + 액센트 바) ── */
-.planet-create-page__titlebar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.planet-create-page__step {
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--neon);
-  opacity: 0.85;
-}
-.planet-create-page__title {
+.create__preview-note {
   margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #f2f5fb;
-}
-.planet-create-page__title-accent {
-  width: 4px;
-  height: 20px;
-  border-radius: 2px;
-  background: var(--neon);
-  box-shadow: 0 0 10px var(--neon-glow);
+  font-size: 0.88rem;
+  color: var(--faint);
+  text-align: center;
+  word-break: keep-all;
 }
 
-/* ── 슬라이더 목록 ── */
-.planet-create-page__sliders {
+/* ── 오른쪽: 행성 특성 설정 ──────────────────────────────────────── */
+.create__panel {
   display: flex;
   flex-direction: column;
-  gap: 16px;
-}
-.planet-create-page__control {
-  padding: 10px 12px;
-  border-radius: 12px;
+  gap: clamp(7px, 1.3vh, 13px);
+  padding: clamp(9px, 1.7vh, 17px) 26px clamp(9px, 1.5vh, 15px);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--panel);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  box-sizing: border-box;
 }
 
-/* 헤더: 아이콘+라벨(좌) / 수치(우) */
-.planet-create-page__control-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+.create__panel-title {
+  margin: 0;
+  padding-bottom: clamp(7px, 1.1vh, 10px);
+  border-bottom: 1px solid var(--line);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #ffffff;
 }
-.planet-create-page__control-label {
+
+.create__controls {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(6px, 1.4vh, 14px);
+}
+
+/* 항목명 / 현재 값 / 슬라이더 3요소를 확실히 분리한다 */
+.create__control {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(3px, 0.6vh, 6px);
+}
+
+.create__control-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  line-height: 1.25;
+}
+
+.create__control-label {
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  font-size: 0.95rem;
   font-weight: 600;
-  color: #e8ecf5;
+  color: var(--ink);
+  cursor: pointer;
 }
-.planet-create-page__control-icon {
-  color: var(--neon);
-  opacity: 0.9;
+
+.create__control-icon {
+  color: var(--cyan);
   flex-shrink: 0;
 }
-.planet-create-page__control-value {
+
+.create__control-value {
   font-family: var(--mono);
-  font-weight: 700;
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #ffffff;
   font-variant-numeric: tabular-nums;
-  color: var(--neon);
-  text-shadow: 0 0 8px var(--neon-glow);
+  white-space: nowrap;
 }
 
-/* ── 글래스모피즘 네온 슬라이더(네이티브) ── 대기두께/구름/CO2처럼 서로 얽히지
-   않는 슬라이더는 이 네이티브 <input type="range">를 그대로 쓴다. */
-.planet-create-page__slider {
+.create__control-value em {
+  margin-left: 4px;
+  font-style: normal;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--faint);
+}
+
+/* 한 줄 기준 높이로 고정한다 - 항목을 만져 문구가 바뀔 때 패널 높이가 늘어나면
+   그만큼 페이지가 길어져 스크롤이 생긴다. 전문은 title 툴팁에 있다. */
+.create__panel-hint {
+  margin: 0;
+  padding: clamp(5px, 0.9vh, 8px) 12px;
+  border-radius: 10px;
+  background: var(--inset);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: var(--dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── 슬라이더 (네이티브 / 커플링용 커스텀 공통 치수) ─────────────── */
+.create-slider {
+  width: 100%;
+  height: 20px; /* 손가락/마우스가 잡기 쉬운 히트 영역 */
+  cursor: pointer;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 네이티브 range - 트랙은 배경 그라디언트로 채운다(--fill이 현재 값) */
+.create-slider--native {
   -webkit-appearance: none;
   appearance: none;
-  width: 100%;
-  height: 6px;
-  border-radius: 10px;
-  cursor: pointer;
-  outline: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
+.create-slider--native::-webkit-slider-runnable-track {
+  height: 8px;
+  border-radius: 4px;
   background: linear-gradient(
-    to right,
-    var(--neon) 0 var(--fill, 50%),
-    rgba(255, 255, 255, 0.15) var(--fill, 50%) 100%
+    90deg,
+    var(--cyan) 0 var(--fill, 50%),
+    rgba(255, 255, 255, 0.14) var(--fill, 50%) 100%
   );
-  box-shadow: 0 0 6px rgba(45, 212, 191, 0.12) inset;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-user-drag: none;
-  touch-action: none;
 }
 
-.planet-create-page__slider::-webkit-slider-thumb {
+.create-slider--native::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
+  margin-top: -6px;
   border-radius: 50%;
+  border: 2px solid #04121f;
   background: #ffffff;
-  border: 2px solid var(--neon);
-  box-shadow: 0 0 8px var(--neon-glow);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-.planet-create-page__slider::-webkit-slider-thumb:hover {
-  transform: scale(1.25);
-  box-shadow: 0 0 16px var(--neon-glow);
-}
-.planet-create-page__slider:active::-webkit-slider-thumb {
-  transform: scale(1.2);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.6), 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.15s ease, transform 0.15s ease;
 }
 
-.planet-create-page__slider::-moz-range-track {
-  height: 6px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.15);
-}
-.planet-create-page__slider::-moz-range-progress {
-  height: 6px;
-  border-radius: 10px;
-  background: var(--neon);
-}
-.planet-create-page__slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--neon);
-  border-radius: 50%;
-  background: #ffffff;
-  box-shadow: 0 0 8px var(--neon-glow);
-  transition: transform 0.2s ease;
-}
-.planet-create-page__slider:hover::-moz-range-thumb {
-  transform: scale(1.25);
+.create-slider--native:hover::-webkit-slider-thumb {
+  transform: scale(1.08);
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 14px rgba(45, 212, 191, 0.5);
 }
 
-/* ── 글래스모피즘 네온 슬라이더(커스텀, div 기반) ── 빙하/바다처럼 서로 캡을
-   실시간으로 밀어내야 하는 경우에만 쓴다.
-   네이티브 <input type="range">는 손잡이 위치를 min/max 속성에 직접 묶어서
-   계산하기 때문에, 트랙을 0~100으로 그리면서 이동 가능 범위만 10~80처럼 좁게
-   막는 게 불가능하다(둘을 분리하려면 min/max를 실제로 좁혀야 하는데, 그러면
-   커플링(빙하/바다)에 따라 트랙 폭 자체의 값↔위치 비율이 슬라이더마다 달라져서
-   "같은 칸인데 왜 이렇게 다르게 움직이지"처럼 보인다).
-   그래서 트랙/손잡이를 직접 그리고, 값은 항상 0~100 스케일로 트랙 전체에 매핑한
-   뒤, 실제로 손잡이가 갈 수 있는 구간(min~cap)만 별도로 표시한다. */
-.planet-create-page__slider-track {
+.create-slider--native::-moz-range-track {
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.create-slider--native::-moz-range-progress {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--cyan);
+}
+
+.create-slider--native::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #04121f;
+  background: #ffffff;
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.6);
+}
+
+/* 빙하/바다용 커스텀 슬라이더 - 트랙은 항상 0~100으로 그리고, 갈 수 있는 구간
+   (usable)만 밝게 표시한다. 손잡이는 value/100 위치에 절대 배치. */
+.create-slider--custom {
   position: relative;
-  width: 100%;
-  height: 6px;
-  border-radius: 10px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.06);
-  box-shadow: 0 0 6px rgba(45, 212, 191, 0.12) inset;
-  outline: none;
-  user-select: none;
-  -webkit-user-select: none;
-  touch-action: none;
+  display: flex;
+  align-items: center;
 }
 
-.planet-create-page__slider-track:focus-visible {
-  box-shadow: 0 0 0 2px var(--neon-glow), 0 0 6px rgba(45, 212, 191, 0.12) inset;
-}
-
-/* 실제로 조작 가능한 구간(min~cap) - 트랙 전체(0~100) 위에서 이 구간만 밝게
-   띄워서, 왜 손잡이가 거기서 멈추는지 한눈에 보이게 한다. */
-.planet-create-page__slider-usable {
+.create-slider--custom::before {
+  content: "";
   position: absolute;
-  top: 0;
-  height: 100%;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.28);
-  pointer-events: none;
-}
-
-.planet-create-page__slider-fill {
-  position: absolute;
-  top: 0;
   left: 0;
-  height: 100%;
-  border-radius: 10px;
-  background: var(--neon);
-  pointer-events: none;
+  right: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
 }
 
-.planet-create-page__slider-thumb {
+.create-slider--custom:focus-visible {
+  outline: none;
+}
+
+.create-slider--custom:focus-visible::before {
+  box-shadow: 0 0 0 2px rgba(45, 212, 191, 0.5);
+}
+
+.create-slider__usable {
+  position: absolute;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.create-slider__fill {
+  position: absolute;
+  left: 0;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--cyan);
+}
+
+.create-slider__thumb {
   position: absolute;
   top: 50%;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
+  margin-left: -10px;
   border-radius: 50%;
+  border: 2px solid #04121f;
   background: #ffffff;
-  border: 2px solid var(--neon);
-  box-shadow: 0 0 8px var(--neon-glow);
-  transform: translate(-50%, -50%);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transform: translateY(-50%);
+  box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.6), 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: box-shadow 0.15s ease;
   pointer-events: none;
 }
 
-.planet-create-page__slider-track:hover .planet-create-page__slider-thumb {
-  transform: translate(-50%, -50%) scale(1.25);
-  box-shadow: 0 0 16px var(--neon-glow);
+.create-slider--custom:hover .create-slider__thumb,
+.create-slider--custom:active .create-slider__thumb {
+  box-shadow: 0 0 0 1px var(--cyan), 0 0 14px rgba(45, 212, 191, 0.5);
 }
 
-.planet-create-page__slider-track:active .planet-create-page__slider-thumb {
-  transform: translate(-50%, -50%) scale(1.2);
-}
-
-.planet-create-page__actions {
+/* ── 하단 액션 ───────────────────────────────────────────────────── */
+/* 남는 높이를 위쪽 여백으로 밀어내 버튼을 페이지 맨 아래 줄에 앉힌다 - 지점 선택
+   카드와 붙어 보이지 않게 "카드가 끝나고 액션 영역이 시작된다"는 간격이 생긴다
+   (position: fixed는 쓰지 않는다). */
+.create__actions {
+  position: relative;
+  z-index: 1;
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  padding: 0 40px 40px;
+  gap: 20px;
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: clamp(4px, 1.6vh, 24px);
 }
 
-.planet-create-page__actions button {
-  padding: 12px 20px;
+.create__back {
+  padding: clamp(7px, 1.1vh, 10px) 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--faint);
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.create__back:hover {
+  transform: none;
+  border-color: var(--line-strong);
+  color: var(--dim);
+  box-shadow: none;
+}
+
+.create__cta {
+  padding: clamp(9px, 1.4vh, 13px) 32px;
+  border: 1px solid rgba(94, 234, 212, 0.55);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.96), rgba(13, 148, 136, 0.96));
+  color: #04121f;
+  font-size: 1.05rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  box-shadow: 0 0 26px rgba(45, 212, 191, 0.25);
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+.create__cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+  box-shadow: 0 0 34px rgba(45, 212, 191, 0.42);
+}
+
+/* ── 반응형 ──────────────────────────────────────────────────────── */
+@media (max-width: 1240px) {
+  .create__body {
+    grid-template-columns: minmax(0, 1fr) minmax(380px, 460px);
+    gap: 20px;
+  }
+}
+
+@media (max-width: 900px) {
+  .create {
+    padding: 18px 16px 22px;
+  }
+
+  .create__body {
+    grid-template-columns: 1fr;
+  }
+
+  .create__actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .create__cta,
+  .create__back {
+    width: 100%;
+  }
 }

@@ -16,7 +16,7 @@ import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
 
-// 타임라인 항목의 label("☁️ 인공 구름 생성기" 등, useGameStore.useItem이 `${item.emoji}
+// 타임라인 항목의 label("☁️ 인공 구름 생성기" 등, useGameStore.applyEquipment가 `${item.emoji}
 // ${item.name}`로 저장)을 아이템 key로 되돌린다 - "아이템" 단계만 이 형식과 일치하고,
 // "행성 생성"/"⚠️ ..."/"최종 확인 N/3" 같은 다른 단계 label은 매칭되지 않아 undefined를
 // 돌려준다(원인을 하나로 특정할 수 없는 단계에 잘못 아이템 설명을 붙이지 않기 위함).
@@ -135,6 +135,10 @@ function ReportPage() {
   const inventory = useGameStore((state) => state.inventory);
   const resetGame = useGameStore((state) => state.resetGame);
   const replayGame = useGameStore((state) => state.replayGame);
+  // 여기서 다시 시작하는 사람은 이미 한 판을 끝낸 사람이라 온보딩을 띄우지 않는다
+  // (행성 생성 화면·플레이 화면 둘 다. resetGame은 이 값을 건드리지 않으므로
+  // 행성 만들기를 거쳐도 유지된다).
+  const skipTutorials = useGameStore((state) => state.skipTutorials);
 
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
     title: "행성 진단 결과",
@@ -267,11 +271,13 @@ function ReportPage() {
   const selectedGroup = selectedGroupKey != null ? quizGroups.find((g) => g.key === selectedGroupKey) : null;
 
   const handleReplay = async () => {
+    skipTutorials();
     await replayGame();
     navigate("/game");
   };
 
   const handleRestart = () => {
+    skipTutorials();
     resetClimate();
     resetGame();
     navigate("/planet-create");

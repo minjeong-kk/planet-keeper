@@ -158,9 +158,14 @@ const useClimateStore = create(
     // 되지만, useGameStore가 초기화되는데 조성만 남으면 "새 게임인데 이전 판의
     // 행성"이 되어 헷갈린다. 두 store의 version을 같이 올려 항상 함께 초기화한다.
     //
-    // version 2: 빙하+바다 상호제약(applyIceOceanCoupling) 도입 당시 버전을 안
-    // 올려서, 그 이전 저장본(예: {iceThickness:80, ocean:80} 같은 합>100 조합)이
-    // migrate로 안 걸러지고 있었다. 방어적으로 지금 올린다.
+    // version 2로 올린 이유가 두 가지 있다(둘 다 옛 저장본을 한 번 비워야 한다).
+    //   1) 빙하+바다 상호제약(applyIceOceanCoupling) 도입 당시 버전을 안 올려서,
+    //      그 이전 저장본(예: {iceThickness:80, ocean:80} 같은 합>100 조합)이
+    //      migrate로 안 걸러지고 있었다.
+    //   2) "이전 판이 지구형 안정으로 끝난 조성 + 그 평형온도(≈288K)"가 그대로
+    //      남아 있어서, 새 게임이 시작부터 ΔE≈0 / 지구형 안정으로 뜨는 문제가
+    //      있었다(StartPage가 resetClimate를 부르지 않았음 - 지금은 부른다).
+    // migrate가 빈 객체를 반환하면 초기 상태와 병합되어 사실상 초기화된다.
     { name: "planet-keeper-climate", version: 2, migrate: () => ({}) },
   ),
 );

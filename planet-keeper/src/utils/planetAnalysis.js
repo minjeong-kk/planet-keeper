@@ -233,6 +233,20 @@ const SLIDER_KEY_LABELS = {
   co2: "CO₂",
 };
 
+// 장비 카드에 붙이는 아주 짧은 효과 키워드 - "무엇을 바꾸는지 · 데워지는지/식는지"
+// 두 조각만 보여준다(예: "구름 증가 · 냉각"). 방향은 previewItemEffect의 사슬 마지막
+// 줄("예상 안정 온도 감소/증가")에서 그대로 읽는다 - 정적 표를 새로 만들면 아이템
+// 데이터와 어긋날 수 있어서, 이미 있는 설명 데이터 하나만 원본으로 쓴다.
+//
+// 표시 전용이다. "이 장비가 지금 실제로 도움이 되는가"는 clamp 때문에 정적으로
+// 판단할 수 없으므로 게임 로직은 여전히 물리엔진(itemDeltaEnergyChange)으로 판단한다.
+export function itemEffectKeyword(item) {
+  const change = shortSliderChangeLabel(item.key, item.delta);
+  const chain = previewItemEffect(item).chain ?? [];
+  const last = chain[chain.length - 1] ?? "";
+  const direction = last.includes("감소") ? "냉각" : last.includes("증가") ? "가열" : null;
+  return direction ? `${change} · ${direction}` : change;
+}
 export function shortSliderChangeLabel(key, delta) {
   const label = SLIDER_KEY_LABELS[key] ?? "행성 조성";
   return `${label} ${delta > 0 ? "증가" : "감소"}`;

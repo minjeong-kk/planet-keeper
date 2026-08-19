@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import useGameStore, { itemDeltaEnergyChange, ITEM_EFFECT_EPSILON } from "../../store/useGameStore.js";
 import useClimateStore from "../../store/useClimateStore.js";
 import { previewItemEffect, formatSigned } from "../../utils/planetAnalysis.js";
@@ -16,7 +17,7 @@ function ItemInfoModal({ item, onClose }) {
   const before = physicsResult?.deltaEnergy;
   const change = physicsResult ? itemDeltaEnergyChange(item, values, currentTemperature) : null;
   const after = before != null && change != null ? before + change : null;
-  // "효과 없음" 기준은 게임 로직(pickVisibleItems/useItem)이 쓰는 것과 같아야 한다.
+  // "효과 없음" 기준은 게임 로직(pickVisibleItems/applyEquipment)이 쓰는 것과 같아야 한다.
   // 여기만 다른 값을 쓰면 모달은 "변한다"고 했는데 엔진은 "효과 없음"으로 판정한다.
   const trend =
     change == null || Math.abs(change) < ITEM_EFFECT_EPSILON
@@ -25,7 +26,11 @@ function ItemInfoModal({ item, onClose }) {
         ? "줄어들"
         : "늘어날";
 
-  return (
+  // 장비 카드를 감싼 .panel/.mission에는 backdrop-filter가 걸려 있는데, 그러면 그
+  // 요소가 position: fixed 자손의 기준(컨테이닝 블록)이 된다 - 모달이 화면 전체가
+  // 아니라 그 카드 안에 갇혀서 행성 진단 패널과 겹치고, 오버레이·확인 버튼이 밀려나
+  // 닫을 수 없었다. body로 포탈해서 화면 기준으로 뜨게 한다.
+  return createPortal(
     <div className="item-info-modal-overlay" onClick={onClose}>
       <div className="item-info-modal" onClick={(e) => e.stopPropagation()}>
 
@@ -94,7 +99,8 @@ function ItemInfoModal({ item, onClose }) {
         </button>
 
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
