@@ -26,7 +26,6 @@ const ITEM_KEY_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${ite
 // 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
 const CONCEPT_ALIASES = {
   피드백: "climateFeedback",
-  "에너지 평형": "energyBalance",
   평균기온: "currentTemperature",
 };
 
@@ -328,7 +327,7 @@ function ReportPage() {
             </span>
           </div>
           <div className="report-page__metric-box">
-            <span className="report-page__metric-label">에너지 수지 판정</span>
+            <span className="report-page__metric-label">에너지 불균형 판정</span>
             <span className="report-page__metric-value">
               {final?.ml ? final.ml.label : "-"}
             </span>
@@ -373,7 +372,7 @@ function ReportPage() {
                 className="report-page__timeline-chart"
                 viewBox={`0 0 ${CHART_W} ${CHART_H}`}
                 role="img"
-                aria-label="ΔE(에너지 수지) 추이 그래프"
+                aria-label="ΔE(에너지 불균형) 추이 그래프"
               >
                 <rect
                   className="report-page__timeline-chart-band"

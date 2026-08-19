@@ -19,7 +19,7 @@ function InfoPanel({ physicsResult, co2Ppm }) {
         },
         {
           icon: "⚡",
-          label: <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 수지</Term>,
+          label: <Term concept={CLIMATE_CONCEPTS.deltaEnergy}>에너지 불균형</Term>,
           value: `${physicsResult.deltaEnergy >= 0 ? "+" : ""}${physicsResult.deltaEnergy.toFixed(1)} W/m²`,
           ok: Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON,
         },

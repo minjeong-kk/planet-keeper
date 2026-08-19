@@ -575,7 +575,7 @@
   color: var(--text-h);
   padding: 22px 26px;
   border-radius: 16px;
-  max-width: 480px;
+  max-width: 600px;
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
@@ -637,7 +637,7 @@
 }
 
 .report-page__modal-question {
-  font-weight: 700;
+  font-weight: 600;
   font-size: 0.95rem;
   margin: 0;
   line-height: 1.45;
@@ -671,12 +671,12 @@
 /* 차분하고 신뢰감을 주는 딥 그린 (형광 텍스트 완전 제거) */
 .text-correct {
   color: var(--success);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .text-wrong {
   color: var(--danger);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .report-page__modal-section {

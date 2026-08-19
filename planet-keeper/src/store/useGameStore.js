@@ -233,10 +233,17 @@ function pickVisibleItems(deltaEnergy, values, currentTemperature) {
 
   const guaranteed = shuffled(working).slice(0, Math.min(GUARANTEED_WORKING_CHOICES, working.length));
   const guaranteedIds = new Set(guaranteed.map((item) => item.id));
-  const rest = shuffled(pool.filter((item) => !guaranteedIds.has(item.id))).slice(
-    0,
-    ITEM_CHOICES_SHOWN - guaranteed.length,
-  );
+  // 나머지 후보도 최소한 "뭔가는 바뀌는" 아이템으로만 채운다 - 안 그러면 이미
+  // 슬라이더가 한계(0/100)에 붙어 클램프로 효과가 0인 아이템(예: 남극처럼 빙하가
+  // 이미 거의 100%인 지점에서 빙하를 더 늘리는 아이템)이 필러로 계속 뽑혀서
+  // 써도 아무 일도 안 일어나는 죽은 선택지가 된다.
+  const rest = shuffled(
+    pool.filter(
+      (item) =>
+        !guaranteedIds.has(item.id) &&
+        Math.abs(itemDeltaEnergyChange(item, values, currentTemperature)) > ITEM_EFFECT_EPSILON,
+    ),
+  ).slice(0, ITEM_CHOICES_SHOWN - guaranteed.length);
   return shuffled([...guaranteed, ...rest]);
 }
 

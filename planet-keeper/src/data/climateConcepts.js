@@ -3,7 +3,7 @@
 
 export const CLIMATE_CONCEPTS = {
   energyBalance: {
-    term: "열수지 평형",
+    term: "에너지 평형",
     detail: "지구가 흡수하는 태양복사 에너지와 우주로 방출하는 지구복사 에너지가 거의 같은 상태입니다. 둘의 차이가 지속되면 기후는 점차 따뜻해지거나 차가워집니다.",
   },
   albedo: {

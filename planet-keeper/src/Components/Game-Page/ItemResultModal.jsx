@@ -55,7 +55,7 @@ function ItemResultModal({ item, before, after, lines, ok, onClose }) {
 
         {!temperatureChanged && (
           <p className="item-result__hint">
-            조성이 바뀌어도 온도는 한 걸음씩만 움직입니다 - 지금은 에너지 수지가 먼저 변했습니다.
+            조성이 바뀌어도 온도는 한 걸음씩만 움직입니다 - 지금은 에너지 불균형이 먼저 변했습니다.
           </p>
         )}
 

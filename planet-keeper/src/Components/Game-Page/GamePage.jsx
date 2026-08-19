@@ -383,7 +383,7 @@ function GamePage() {
       ? Math.max(0, pendingClimateEvent.expiresAt - elapsedSeconds)
       : CLIMATE_EVENT_RESPONSE_SECONDS;
 
-  // 경보 대응 중에는 슬라이더를 움직일 때마다 지금 조성의 ΔE/평형 온도를 다시
+  // 경보 대응 중에는 슬라이더를 움직일 때마다 지금 조성의 ΔE/예상 안정 온도를 다시
   // 계산해서 보여준다(표시 전용 - 실제 physicsResult는 resolveClimateEvent가
   // 판정할 때만 갱신된다). 플레이어가 "지금 내가 맞는 방향으로 가고 있나"를
   // 값 자체로 확인할 수 있게 하는 용도다.
@@ -555,7 +555,7 @@ function GamePage() {
               </p>
             </div>
           ) : (
-            /* 1단계: 목표가 "에너지 균형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
+            /* 1단계: 목표가 "에너지 평형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
                온도 안정 구간은 아직 보여주지 않는다. */
             <div className="hud__balance">
               <span className="hud__balance-label">에너지 불균형</span>
@@ -581,10 +581,10 @@ function GamePage() {
           )}
           </div>
 
-          {/* 평형 온도/ΔE는 보조 정보 - 현재 온도보다 작게, 아래쪽에 둔다. */}
+          {/* 예상 안정 온도/ΔE는 보조 정보 - 현재 온도보다 작게, 아래쪽에 둔다. */}
           <div className="hud__substats">
             <div className="hud__substat">
-              <span className="hud__substat-label">평형 온도</span>
+              <span className="hud__substat-label">예상 안정 온도</span>
               <span className="hud__substat-value">
                 {equilibriumTemperature != null ? `${equilibriumTemperature.toFixed(1)} K` : "--"}
               </span>
@@ -726,7 +726,7 @@ function GamePage() {
             {isBriefing ? (
               <>
                 <p className="climate-event__goal">
-                  <strong>목표</strong> 에너지 균형을 회복하세요 (ΔE를 0에 가깝게)
+                  <strong>목표</strong> 에너지 평형을 회복하세요 (ΔE를 0에 가깝게)
                 </p>
                 {pendingClimateEvent.hint && (
                   <p className="climate-event__hint">💡 {pendingClimateEvent.hint}</p>
@@ -757,7 +757,7 @@ function GamePage() {
                   늘어납니다
                 </p>
 
-                {/* 조절하는 동안 지금 조성의 ΔE/평형 온도를 실시간으로 보여준다. */}
+                {/* 조절하는 동안 지금 조성의 ΔE/예상 안정 온도를 실시간으로 보여준다. */}
                 {livePhysics && (
                   <div className={`climate-event__live climate-event__live--${liveTrend}`}>
                     <div className="climate-event__live-item">
@@ -765,7 +765,7 @@ function GamePage() {
                       <strong>{formatSigned(livePhysics.deltaEnergy)} W/m²</strong>
                     </div>
                     <div className="climate-event__live-item">
-                      <span>평형 온도</span>
+                      <span>예상 안정 온도</span>
                       <strong>{equilibriumTemperatureOf(livePhysics).toFixed(1)} K</strong>
                     </div>
                     <span className="climate-event__live-tag">
