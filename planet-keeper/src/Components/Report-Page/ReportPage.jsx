@@ -395,7 +395,6 @@ function ReportPage() {
             </div>
 
             <div className="report-page__timeline-detail-col">
-              <p className="report-page__timeline-detail-col-title">과정 설명</p>
               {activePoint ? (
                 <div className="report-page__timeline-detail">
                   <div className="report-page__timeline-card-header">
@@ -462,7 +461,6 @@ function ReportPage() {
           </div>
 
           <div className="report-page__concept-col">
-            <p className="report-page__timeline-detail-col-title">관련 개념 (이번 플레이 기준)</p>
             <div className="report-page__concept-grid">
               {Object.entries(CLIMATE_CONCEPTS)
                 .filter(([key]) => relevantKeys.has(key))
@@ -481,6 +479,66 @@ function ReportPage() {
           </div>
         </div>
       </CollapsibleSection>
+
+      {/* 문제 해설 모달 - CollapsibleSection 밖에 둔다. 접기/펼치기와는 무관한
+          화면 전체 오버레이라 콘텐츠 트리 안에 있으면 안 된다. */}
+      {selectedGroup && (
+        <div className="report-page__modal-overlay" onClick={() => setSelectedGroupKey(null)}>
+          <div className="report-page__modal" onClick={(e) => e.stopPropagation()}>
+            <div className="report-page__modal-header">
+              <span className={`report-page__modal-badge ${selectedGroup.correct ? "report-page__modal-badge--correct" : "report-page__modal-badge--wrong"}`}>
+                {selectedGroup.correct ? "정답" : "오답"}
+              </span>
+              <p className="report-page__modal-question">{selectedGroup.title}</p>
+            </div>
+
+            <div className="report-page__modal-answers">
+              {selectedGroup.attempts.map((attempt, i) => (
+                <div key={i} className="report-page__modal-answer-row">
+                  <span className="report-page__modal-label">
+                    {selectedGroup.attempts.length > 1 ? `${i + 1}차 제출` : "제출한 답"}
+                  </span>
+                  <span className={attempt.correct ? "text-correct" : "text-wrong"}>{attempt.selectedAnswer}</span>
+                </div>
+              ))}
+              <div className="report-page__modal-answer-row">
+                <span className="report-page__modal-label">정답</span>
+                <span className="text-correct">{selectedGroup.correctAnswer}</span>
+              </div>
+            </div>
+
+            {selectedGroup.explanation && (
+              <div className="report-page__modal-section">
+                <h4 className="report-page__modal-subtitle">💡 해설</h4>
+                <div className="report-page__modal-explanation">
+                  <p>{selectedGroup.explanation}</p>
+                </div>
+              </div>
+            )}
+
+            {selectedGroup.concepts?.length > 0 && (
+              <div className="report-page__modal-section">
+                <h4 className="report-page__modal-subtitle">📚 관련 개념</h4>
+                <ul className="report-page__concept-list">
+                  {selectedGroup.concepts.map((concept) => {
+                    const matched = lookupConcept(concept);
+                    return (
+                      <li key={concept}>
+                        <strong className="report-page__concept-term">{concept}</strong>
+                        {matched && <span> — {matched.detail}</span>}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
+
+            <button className="report-page__modal-close-btn" onClick={() => setSelectedGroupKey(null)}>
+              닫기
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="report-page__actions">
         <button className="btn-primary" onClick={handleReplay}>
