@@ -73,6 +73,31 @@ const STAGE_META = {
   [GAME_STAGES.REPORT]: { tag: "MISSION END", objective: "결과 보고서로 이동합니다" },
 };
 
+// 지점 선택(PlanetLocationPicker)으로 시작했을 때, 그 지점의 첫 판정이 직관과
+// 반대로 보일 수 있는 경우를 설명한다 - 이 엔진은 지점마다 실측 온도/알베도는
+// 반영하지만 위도별 실제 일사량 차이나 대기·해류의 열 수송은 반영하지 않고 모든
+// 지점에 같은 태양상수를 쓴다(PlanetLocationPicker의 picker__flag-note와 같은
+// 이유). 그래서 실제로는 추운 남극이 "에너지 과다"로, 실제로는 더운 사하라/
+// 태평양/아마존이 "에너지 부족"으로 나온다 - 계산이 틀린 게 아니라 이 세 지점
+// 모두 실제로는 대기·해류가 계속 열을 옮겨줘야 그 온도가 유지된다는 뜻이다.
+// 서울은 이미 Earth-like 근처라 해당 없음.
+const LOCATION_IMBALANCE_EXPECTED = {
+  antarctica: "Energy Surplus",
+  sahara: "Energy Deficit",
+  pacific: "Energy Deficit",
+  amazon: "Energy Deficit",
+};
+const LOCATION_IMBALANCE_NOTES = {
+  antarctica:
+    "남극은 실측 온도가 230K로 매우 낮은데도 \"에너지 과다\"로 나옵니다 - 이 엔진은 모든 지점에 같은 태양상수를 적용해서, 실제로는 대기·해류가 계속 열을 밖으로 옮겨야 유지되는 이 낮은 온도를 그 유출 없이 계산하면 오히려 에너지가 남는 것처럼 보입니다.",
+  sahara:
+    "사하라는 실측 온도가 300K로 높은데도 \"에너지 부족\"으로 나옵니다 - 위도에 따라 실제로 크게 다른 일사량 차이를 이 엔진은 반영하지 않아서, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 이 온도를 그 유입 없이 계산하면 오히려 에너지가 부족한 것처럼 보입니다.",
+  pacific:
+    "태평양 중심부는 실측 온도가 301K로 높은데도 \"에너지 부족\"으로 나옵니다 - 사하라와 같은 이유로, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 온도를 그 유입 없이 계산한 결과입니다.",
+  amazon:
+    "아마존은 실측 온도가 299K로 높은데도 \"에너지 부족\"으로 나옵니다 - 사하라와 같은 이유로, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 온도를 그 유입 없이 계산한 결과입니다.",
+};
+
 // 아이템 사용/2단계 확인 후 물리엔진이 판정한 상태 - 행성 옆 배지로 강조 표시한다.
 // Energy Surplus/Deficit은 아이템을 잘못 골라 오히려 에너지 불균형이 커진 경우다.
 const STABLE_BADGES = {
@@ -161,6 +186,7 @@ function GamePage() {
   const values = useClimateStore((state) => state.values);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const resetClimate = useClimateStore((state) => state.resetClimate);
+  const selectedLocation = useClimateStore((state) => state.selectedLocation);
   // 1초마다 도는 elapsedSeconds 틱에도 GamePage가 리렌더되므로, values/physicsResult/
   // inventory가 그대로인데 매번 다시 계산되지 않도록 메모이즈한다.
   const climateInputs = useMemo(() => mapSlidersToClimateInputs(values), [values]);
@@ -231,6 +257,10 @@ function GamePage() {
   // 있다. 열려 있는 동안에는 아래 타이머 effect가 tickSecond를 돌리지 않으므로
   // 이상기후가 끼어들지 않는다.
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  // 지점 프리셋으로 시작했고 그 지점의 첫 판정이 LOCATION_IMBALANCE_EXPECTED와
+  // 일치할 때만(슬라이더를 미리 만져 조성이 달라졌으면 안 뜬다) 온보딩 직후
+  // 한 번 보여주는 설명 문구.
+  const [locationNote, setLocationNote] = useState(null);
   // 1단계를 통과(에너지 평형 달성)한 순간 한 번 띄우는 단계 전환 모달.
   // 2단계 UI(지구 유사 온도 게이지)로 바뀌는 시점을 설명해 준다.
   const [stageClearOpen, setStageClearOpen] = useState(false);
@@ -280,6 +310,10 @@ function GamePage() {
   const handleTutorialFinish = () => {
     setTutorialOpen(false);
     dismissTutorial();
+    const expected = selectedLocation && LOCATION_IMBALANCE_EXPECTED[selectedLocation.id];
+    if (expected && mlResult?.label === expected) {
+      setLocationNote(LOCATION_IMBALANCE_NOTES[selectedLocation.id]);
+    }
   };
 
   // 선택지를 누르면 곧바로 판정한다(별도 제출 버튼 없음).
@@ -603,6 +637,16 @@ function GamePage() {
         </section>
 
         <aside className="hud__column hud__column--right">
+          {locationNote && (
+            <div className="mission mission--notice">
+              <span className="mission__eyebrow">🌍 지점 특이사항</span>
+              <p className="mission__notice-text">{locationNote}</p>
+              <button type="button" className="hud-btn" onClick={() => setLocationNote(null)}>
+                확인했습니다
+              </button>
+            </div>
+          )}
+
           {/* 임무 패널 - 문제를 푼 직후에는 같은 자리가 해설 카드로 바뀐다. */}
           {result ? (
             <QuizResult result={result} onClose={() => setResult(null)} />

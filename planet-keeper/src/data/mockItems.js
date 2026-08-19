@@ -52,12 +52,16 @@ export const MOCK_ITEMS = [
     delta: -12,
   },
   {
+    // co2Term은 로그 응답이라 넓은 범위를 커버한다 - delta가 크면(원래 12) 빙하/구름을
+    // 어떻게 세팅해도 이 아이템 두세 번으로 ΔE가 닫혀 항상 Earth-like Stable로
+    // 수렴했다(빙하/구름 조성이 결과에 반영 안 됨). 6으로 줄여 다른 슬라이더의
+    // 비중을 키운다.
     id: "carbon_capture",
     name: "탄소 포집 장치",
     emoji: "🏭",
     description: "대기 중 온실가스(CO2)를 흡수하여 대기 재복사 에너지를 줄이고 온도를 낮춥니다.",
     key: "co2",
-    delta: -12,
+    delta: -6,
   },
   {
     id: "greenhouse_emitter",
@@ -65,7 +69,7 @@ export const MOCK_ITEMS = [
     emoji: "🌋",
     description: "지열을 자극해 CO2를 강제 방출하고 대기 재복사량을 늘려 극도의 저온 상태를 탈출합니다.",
     key: "co2",
-    delta: 12,
+    delta: 6,
   },
   {
     // ponytail: 원본 설명(태양 유입 에너지 총량 조정)은 지금 코드에 없는 값이다
@@ -79,12 +83,17 @@ export const MOCK_ITEMS = [
     delta: 8,
   },
   {
+    // CO2 계열과 마찬가지로 온실효과(greenhouseStrengthOf) 쪽 레버라 delta가 크면
+    // 빙하/구름으로 세팅한 조성과 무관하게 이 아이템 몇 번만으로 ΔE가 닫혀버려서
+    // 항상 Earth-like Stable로 수렴했다(원래 delta 15 - 아래 co2 delta 6과 같은
+    // 이유로 축소). 두 계열(co2/atmThickness) 다 줄여야 빙하·구름 조성이 결과
+    // 온도(Cold/Earth-like/Warm Stable)에 실제로 반영된다.
     id: "density_regulator",
     name: "대기 밀도 조절기",
     emoji: "🌫️",
     description: "대기의 전반적인 두께를 압축 및 팽창시켜 대기 흡수율과 복사 보유 능력을 동시 조정합니다.",
     key: "atmThickness",
-    delta: 15,
+    delta: 8,
   },
   {
     id: "atm_thinner",
@@ -92,6 +101,6 @@ export const MOCK_ITEMS = [
     emoji: "🌬️",
     description: "대기를 강제로 얇게 압축해 온실효과를 줄이고 지표 복사가 우주로 더 잘 빠져나가게 합니다.",
     key: "atmThickness",
-    delta: -15,
+    delta: -8,
   },
 ];

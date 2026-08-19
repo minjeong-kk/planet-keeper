@@ -1973,6 +1973,27 @@
   word-break: keep-all;
 }
 
+.item-result__step strong {
+  color: #f2f7ff;
+  font-weight: 600;
+}
+
+/* 알베도->ASR 계열 / 온실효과->OLR 계열 색 구분 - 리포트 페이지 타임라인
+   (report-page__timeline-explain-line--albedo/greenhouse)과 같은 배색이다. */
+.item-result__step--albedo {
+  color: #2dd4bf;
+}
+.item-result__step--albedo strong {
+  color: #2dd4bf;
+}
+
+.item-result__step--greenhouse {
+  color: #a78bfa;
+}
+.item-result__step--greenhouse strong {
+  color: #a78bfa;
+}
+
 .item-result__arrow {
   font-size: 0.85rem;
   line-height: 1.1;
