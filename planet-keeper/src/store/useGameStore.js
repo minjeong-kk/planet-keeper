@@ -206,10 +206,15 @@ export function itemDeltaEnergyChange(item, values, currentTemperature) {
   return after - before;
 }
 
-// 지금 ΔE 방향에 실제로 도움이 되는(clamp에 걸려 무효화되지 않은) 아이템이 후보에
-// 최소 하나는 포함되도록 먼저 하나를 고정으로 뽑은 뒤, 나머지를 무작위로 채운다 -
-// 안 그러면 무작위로 고른 4개가 전부 틀린 방향(또는 전부 효과 없는 아이템)이라
-// 이번 라운드에 답이 없는 경우가 생길 수 있다.
+// 지금 ΔE 방향에 실제로 도움이 되는(clamp에 걸려 무효화되지 않은) 아이템을 후보에
+// 최소 GUARANTEED_WORKING_CHOICES개 고정으로 넣은 뒤 나머지를 무작위로 채운다.
+//
+// 예전에는 1개만 보장했는데, 장비를 바로 쓰지 않고 확보해 두는 구조로 바뀌면서
+// "4개 중 3개가 반대 방향"인 라운드가 체감상 답답했다(잘못 확보하면 그 장비가
+// 인벤토리에 남는다). 2개를 보장하면 방향은 여전히 스스로 판단해야 하지만
+// 고를 여지가 생긴다. 방향 자체를 알려주지는 않는다.
+const GUARANTEED_WORKING_CHOICES = 2;
+
 function pickVisibleItems(deltaEnergy, values, currentTemperature) {
   const pool = MOCK_ITEMS;
 
@@ -226,9 +231,13 @@ function pickVisibleItems(deltaEnergy, values, currentTemperature) {
   // 안전망) 보장 없이 무작위로만 채운다.
   if (working.length === 0) return shuffled(pool).slice(0, ITEM_CHOICES_SHOWN);
 
-  const guaranteed = pickRandom(working);
-  const rest = shuffled(pool.filter((item) => item.id !== guaranteed.id)).slice(0, ITEM_CHOICES_SHOWN - 1);
-  return shuffled([guaranteed, ...rest]);
+  const guaranteed = shuffled(working).slice(0, Math.min(GUARANTEED_WORKING_CHOICES, working.length));
+  const guaranteedIds = new Set(guaranteed.map((item) => item.id));
+  const rest = shuffled(pool.filter((item) => !guaranteedIds.has(item.id))).slice(
+    0,
+    ITEM_CHOICES_SHOWN - guaranteed.length,
+  );
+  return shuffled([...guaranteed, ...rest]);
 }
 
 // 행성 상태(0~4) 판정. 예전에는 학습된 ONNX 모델(climateClassifier.js)이 했지만,
@@ -599,9 +608,15 @@ const useGameStore = create(
 
     if (!physicsResult) return;
     if ((equipment[item.id] ?? 0) <= 0) return; // 보유하지 않은 장비
-    // 보상 선택 중에는 사용하지 않는다 - 고르는 중에 사용까지 겹치면 어느 쪽에
-    // 반응한 건지 헷갈린다(호출부도 이 단계에서는 카드를 잠근다).
-    if (currentStage === GAME_STAGES.ITEM) return;
+    // 장비는 1단계에서만 쓴다. 두 단계의 목표가 다르기 때문이다 -
+    //   1단계: 장비로 에너지 불균형을 줄여 "평형"을 만든다
+    //   2단계: 그 평형을 유지한 채 문제를 풀어 "지구 유사 온도"로 맞춘다
+    // 2단계에서 장비를 쓰면 평형이 다시 깨지는데도 문제 풀이만으로 진행돼 단계
+    // 구분이 무의미해진다(게다가 finalizeGame의 CO2 자동 조정이 그 변화를 덮어써서
+    // 플레이어 조작이 결과에 반영되지도 않는다). 보상 선택(ITEM) 중에도 막는다 -
+    // 고르는 중에 사용까지 겹치면 어느 쪽에 반응한 건지 헷갈린다.
+    // 보유 장비는 소모하지 않고 그대로 남는다(리포트에 기록).
+    if (currentStage !== GAME_STAGES.PROBLEM1) return;
 
     const nextEquipment = { ...equipment };
     if (nextEquipment[item.id] > 1) nextEquipment[item.id] -= 1;

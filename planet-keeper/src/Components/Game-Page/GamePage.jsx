@@ -5,6 +5,8 @@ import EquipmentPanel from "./EquipmentPanel";
 import EquipmentReward from "./EquipmentReward";
 import InfoPanel from "./InfoPanel";
 import PlanetDiagnosis from "./PlanetDiagnosis";
+import ItemResultModal from "./ItemResultModal";
+import StageClearModal from "./StageClearModal";
 import Tutorial from "../common/Tutorial";
 import { GAME_TOUR_STEPS } from "../common/tourSteps.js";
 import PlanetUI from "../Planet-ui.jsx";
@@ -16,7 +18,6 @@ import useGameStore, {
   CLIMATE_EVENT_RESPONSE_SECONDS,
   MAX_EQUIPMENT_CAPACITY,
   equipmentTotalCount,
-  ITEM_EFFECT_EPSILON,
 } from "../../store/useGameStore";
 import { slidersToVisual } from "../../utils/climateVisual.js";
 import {
@@ -47,8 +48,6 @@ const CLIMATE_TICK_ENABLED = true;
 // 하단 "최근 활동" 로그에 남겨두는 최대 항목 수.
 const ACTIVITY_LOG_LIMIT = 8;
 
-// 장비 사용 직후 행성 옆에 뜨는 효과 카드가 유지되는 시간(ms).
-const USE_EFFECT_DISPLAY_MS = 3200;
 
 // 조성·온도가 바뀔 때 행성 외형이 그 값으로 옮겨가는 시간(ms). 즉시 바꾸면 한 프레임
 // 만에 끝나서 "변했다"는 게 눈에 안 들어온다 - 장비 효과가 보이도록 천천히 모습을 바꾼다.
@@ -68,9 +67,9 @@ const SAFE_BAND_END = gaugePercent(EARTH_LIKE_MAX_K);
 // 단계별 헤더 문구 - "1단계 문제" 같은 학습 플랫폼 표현 대신 임무 브리핑처럼 보이게 한다.
 const STAGE_META = {
   [GAME_STAGES.CREATOR]: { tag: "STANDBY", objective: "행성 데이터를 불러오는 중" },
-  [GAME_STAGES.PROBLEM1]: { tag: "MISSION 01", objective: "에너지 불균형의 원인을 찾아라" },
+  [GAME_STAGES.PROBLEM1]: { tag: "MISSION 01", objective: "흡수·방출 에너지의 균형을 맞춰라" },
   [GAME_STAGES.ITEM]: { tag: "MISSION 01", objective: "확보할 기후 제어 장비를 선택하라" },
-  [GAME_STAGES.FINAL]: { tag: "MISSION 02", objective: "행성을 지구형 안정 상태로 확정하라" },
+  [GAME_STAGES.FINAL]: { tag: "MISSION 02", objective: "지구와 유사한 목표 온도로 맞춰라" },
   [GAME_STAGES.REPORT]: { tag: "MISSION END", objective: "결과 보고서로 이동합니다" },
 };
 
@@ -232,12 +231,17 @@ function GamePage() {
   // 있다. 열려 있는 동안에는 아래 타이머 effect가 tickSecond를 돌리지 않으므로
   // 이상기후가 끼어들지 않는다.
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  // 1단계를 통과(에너지 평형 달성)한 순간 한 번 띄우는 단계 전환 모달.
+  // 2단계 UI(지구 유사 온도 게이지)로 바뀌는 시점을 설명해 준다.
+  const [stageClearOpen, setStageClearOpen] = useState(false);
+  const wasFinalRef = useRef(false);
   // 장비 사용 직후 행성 옆에 잠깐 뜨는 효과 카드 { item, before, after }.
   const [useEffectCard, setUseEffect] = useState(null);
 
   const isLocked = !!pendingClimateEvent;
   const isItemStage = currentStage === GAME_STAGES.ITEM;
-  const isQuizStage = currentStage === GAME_STAGES.PROBLEM1 || currentStage === GAME_STAGES.FINAL;
+  const isFinalStage = currentStage === GAME_STAGES.FINAL;
+  const isQuizStage = currentStage === GAME_STAGES.PROBLEM1 || isFinalStage;
   const stageMeta = STAGE_META[currentStage] ?? STAGE_META[GAME_STAGES.CREATOR];
 
   // 시간이 지날수록 기후가 악화되는 압박 장치 - CREATOR/REPORT를 제외한 모든
@@ -249,12 +253,12 @@ function GamePage() {
   useEffect(() => {
     if (!CLIMATE_TICK_ENABLED) return undefined;
     if (currentStage === GAME_STAGES.REPORT || currentStage === GAME_STAGES.CREATOR) return undefined;
-    // 온보딩 중에는 게임을 멈춘다 - 설명을 읽는 동안 경과 시간이 쌓이거나
-    // 이상기후가 터지면 튜토리얼의 의미가 없다.
-    if (tutorialOpen) return undefined;
+    // 온보딩·장비 사용 결과를 읽는 동안에는 게임을 멈춘다 - 설명을 읽는 사이
+    // 경과 시간이 쌓이거나 이상기후가 터지면 읽을 수가 없다.
+    if (tutorialOpen || useEffectCard || stageClearOpen) return undefined;
     const timer = setInterval(tickSecond, 1000);
     return () => clearInterval(timer);
-  }, [currentStage, tickSecond, tutorialOpen]);
+  }, [currentStage, tickSecond, tutorialOpen, useEffectCard, stageClearOpen]);
 
   // 온보딩이 예약된 판에서 실제로 플레이 가능한 화면이 준비되면(문제/장비 단계 + 물리
   // 결과가 채워짐) 한 번만 자동으로 연다.
@@ -263,6 +267,15 @@ function GamePage() {
     if (currentStage === GAME_STAGES.CREATOR || currentStage === GAME_STAGES.REPORT) return;
     setTutorialOpen(true);
   }, [tutorialPending, physicsResult, currentStage]);
+
+  // PROBLEM1/ITEM -> FINAL로 처음 넘어가는 순간을 잡아 전환 모달을 띄운다
+  // (아이템 사용/이상기후 대응 어느 경로로 평형에 도달했든 한 번만 뜬다).
+  useEffect(() => {
+    const isFinal = currentStage === GAME_STAGES.FINAL;
+    if (isFinal && !wasFinalRef.current && physicsResult) setStageClearOpen(true);
+    if (currentStage === GAME_STAGES.CREATOR) wasFinalRef.current = false;
+    else if (isFinal) wasFinalRef.current = true;
+  }, [currentStage, physicsResult]);
 
   const handleTutorialFinish = () => {
     setTutorialOpen(false);
@@ -290,15 +303,20 @@ function GamePage() {
     claimEquipment(item);
   };
 
-  // 장비 사용: 실제로 행성을 바꾼다. 사용 전/후 스냅샷을 비교해 짧은 효과 카드를
-  // 띄운다(온도·ΔE가 어떻게 움직였는지). applyEquipment는 await 하면 store 갱신이
-  // 끝난 상태이므로 그 뒤에 최신 physicsResult를 읽는다.
+  // 장비 사용: 실제로 행성을 바꾼 뒤 "사용 결과" 모달을 띄운다. 숫자 변화(온도·ΔE)
+  // 뿐 아니라 조성 -> 알베도/온실효과 -> ASR/OLR -> ΔE로 이어지는 인과 사슬까지
+  // 그때그때 보여주는 게 이 게임의 학습 목표라서, store가 만든 판정 문구
+  // (notice.lines = describeItemJudgment 결과)를 그대로 받아 쓴다.
+  // applyEquipment는 await 하면 store 갱신이 끝난 상태다.
   const handleUseEquipment = async (item) => {
     const before = useGameStore.getState().physicsResult;
     setResult(null);
     await applyEquipment(item);
-    const after = useGameStore.getState().physicsResult;
-    if (before && after && after !== before) setUseEffect({ item, before, after });
+    const state = useGameStore.getState();
+    const after = state.physicsResult;
+    if (before && after && after !== before) {
+      setUseEffect({ item, before, after, lines: state.notice?.lines ?? [], ok: !!state.notice?.ok });
+    }
   };
 
   // 피드백 플래시 / 해설 카드는 각자 정해진 시간 뒤 자동으로 사라진다.
@@ -345,16 +363,18 @@ function GamePage() {
   const heldEquipmentCount = useMemo(() => equipmentTotalCount(equipment), [equipment]);
 
 
-  // 장비 사용 효과 카드는 잠깐 보여준 뒤 사라진다.
-  useEffect(() => {
-    if (!useEffectCard) return undefined;
-    const timer = setTimeout(() => setUseEffect(null), USE_EFFECT_DISPLAY_MS);
-    return () => clearTimeout(timer);
-  }, [useEffectCard]);
-
   const displayTemperature = useAnimatedNumber(physicsResult?.currentTemperature ?? null);
   const markerPercent = gaugePercent(displayTemperature);
   const badge = STABLE_BADGES[mlResult?.label];
+  // 지구 유사 온도 안정 게이지는 2단계부터만 보여준다 - 1단계에서 "온도가 지구와
+  // 비슷하다"와 "에너지 평형이다"가 혼동되지 않게 하려는 것이다(에너지가 크게
+  // 불균형인데도 온도만 범위 안이면 안정처럼 보이던 문제).
+  const showTemperatureBand = currentStage === GAME_STAGES.FINAL || currentStage === GAME_STAGES.REPORT;
+  // ΔE 막대의 마커 위치(0%=에너지 부족 끝, 50%=평형, 100%=에너지 과다 끝).
+  // 표시 범위는 평형 허용범위의 4배까지 - 그보다 크면 양끝에 붙는다.
+  const balancePercent = physicsResult
+    ? Math.min(100, Math.max(0, 50 + (physicsResult.deltaEnergy / (ENERGY_BALANCE_EPSILON * 4)) * 50))
+    : 50;
   const isBalanced = physicsResult ? Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON : false;
   // 브리핑 단계(expiresAt === null)에는 카운트다운이 아직 흐르지 않는다.
   const isBriefing = !!pendingClimateEvent && pendingClimateEvent.expiresAt == null;
@@ -392,12 +412,14 @@ function GamePage() {
       ? "이상기후에 대응하세요"
       : isItemStage
         ? "확보할 장비를 선택하세요"
-        : isQuizStage
-          ? heldEquipmentCount >= MAX_EQUIPMENT_CAPACITY
-            ? "장비 보유 한도 - 왼쪽에서 먼저 사용하세요"
-            : heldEquipmentCount > 0
-              ? "선택지를 누르면 응답됩니다 · 장비는 왼쪽에서 언제든 사용"
-              : "선택지를 누르면 바로 응답됩니다"
+        : isFinalStage
+          ? "선택지를 누르면 응답됩니다 · 2단계에서는 장비를 쓸 수 없습니다"
+          : isQuizStage
+            ? heldEquipmentCount >= MAX_EQUIPMENT_CAPACITY
+              ? "장비 보유 한도 - 왼쪽에서 먼저 사용하세요"
+              : heldEquipmentCount > 0
+                ? "선택지를 누르면 응답됩니다 · 장비는 왼쪽에서 사용"
+                : "선택지를 누르면 바로 응답됩니다"
           : currentStage === GAME_STAGES.REPORT
             ? "임무 종료 - 결과 보고서로 이동합니다"
             : "";
@@ -467,8 +489,14 @@ function GamePage() {
           <EquipmentPanel
             equipment={equipment}
             onUse={handleUseEquipment}
-            disabled={isLocked || isItemStage || isComputing}
-            lockReason={isItemStage ? "먼저 확보할 장비를 선택하세요." : null}
+            disabled={isLocked || isItemStage || isComputing || isFinalStage}
+            lockReason={
+              isFinalStage
+                ? "🔒 2단계에서는 기후 제어 장비를 사용할 수 없습니다. 현재 평형 상태를 유지하면서 목표 온도를 맞춰보세요."
+                : isItemStage
+                  ? "먼저 확보할 장비를 선택하세요."
+                  : null
+            }
           />
         </aside>
 
@@ -490,39 +518,6 @@ function GamePage() {
               </div>
             )}
 
-            {/* 장비 사용 직후 - 무엇을 썼고 온도/ΔE가 어떻게 움직였는지만 짧게 */}
-            {useEffectCard && (
-              <div className="use-effect">
-                <span className="use-effect__title">
-                  {useEffectCard.item.emoji} {useEffectCard.item.name} 사용
-                </span>
-                <span className="use-effect__row">
-                  현재 온도 {useEffectCard.before.currentTemperature.toFixed(1)} K
-                  <em>→</em>
-                  {useEffectCard.after.currentTemperature.toFixed(1)} K
-                </span>
-                <span className="use-effect__row">
-                  에너지 불균형 {formatSigned(useEffectCard.before.deltaEnergy)}
-                  <em>→</em>
-                  {formatSigned(useEffectCard.after.deltaEnergy)} W/m²
-                </span>
-                {/* 어떤 장비가 맞는 선택인지 미리 알려주지 않고, 쓴 뒤의 결과로
-                    알려준다 - 방향을 스스로 판단하고 결과로 확인하는 흐름이다. */}
-                {(() => {
-                  const gap = Math.abs(useEffectCard.after.deltaEnergy) - Math.abs(useEffectCard.before.deltaEnergy);
-                  const tone = gap < -ITEM_EFFECT_EPSILON ? "good" : gap > ITEM_EFFECT_EPSILON ? "bad" : "same";
-                  return (
-                    <span className={`use-effect__trend is-${tone}`}>
-                      {tone === "good"
-                        ? "↘ 균형에 가까워졌습니다"
-                        : tone === "bad"
-                          ? "↗ 균형에서 멀어졌습니다"
-                          : "· 거의 변화가 없습니다"}
-                    </span>
-                  );
-                })()}
-              </div>
-            )}
           </div>
 
           {/* 현재 온도 + 게이지는 튜토리얼에서 한 덩어리로 강조한다. */}
@@ -535,24 +530,55 @@ function GamePage() {
             </p>
           </div>
 
-          <div className="hud__gauge">
-            <div className="hud__gauge-track">
-              <div
-                className="hud__gauge-safe"
-                style={{ left: `${SAFE_BAND_START}%`, width: `${SAFE_BAND_END - SAFE_BAND_START}%` }}
-              />
-              {physicsResult && (
-                <div className="hud__gauge-marker" style={{ left: `${markerPercent}%` }}>
-                  <span className="hud__gauge-marker-value">{displayTemperature.toFixed(1)} K</span>
-                </div>
-              )}
+          {showTemperatureBand ? (
+            /* 2단계: 목표가 "온도" 자체다 - 지구 유사 안정 구간을 활성화해서 보여준다. */
+            <div className="hud__gauge">
+              <div className="hud__gauge-track">
+                <div
+                  className="hud__gauge-safe"
+                  style={{ left: `${SAFE_BAND_START}%`, width: `${SAFE_BAND_END - SAFE_BAND_START}%` }}
+                />
+                {physicsResult && (
+                  <div className="hud__gauge-marker" style={{ left: `${markerPercent}%` }}>
+                    <span className="hud__gauge-marker-value">{displayTemperature.toFixed(1)} K</span>
+                  </div>
+                )}
+              </div>
+              <div className="hud__gauge-scale">
+                <span>너무 추움</span>
+                <span className="hud__gauge-scale--safe">안정</span>
+                <span>너무 뜨거움</span>
+              </div>
+              <p className="hud__gauge-note">
+                목표: 현재 온도를 안정 구간({COLD_STABLE_MAX_K.toFixed(1)} ~ {EARTH_LIKE_MAX_K.toFixed(1)} K)
+                안으로
+              </p>
             </div>
-            <div className="hud__gauge-scale">
-              <span>너무 추움</span>
-              <span className="hud__gauge-scale--safe">안정</span>
-              <span>너무 뜨거움</span>
+          ) : (
+            /* 1단계: 목표가 "에너지 균형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
+               온도 안정 구간은 아직 보여주지 않는다. */
+            <div className="hud__balance">
+              <span className="hud__balance-label">에너지 불균형</span>
+              <p className={`hud__balance-value${isBalanced ? " hud__balance-value--ok" : ""}`}>
+                {physicsResult ? formatSigned(physicsResult.deltaEnergy) : "--"}
+                <span className="hud__balance-unit">W/m²</span>
+              </p>
+              <div className="hud__balance-track">
+                <span className="hud__balance-zero" />
+                {physicsResult && (
+                  <span
+                    className={`hud__balance-marker${isBalanced ? " is-ok" : ""}`}
+                    style={{ left: `${balancePercent}%` }}
+                  />
+                )}
+              </div>
+              <div className="hud__balance-scale">
+                <span>에너지 부족</span>
+                <span className="hud__balance-scale--zero">0</span>
+                <span>에너지 과다</span>
+              </div>
             </div>
-          </div>
+          )}
           </div>
 
           {/* 평형 온도/ΔE는 보조 정보 - 현재 온도보다 작게, 아래쪽에 둔다. */}
@@ -788,6 +814,25 @@ function GamePage() {
             )}
           </div>
         </div>
+      )}
+
+      {/* 1단계 통과 - 두 단계의 목표 차이를 짚어주고 2단계 UI로 넘긴다.
+          평형을 만든 그 장비의 사용 결과(인과 설명)를 먼저 읽게 하고 그 모달을 닫은
+          뒤에 띄운다 - 동시에 뜨면 인과 설명이 이 모달 뒤에 가려진다. */}
+      {stageClearOpen && !useEffectCard && physicsResult && (
+        <StageClearModal physicsResult={physicsResult} onStart={() => setStageClearOpen(false)} />
+      )}
+
+      {/* 장비 사용 결과 - 숫자 변화 + 인과 사슬을 또렷하게 보여준다. */}
+      {useEffectCard && (
+        <ItemResultModal
+          item={useEffectCard.item}
+          before={useEffectCard.before}
+          after={useEffectCard.after}
+          lines={useEffectCard.lines}
+          ok={useEffectCard.ok}
+          onClose={() => setUseEffect(null)}
+        />
       )}
 
       {/* 첫 플레이 온보딩 - 실제 UI를 하나씩 짚어준다(data-tour 대상). */}

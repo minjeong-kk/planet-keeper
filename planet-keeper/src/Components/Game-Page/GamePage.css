@@ -422,6 +422,10 @@
   position: relative;
   width: 100%;
   min-height: 118px;
+  /* 채워진 칸은 <button>, 빈 슬롯은 <div>라 브라우저 기본 box-sizing이 서로 다르다
+     (버튼 border-box / div content-box) - 그래서 빈 슬롯만 padding+border만큼 칸보다
+     커져 옆 칸과 겹쳐 보였다. 둘 다 border-box로 못 박는다. */
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -448,8 +452,10 @@
 }
 
 /* 빈 슬롯 - 버튼이 아니라 자리 표시용 div다 */
+/* 빈 슬롯도 채워진 칸과 같은 높이로 - 두 줄 높이가 어긋나지 않게 한다 */
 .equipment-card--empty {
   justify-content: center;
+  min-height: 118px;
   border-style: dashed;
   background: rgba(3, 8, 15, 0.3);
   color: var(--faint);
@@ -566,6 +572,7 @@
 
 .reward-card {
   width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   gap: 12px;
@@ -963,6 +970,7 @@
 
 .choice {
   width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: flex-start;
   gap: 11px;
@@ -1055,6 +1063,7 @@
 
 .mission__card-toggle {
   width: 100%;
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1836,55 +1845,176 @@
   text-align: center;
 }
 
-/* 장비 사용 직후 행성 옆에 잠깐 뜨는 효과 카드 - 무엇을 썼고 온도/ΔE가 어떻게
-   움직였는지만 짧게 보여준다(자세한 판정 문구는 하단 최근 활동 로그에 남는다). */
-.use-effect {
-  position: absolute;
-  left: 50%;
-  bottom: -14px;
-  transform: translateX(-50%);
-  z-index: 2;
+/* ── 장비 사용 결과 모달 ────────────────────────────────────────────
+   조성 변화가 알베도/온실효과 -> ASR/OLR -> ΔE로 이어지는 과정을 사용 직후에
+   또렷하게 보여주는 자리다(예전에는 하단 로그에 한 줄씩 들어가 잘 안 읽혔다). */
+.item-result-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 6, 13, 0.72);
+  backdrop-filter: blur(4px);
+  animation: itemResultFade 0.18s ease-out;
+}
+
+.item-result {
+  width: min(480px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 24px 26px 20px;
+  border: 1px solid rgba(45, 212, 191, 0.32);
+  border-radius: 16px;
+  background: linear-gradient(160deg, #0d1c2c 0%, #060d18 100%);
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.62);
+  color: #eaf1fb;
+  text-align: left;
+  box-sizing: border-box;
+  animation: itemResultPop 0.24s cubic-bezier(0.2, 1.1, 0.4, 1);
+}
+
+/* 균형에 도달한 사용은 테두리로 한 번 더 알려준다 */
+.item-result--ok {
+  border-color: rgba(52, 211, 153, 0.45);
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.62), 0 0 40px rgba(52, 211, 153, 0.14);
+}
+
+.item-result__head {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.item-result__emoji {
+  font-size: 1.9rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 8px rgba(45, 212, 191, 0.35));
+}
+
+.item-result__title {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: #ffffff;
+}
+
+.item-result__sub {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: #7c93ad;
+}
+
+.item-result__numbers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.item-result__number {
+  flex: 1 1 160px;
   display: flex;
   flex-direction: column;
   gap: 3px;
-  padding: 11px 16px;
-  border: 1px solid var(--line-strong);
-  border-radius: 12px;
-  background: rgba(6, 16, 26, 0.94);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.55), 0 0 26px rgba(45, 212, 191, 0.2);
-  white-space: nowrap;
-  animation: useEffectIn 0.3s ease-out;
-  pointer-events: none;
+  padding: 10px 13px;
+  border: 1px solid rgba(94, 234, 212, 0.16);
+  border-radius: 10px;
+  background: rgba(3, 8, 15, 0.5);
 }
 
-.use-effect__title {
-  font-size: 0.82rem;
-  font-weight: 800;
-  color: var(--cyan-soft);
-}
-
-.use-effect__row {
-  font-family: var(--mono);
+.item-result__number span {
   font-size: 0.76rem;
-  color: var(--dim);
-  font-variant-numeric: tabular-nums;
+  color: #7c93ad;
 }
 
-.use-effect__row em {
+.item-result__number strong {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.item-result__number em {
   margin: 0 6px;
   font-style: normal;
-  color: var(--cyan);
-  font-weight: 700;
+  color: #2dd4bf;
 }
 
-@keyframes useEffectIn {
+.item-result__hint {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: #7c93ad;
+  word-break: keep-all;
+}
+
+/* 인과 사슬 - 블록 사이의 "↓"만 화살표로 그린다 */
+.item-result__chain {
+  list-style: none;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(3, 8, 15, 0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.item-result__step {
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: #d7e5f5;
+  word-break: keep-all;
+}
+
+.item-result__arrow {
+  font-size: 0.85rem;
+  line-height: 1.1;
+  color: #2dd4bf;
+  text-align: center;
+}
+
+.item-result__close {
+  align-self: flex-end;
+  padding: 10px 24px;
+  border: 1px solid rgba(94, 234, 212, 0.5);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(13, 148, 136, 0.95));
+  color: #04121f;
+  font-size: 0.9rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.item-result__close:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 0 24px rgba(45, 212, 191, 0.35);
+}
+
+@keyframes itemResultFade {
   from {
     opacity: 0;
-    transform: translate(-50%, 8px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes itemResultPop {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
   }
 }
 
@@ -1900,22 +2030,245 @@
   height: 0;
 }
 
-/* 장비 사용 결과 - |ΔE|가 줄었는지 늘었는지. 쓰기 전에 정답을 알려주는 대신
-   쓴 뒤의 결과로 방향을 배우게 하는 자리다. */
-.use-effect__trend {
-  margin-top: 3px;
-  font-size: 0.78rem;
-  font-weight: 700;
+/* ── 1단계: 에너지 균형 지표 ────────────────────────────────────────
+   1단계의 목표는 "온도가 지구와 비슷한가"가 아니라 "흡수·방출 에너지가 균형인가"다.
+   그래서 이 단계에서는 지구 유사 온도 안정 구간(hud__gauge)을 감추고 ΔE를 큰
+   지표로 둔다 - 온도만 범위 안이면 안정처럼 보이던 혼동을 없앤다. */
+.hud__balance {
+  width: min(520px, 100%);
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
 }
 
-.use-effect__trend.is-good {
+.hud__balance-label {
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+}
+
+.hud__balance-value {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 1.9rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--warn);
+  font-variant-numeric: tabular-nums;
+}
+
+.hud__balance-value--ok {
   color: var(--ok);
 }
 
-.use-effect__trend.is-bad {
-  color: var(--warn);
+.hud__balance-unit {
+  margin-left: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--faint);
 }
 
-.use-effect__trend.is-same {
+.hud__balance-track {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  margin-top: 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: linear-gradient(
+    90deg,
+    rgba(56, 189, 248, 0.5) 0%,
+    rgba(56, 189, 248, 0.16) 38%,
+    rgba(45, 212, 191, 0.28) 50%,
+    rgba(251, 146, 60, 0.16) 62%,
+    rgba(248, 113, 113, 0.5) 100%
+  );
+}
+
+/* 가운데(=평형 0) 기준선 */
+.hud__balance-zero {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: 50%;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: rgba(94, 234, 212, 0.75);
+}
+
+.hud__balance-marker {
+  position: absolute;
+  top: 50%;
+  width: 4px;
+  height: 22px;
+  margin-left: -2px;
+  border-radius: 2px;
+  background: #ffffff;
+  transform: translateY(-50%);
+  box-shadow: 0 0 14px rgba(255, 255, 255, 0.8);
+  transition: left 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.hud__balance-marker.is-ok {
+  background: var(--ok);
+  box-shadow: 0 0 16px rgba(52, 211, 153, 0.8);
+}
+
+.hud__balance-scale {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 8px;
+  font-size: 0.76rem;
   color: var(--faint);
+}
+
+.hud__balance-scale--zero {
+  color: var(--cyan);
+  font-weight: 700;
+}
+
+/* 2단계 게이지 아래 목표 안내 */
+.hud__gauge-note {
+  margin: 8px 0 0;
+  font-size: 0.76rem;
+  color: var(--faint);
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* ── 1단계 통과: 단계 전환 모달 ─────────────────────────────────── */
+.stage-clear-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(3, 6, 13, 0.74);
+  backdrop-filter: blur(5px);
+  animation: itemResultFade 0.2s ease-out;
+}
+
+.stage-clear {
+  width: min(500px, 100%);
+  max-height: 86vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px 30px 24px;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  border-radius: 18px;
+  background: linear-gradient(160deg, #0c2224 0%, #060d18 100%);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.65), 0 0 50px rgba(52, 211, 153, 0.16);
+  color: #eaf1fb;
+  text-align: left;
+  box-sizing: border-box;
+  animation: itemResultPop 0.28s cubic-bezier(0.2, 1.1, 0.4, 1);
+}
+
+.stage-clear__badge {
+  align-self: flex-start;
+  padding: 5px 13px;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  border-radius: 20px;
+  background: rgba(52, 211, 153, 0.14);
+  font-size: 0.86rem;
+  font-weight: 800;
+  color: var(--ok, #34d399);
+}
+
+.stage-clear__lead {
+  margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: #ffffff;
+  word-break: keep-all;
+}
+
+.stage-clear__numbers {
+  display: flex;
+  gap: 10px;
+}
+
+.stage-clear__numbers > div {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 13px;
+  border: 1px solid rgba(94, 234, 212, 0.16);
+  border-radius: 10px;
+  background: rgba(3, 8, 15, 0.5);
+}
+
+.stage-clear__numbers span {
+  font-size: 0.76rem;
+  color: #7c93ad;
+}
+
+.stage-clear__numbers strong {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
+}
+
+.stage-clear__next {
+  padding: 14px 16px;
+  border-radius: 12px;
+  ;
+  background: rgba(3, 8, 15, 0.5);
+}
+
+.stage-clear__next-title {
+  margin: 0 0 6px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #5eead4;
+}
+
+.stage-clear__next-body {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: #d7e5f5;
+  word-break: keep-all;
+}
+
+.stage-clear__next-body strong {
+  color: #ffffff;
+}
+
+.stage-clear__note {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(148, 176, 205, 0.2);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: #7c93ad;
+  word-break: keep-all;
+}
+
+.stage-clear__cta {
+  align-self: stretch;
+  padding: 13px 24px;
+  border: 1px solid rgba(94, 234, 212, 0.5);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.95), rgba(13, 148, 136, 0.95));
+  color: #04121f;
+  font-size: 0.98rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.stage-clear__cta:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 0 28px rgba(45, 212, 191, 0.4);
 }
