@@ -101,14 +101,16 @@ const useClimateStore = create(
   setValuesFromPoint: (point) =>
     set((state) => {
       const clamp = (v) => Math.min(100, Math.max(0, v));
-      const iceThickness = clamp(point.values.iceThickness);
-      // 빙하+바다 상호제약(applyIceOceanCoupling)도 여기서 그대로 쓴다 - 이제
-      // 어느 진입점이든 같은 규칙 하나만 쓴다.
-      const withIce = { ...state.values, iceThickness, ocean: clamp(point.values.ocean) };
 
       return {
         values: {
-          ...applyIceOceanCoupling(withIce, "iceThickness"),
+          ...state.values,
+          // 지점 프리셋의 iceThickness/ocean은 이미 지리적으로 유효한 조합(합≤100)이라
+          // applyIceOceanCoupling을 거치지 않고 그대로 쓴다 - 거치면 항상 ocean이
+          // 밀려나서(커플링 기준 키가 "iceThickness"로 고정) 빙하+바다가 둘 다 높은
+          // 지점(예: 북극)에서 실측 ocean 값이 조용히 달라질 수 있다.
+          iceThickness: clamp(point.values.iceThickness),
+          ocean: clamp(point.values.ocean),
           cloud: clamp(point.values.cloud),
           atmThickness: atmThicknessToSlider(point.values.atmThickness),
           co2: co2PpmToSlider(point.values.co2),
@@ -155,12 +157,15 @@ const useClimateStore = create(
     // 여기 저장되는 값(슬라이더 0~100, 온도 K)은 ΔE 스케일과 무관해서 그대로 둬도
     // 되지만, useGameStore가 초기화되는데 조성만 남으면 "새 게임인데 이전 판의
     // 행성"이 되어 헷갈린다. 두 store의 version을 같이 올려 항상 함께 초기화한다.
-    // version 2: 예전 저장본에는 "이전 판이 지구형 안정으로 끝난 조성 + 그
-    // 평형온도(≈288K)"가 그대로 남아 있어서, 새 게임이 시작부터 ΔE≈0 / 지구형
-    // 안정으로 뜨는 문제가 있었다(StartPage가 resetClimate를 부르지 않았음).
-    // 지금은 시작할 때 초기화하지만, 이미 그 상태로 저장된 브라우저를 한 번
-    // 비우기 위해 version을 올린다 - migrate가 빈 객체를 반환하면 초기 상태와
-    // 병합되어 사실상 초기화된다.
+    //
+    // version 2로 올린 이유가 두 가지 있다(둘 다 옛 저장본을 한 번 비워야 한다).
+    //   1) 빙하+바다 상호제약(applyIceOceanCoupling) 도입 당시 버전을 안 올려서,
+    //      그 이전 저장본(예: {iceThickness:80, ocean:80} 같은 합>100 조합)이
+    //      migrate로 안 걸러지고 있었다.
+    //   2) "이전 판이 지구형 안정으로 끝난 조성 + 그 평형온도(≈288K)"가 그대로
+    //      남아 있어서, 새 게임이 시작부터 ΔE≈0 / 지구형 안정으로 뜨는 문제가
+    //      있었다(StartPage가 resetClimate를 부르지 않았음 - 지금은 부른다).
+    // migrate가 빈 객체를 반환하면 초기 상태와 병합되어 사실상 초기화된다.
     { name: "planet-keeper-climate", version: 2, migrate: () => ({}) },
   ),
 );

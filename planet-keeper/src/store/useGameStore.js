@@ -827,10 +827,10 @@ const useGameStore = create(
       // 게임 한 판이 짧아 손실도 작다. 빈 객체를 반환하면 초기 상태와 병합되어
       // 사실상 초기화된다. 앞으로 저장 구조를 바꿀 때도 version을 올리면 된다.
       //
-      // version 2: useClimateStore와 짝을 맞춰 함께 비운다(한쪽만 초기화되면
-      // "새 게임인데 이전 판의 행성"이 되어 헷갈린다). 이전 판의 physicsResult/
-      // mlResult 스냅샷이 남아 있으면 새 판 시작 화면에 그 온도·판정이 그대로
-      // 보이는 문제가 있었다.
+      // version 2: useClimateStore와 항상 짝을 맞춰 함께 비운다(한쪽만 초기화되면
+      // "새 게임인데 이전 판의 행성"이 되어 헷갈린다 - 올린 이유는 useClimateStore.js
+      // 주석 참고). 이전 판의 physicsResult/mlResult 스냅샷이 남아 있으면 새 판
+      // 시작 화면에 그 온도·판정이 그대로 보이는 문제도 있었다.
       version: 2,
       migrate: () => ({}),
       // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -

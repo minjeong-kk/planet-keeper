@@ -9,9 +9,13 @@ import {
 } from "../../utils/physicsEngine.js";
 import "./PlanetLocationPicker.css";
 
-// 행성 생성 화면 아래쪽의 "특정 지점에서 시작하기" 카드. 마커를 클릭하면 그 지점의
-// 물리값을 슬라이더 "초기값"으로만 세팅한다(setValuesFromPoint) - 그 이후는 평소처럼
-// 슬라이더를 자유롭게 다시 만질 수 있고 잠기지 않는다(선택 로직 자체는 예전과 동일).
+// 행성 생성 화면 아래쪽의 "특정 지점에서 시작하기" 카드.
+//
+// 5개 대표 지점(climatePoints.js)은 기상청 KIM 지점 실측값이다(data-pipeline/
+// Analysis/build_presets.py가 생성) - 예전엔 실측 전이라 목데이터였지만 지금은
+// 아니다. 마커를 클릭하면 그 지점의 물리값을 슬라이더 "초기값"으로만 세팅한다
+// (setValuesFromPoint) - 그 이후는 평소처럼 슬라이더를 자유롭게 다시 만질 수 있고
+// 잠기지 않는다(선택 로직 자체는 예전과 동일).
 //
 // 지도 배경은 3D 지구가 이미 쓰는 earth.jpg(Solar System Scope, CC BY 4.0,
 // README에 출처 기록됨)를 그대로 재사용한다(PlanetLocationPicker.css) - 새

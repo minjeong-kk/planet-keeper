@@ -275,7 +275,7 @@ export function computeClimateV2(inputs = {}) {
  *
  * @param {{iceThickness:number, ocean:number, cloud:number, atmThickness:number, co2:number}} sliders
  */
-// CO₂ 슬라이더(0~100)를 ppm으로 변환한다(≈130~1296 ppm). climateVisual.js의
+// CO₂ 슬라이더(0~100)를 ppm으로 변환한다(≈128.9~1288.6 ppm). climateVisual.js의
 // co2Ppm() 표시용 변환도 이 함수를 그대로 써서 물리엔진과 항상 같은 값을 쓴다.
 export function sliderToCO2Ppm(co2Slider) {
   return CO2_BASELINE_PPM * (0.3 + clamp((co2Slider ?? 0) / 100, 0, 1) * 2.7)
