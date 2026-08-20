@@ -101,12 +101,40 @@ export function deltaEnergyLines(deltaEnergy) {
 }
 
 // describeItemJudgment/describeTransition처럼 before/after를 둘 다 아는 곳에서만
-// 쓴다 - ΔE 숫자 줄만 "이전 -> 이후"로 바꿔서 이 조작 하나가 ΔE를 얼마나 움직였는지
+// 쓴다 - ΔE 숫자 줄을 "이전 -> 이후"로 바꿔서 이 조작 하나가 ΔE를 얼마나 움직였는지
 // 바로 보이게 한다. 방향 설명 문장은 항상 지금(after) 상태 기준이어야 하므로
 // deltaEnergyLines(after)가 만든 것을 그대로 쓴다.
-function deltaEnergyTransitionLines(before, after) {
+//
+// itemDeltaEnergy(온도 고정, 조성 변화만 반영한 ΔE)를 알면 숫자를 두 줄로 나눈다 -
+// "이 조작이 실제로 한 일"과 "그 뒤 행성이 스스로 한 걸음 식거나 데워진 몫"은
+// 서로 다른 사건이기 때문이다. 판정(describeImbalanceChange)은 앞쪽만 보고 하는데
+// 숫자 줄만 온도까지 반영된 값을 보여주면, 같은 모달 안에서
+//   "ΔE: -114.3 → -111.6" (줄어든 것처럼 보임)
+//   "오히려 에너지가 더 부족해졌습니다 - 방향이 반대인 아이템을 골랐습니다."
+// 처럼 숫자와 문장이 서로 반대로 말하게 된다. 나눠서 보여주면 "아이템은 악화시켰고
+// (-121.4) 행성이 식으면서 일부 상쇄했다(-111.6)"로 읽혀 둘이 같은 이야기를 한다.
+// (온도 이동은 이 게임이 가르치려는 되먹임 그 자체라 감추는 것보다 드러내는 편이 낫다.)
+function deltaEnergyTransitionLines(before, after, itemDeltaEnergy, beforeTemperature, afterTemperature) {
   const [, directionLine] = deltaEnergyLines(after);
-  return [`에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(after)} W/m²`, directionLine];
+
+  // itemDeltaEnergy를 모르면(예전 저장본의 리포트 등) 예전처럼 한 줄로 둔다.
+  // 온도 이동이 사실상 없을 때도 굳이 쪼개지 않는다 - 읽을 게 늘기만 한다.
+  const effect = itemDeltaEnergy ?? after;
+  const stepMoved = Math.abs(after - effect) > ENERGY_EPSILON;
+  if (!stepMoved) {
+    return [`에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(effect)} W/m²`, directionLine];
+  }
+
+  const tempPart =
+    beforeTemperature != null && afterTemperature != null
+      ? `행성 온도가 ${beforeTemperature.toFixed(1)}K → ${afterTemperature.toFixed(1)}K로 한 걸음 움직여`
+      : "행성 온도가 한 걸음 움직여";
+
+  return [
+    `에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(effect)} W/m² (이 조작의 효과)`,
+    `${tempPart} ΔE는 ${formatSigned(after)} W/m²가 되었습니다.`,
+    directionLine,
+  ];
 }
 
 function energyProblemLines(deltaEnergy, direction) {
@@ -580,7 +608,15 @@ export function describeItemJudgment(item, before, after, label, immediateDeltaE
     ...physicsChangeBlocks(before, after, item.key, immediateOutgoingRadiation),
   ];
 
-  blocks.push(deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy));
+  blocks.push(
+    deltaEnergyTransitionLines(
+      before.deltaEnergy,
+      after.deltaEnergy,
+      immediateDeltaEnergy,
+      before.currentTemperature,
+      after.currentTemperature,
+    ),
+  );
   blocks.push(["물리엔진이 최종 기후 상태를 분석합니다."]);
   blocks.push(
     label === "Energy Surplus" || label === "Energy Deficit"
@@ -640,7 +676,15 @@ export function describeTransition(before, after, label, itemKey, itemDelta, imm
     return deltaEnergyLines(after.deltaEnergy);
   }
 
-  blocks.push(deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy));
+  blocks.push(
+    deltaEnergyTransitionLines(
+      before.deltaEnergy,
+      after.deltaEnergy,
+      immediateDeltaEnergy,
+      before.currentTemperature,
+      after.currentTemperature,
+    ),
+  );
 
   // 아직 불평형(Energy Surplus/Deficit)이면 describeItemJudgment와 같은 기준으로
   // "그래서 이 선택이 왜 문제인지"(방향이 반대라 더 나빠졌는지, 방향은 맞는데
