@@ -23,6 +23,10 @@ npm run dev            # http://localhost:5173
 | `npm run preview` | 빌드 결과 미리보기 |
 | `npm run lint` | oxlint |
 
+`vercel.json`은 SPA 라우팅용입니다 - `/report`처럼 하위 경로로 **직접 접속**하면
+그 경로의 파일이 없어 404가 나므로, 정적 파일이 아닌 요청은 `index.html`로 보내
+React Router가 처리하게 합니다(정적 파일은 파일시스템이 먼저 응답하므로 영향 없음).
+
 > 아래 **데이터 파이프라인은 실행하지 않아도 게임이 돌아갑니다.** 수집·도출 결과가
 > `src/data/climateThresholds.js`와 `src/data/climatePoints.js`로 이미 커밋되어 있습니다.
 > API 키가 필요한 건 그 데이터를 **다시 수집할 때**뿐입니다.
