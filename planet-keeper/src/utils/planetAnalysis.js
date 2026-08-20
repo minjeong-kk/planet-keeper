@@ -14,7 +14,7 @@ import {
   computeClimateV2,
   mapSlidersToClimateInputs,
 } from "./physicsEngine.js";
-import { applyIceOceanCoupling } from "../store/useClimateStore.js";
+import { nextValuesForChange } from "../store/useClimateStore.js";
 
 const COMPARE_TOLERANCE = 0.05; // 기준값 대비 ±5% 이내는 "정상"으로 본다
 
@@ -236,13 +236,14 @@ const SLIDER_KEY_LABELS = {
   co2: "CO₂",
 };
 
-// 아이템 적용 후 다음 슬라이더 값(0~100 범위로 clamp). 빙하/바다 상호제약도
-// useClimateStore.setValue와 똑같이 applyIceOceanCoupling을 쓴다 - useGameStore의
-// applyEquipment/pickVisibleItems, 아래 itemEffectKeyword가 전부 이 하나만 쓴다
-// (여기서 빠뜨리면 "예상 ΔE"와 "실제 저장된 값"이 서로 달라지는 문제가 생긴다).
+// 아이템 적용 후 다음 슬라이더 값(0~100 범위로 clamp). 빙하/바다 상호제약과 실측
+// 알베도 폐기 둘 다 useClimateStore.setValue와 똑같이 nextValuesForChange를 쓴다 -
+// useGameStore의 applyEquipment/pickVisibleItems, 아래 itemEffectKeyword가 전부
+// 이 하나만 쓴다(여기서 빠뜨리면 "예상 ΔE"와 "실제 저장된 값"이 서로 달라지는
+// 문제가 생긴다).
 export function nextSliderValues(values, item) {
   const nextValue = Math.min(100, Math.max(0, values[item.key] + item.delta));
-  return applyIceOceanCoupling({ ...values, [item.key]: nextValue }, item.key);
+  return nextValuesForChange(values, item.key, nextValue);
 }
 
 // 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
@@ -302,7 +303,7 @@ export function itemDescriptionFor(item, values, currentTemperature) {
   return `${mechanism} 지금 이 행성에서는 태양광 반사율(알베도)을 ${reflect} 흡수량을 ${absorb}.`;
 }
 
-// 이상기후 경보(useGameStore.js WARMING_EVENTS)의 구름 이벤트 hint도 같은 이유로
+// 이상기후 경보(useGameStore.js CLIMATE_EVENTS)의 구름 이벤트 hint도 같은 이유로
 // 고정 문구였다("옅어지면 흡수 에너지가 늘어난다") - 방금 고친 counterDirection
 // 화살표와 모순되게 보일 수 있어서 여기도 지금 조성/온도로 다시 계산한다. co2/
 // 빙하 이벤트는 단조 반응이라 원래 hint 그대로 둔다.

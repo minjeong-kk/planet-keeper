@@ -21,7 +21,7 @@ export const CLIMATE_VARIABLES = [
 
 // 빙하+바다 비율의 합은 항상 100을 넘을 수 없다(physicsEngine.albedoOf가
 // landRatio = 1 - 빙하 - 바다로 전제). 순수 함수로 빼서 setValue·
-// setValuesFromPoint·useGameStore.nextSliderValues가 전부 이거 하나만 쓴다 -
+// setValuesFromPoint·nextValuesForChange가 전부 이거 하나만 쓴다 -
 // 예전엔 setValue에만 이 규칙이 있고 nextSliderValues(아이템 적용 시 "다음 값"
 // 계산)에는 없어서, 아이템 사용 시 리포트가 예상한 ΔE와 실제 스토어에 반영된
 // ΔE가 갈라지는 버그가 있었다(예: 빙하20/바다80에서 빙하+8 아이템 → 예상은
@@ -34,6 +34,27 @@ export function applyIceOceanCoupling(values, key) {
     return { ...values, [coupledKey]: 100 - values[key] };
   }
   return values;
+}
+
+// 슬라이더 값 하나를 바꿀 때 항상 같이 일어나야 하는 두 부수효과(빙하/바다 상호
+// 제약 + 지표 반사율 실측값 폐기)를 한 곳에 묶는다. setValue와
+// planetAnalysis.nextSliderValues가 이 함수 하나만 쓴다 - 예전엔 measuredSurfaceAlbedo
+// 폐기가 setValue에만 있고 nextSliderValues에는 없어서, 아이템으로 빙하/바다를
+// 바꿀 때 "미리 계산한 다음 ΔE"(실측 알베도가 그대로 남아 거의 안 바뀜)와
+// "실제 스토어에 반영된 ΔE"(실측 알베도가 사라져 슬라이더 기반으로 다시 계산됨)가
+// 서로 어긋나는 버그가 있었다(예: 서울 빙하 복원기 화면 0.00 → 실제 -19.70).
+export function nextValuesForChange(values, key, value) {
+  const changed = values[key] !== value;
+  const next = applyIceOceanCoupling({ ...values, [key]: value }, key);
+
+  // 지표 구성(빙하/바다)을 실제로 바꾸면 그 지점의 실측 지표면 반사율은 더 이상
+  // 이 행성을 설명하지 못하므로 버린다 - 안 버리면 빙하를 100까지 올려도
+  // 알베도가 실측값에 고정돼 슬라이더가 먹지 않는 것처럼 보인다. 그때부터는
+  // albedoOf가 슬라이더 기반 면적 가중으로 되돌아간다.
+  const surfaceChanged = changed && (key === "iceThickness" || key === "ocean");
+  if (surfaceChanged) delete next.measuredSurfaceAlbedo;
+
+  return next;
 }
 
 // 전부 50(중립값)이면 우연히 이미 평형(Earth-like Stable)에 가까운 조성이 되어
@@ -68,15 +89,8 @@ const useClimateStore = create(
 
   setValue: (key, value) =>
     set((state) => {
-      const values = applyIceOceanCoupling({ ...state.values, [key]: value }, key);
       const changed = state.values[key] !== value;
-
-      // 지표 구성(빙하/바다)을 실제로 바꾸면 그 지점의 실측 지표면 반사율은 더 이상
-      // 이 행성을 설명하지 못하므로 버린다 - 안 버리면 빙하를 100까지 올려도
-      // 알베도가 실측값에 고정돼 슬라이더가 먹지 않는 것처럼 보인다. 그때부터는
-      // albedoOf가 슬라이더 기반 면적 가중으로 되돌아간다.
-      const surfaceChanged = changed && (key === "iceThickness" || key === "ocean");
-      if (surfaceChanged) delete values.measuredSurfaceAlbedo;
+      const values = nextValuesForChange(state.values, key, value);
 
       // 값이 실제로 달라질 때만 이미지 모드를 끈다 - 클릭/포커스만으로는 안 꺼짐
       // (같은 값을 다시 세팅하는 호출은 "조작"으로 안 침).
