@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Planet Keeper">
+  <!-- 시작 페이지/게임 HUD와 같은 청록 계열(#5eead4 ~ #0f766e)을 쓴다.
+       배경은 칠하지 않는다 - 라이트/다크 탭 어느 쪽에서도 행성만 떠 보이게 한다. -->
+  <defs>
+    <linearGradient id="pk-planet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#5eead4" />
+      <stop offset="0.55" stop-color="#2dd4bf" />
+      <stop offset="1" stop-color="#0f766e" />
+    </linearGradient>
+    <!-- 고리의 "앞쪽"(행성 아래를 지나는 부분)만 남기는 클립. 행성 중심(y=16)
+         아래만 통과시키면 뒤쪽 절반은 행성에 가려지고 앞쪽 절반만 덧그려진다. -->
+    <clipPath id="pk-ring-front">
+      <rect x="0" y="16.5" width="32" height="15.5" />
+    </clipPath>
+  </defs>
+
+  <!-- 고리(뒤쪽) -->
+  <ellipse cx="16" cy="16" rx="14.6" ry="5.2" fill="none" stroke="#5eead4" stroke-opacity="0.45"
+           stroke-width="1.7" transform="rotate(-22 16 16)" />
+
+  <!-- 행성 -->
+  <circle cx="16" cy="16" r="9.2" fill="url(#pk-planet)" />
+  <!-- 극관/빛 반사 힌트 -->
+  <circle cx="12.5" cy="12" r="3" fill="#eef3fb" fill-opacity="0.35" />
+
+  <!-- 고리(앞쪽) -->
+  <g clip-path="url(#pk-ring-front)">
+    <ellipse cx="16" cy="16" rx="14.6" ry="5.2" fill="none" stroke="#2dd4bf"
+             stroke-width="1.7" transform="rotate(-22 16 16)" />
+  </g>
+</svg>

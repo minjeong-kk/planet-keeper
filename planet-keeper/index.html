@@ -1,10 +1,31 @@
 <!doctype html>
-<html lang="en">
+<html lang="ko">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>planet-keeper</title>
+    <!-- 화면 전체가 어두운 우주 톤이라, 모바일 브라우저 상단바도 같은 색으로 맞춘다. -->
+    <meta name="theme-color" content="#03060d" />
+
+    <title>PLANET KEEPER — 기후 에너지 평형 시뮬레이션</title>
+    <meta
+      name="description"
+      content="알베도와 온실효과를 직접 조절해 행성의 에너지 평형을 맞추는 지구과학 학습 게임입니다. 빙하·바다·구름·대기·CO₂를 바꿔가며 흡수와 방출이 같아지는 지점을 찾아보세요."
+    />
+
+    <!-- 링크 공유용(카카오톡·디스코드·슬랙 등) 미리보기.
+         og:image는 원래 절대 URL이어야 제대로 잡힌다 - 배포 도메인이 정해지면
+         https://<도메인>/assets/earth.jpg 형태로 바꿔야 한다. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ko_KR" />
+    <meta property="og:site_name" content="PLANET KEEPER" />
+    <meta property="og:title" content="PLANET KEEPER — 기후 에너지 평형 시뮬레이션" />
+    <meta
+      property="og:description"
+      content="기후의 법칙을 배우고, 하나뿐인 행성의 운명을 조율하라."
+    />
+    <meta property="og:image" content="/assets/earth.jpg" />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>
