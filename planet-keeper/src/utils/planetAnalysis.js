@@ -574,6 +574,19 @@ function describeImbalanceChange(before, afterDeltaEnergy, label) {
   const worsened = Math.abs(afterDeltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
   const warming = label === "Energy Surplus";
   if (worsened) {
+    // |ΔE|가 커졌어도 부호가 뒤집혔다면 방향이 틀린 게 아니라 "너무 세게" 민 것이다 -
+    // 에너지가 부족하던 행성에 온난화 아이템을 써서 평형을 지나 과다로 넘어간 경우가
+    // 그렇다(예: 대기 두께 100·CO2 0에서 온실가스 방출기는 ΔE를 -18.5에서 +36.4로
+    // 옮긴다). 이걸 "방향이 반대인 아이템"이라고 말하면 정확히 반대로 가르치게 된다 -
+    // 다음에 골라야 할 것도 같은 계열의 약한 아이템이 아니라 반대 계열이다.
+    const overshot = afterDeltaEnergy * before.deltaEnergy < 0;
+    if (overshot) {
+      return [
+        warming
+          ? "🔥 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 과다하니 냉각 아이템이 필요합니다."
+          : "❄️ 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 부족하니 온난화 아이템이 필요합니다.",
+      ];
+    }
     return [
       warming
         ? "🔥 오히려 에너지가 더 과다해졌습니다 - 방향이 반대인 아이템을 골랐습니다."
