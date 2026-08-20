@@ -54,6 +54,11 @@ export const GAME_STAGES = {
   REPORT: "report",
 };
 
+// PlanetCreatePage가 "진행 중인 게임이 있는데 주소창 등으로 여기 직접 들어왔다"를
+// 판단할 때 쓰는 것과 같은 기준 - CREATOR(아직 시작 안 함)도 REPORT(이미 끝남)도
+// 아니면 진행 중이다.
+export const isGameInProgress = (stage) => stage !== GAME_STAGES.CREATOR && stage !== GAME_STAGES.REPORT;
+
 export const MAX_WRONG_COUNT = 3;
 const EARTH_LIKE_STABLE_LABEL = "Earth-like Stable";
 // energyStateOf 기준 "에너지가 평형(|ΔE|≤epsilon)인" 세 상태 - 아이템
@@ -549,7 +554,10 @@ const useGameStore = create(
           ? `⚠️ 반대 방향으로 대응했지만 오히려 악화됐습니다.`
           : `🤝 대응했지만 위기를 상쇄하는 데 그쳤습니다.`;
 
-    get().pushTimeline("이상기후", resultMessage, physics, null);
+    get().pushTimeline("이상기후", resultMessage, physics, null, {
+      immediateDeltaEnergy: immediate.deltaEnergy,
+      immediateOutgoingRadiation: immediate.outgoingRadiation,
+    });
     set({ physicsResult: physics, climateEvent: resultMessage, pendingClimateEvent: null });
 
     // 대응 결과로 에너지가 균형에 들어왔다면 여기서 바로 2단계로 넘긴다 - 예전에는

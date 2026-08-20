@@ -6,7 +6,7 @@ import PlanetLocationPicker from "./PlanetLocationPicker.jsx";
 import Tutorial from "../common/Tutorial.jsx";
 import { CREATE_TOUR_STEPS } from "../common/tourSteps.js";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
-import useGameStore, { GAME_STAGES } from "../../store/useGameStore";
+import useGameStore, { isGameInProgress } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import "./PlanetCreatePage.css";
 
@@ -150,6 +150,7 @@ function PlanetCreatePage() {
   const values = useClimateStore((state) => state.values);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const setValue = useClimateStore((state) => state.setValue);
+  const setCurrentTemperature = useClimateStore((state) => state.setCurrentTemperature);
   const selectedLocation = useClimateStore((state) => state.selectedLocation);
   const isViewingLocationImage = useClimateStore((state) => state.isViewingLocationImage);
   const nextProblem = useGameStore((state) => state.nextProblem);
@@ -165,7 +166,12 @@ function PlanetCreatePage() {
   // 상태에서 슬라이더만 만지고 "완료"를 누르지 않은 채 빠져나가면, 행성(useClimateStore)
   // 은 바뀌었는데 진행 중인 타임라인/판정(useGameStore)은 이전 것으로 남는다.
   const currentStage = useGameStore((state) => state.currentStage);
-  const gameInProgress = currentStage !== GAME_STAGES.CREATOR && currentStage !== GAME_STAGES.REPORT;
+  const gameInProgress = isGameInProgress(currentStage);
+  // "게임으로 돌아가기"를 누르면 슬라이더를 만졌더라도 이 페이지에 들어온 시점의
+  // 조성으로 되돌려서 돌아간다 - 안 그러면 useClimateStore(행성)만 바뀐 채로
+  // /game에 돌아가, useGameStore의 타임라인/판정은 여전히 이전 조성 기준으로
+  // 남는(바로 위 주석이 설명하는) 어긋남이 그대로 재현된다.
+  const resumeSnapshotRef = useRef({ values, currentTemperature });
 
   // 지금 만지고 있는(포커스/드래그 중인) 슬라이더 - 설정 패널 맨 아래 한 줄 설명이
   // 이걸 보고 SLIDER_GUIDE에서 문구를 고른다. 손을 떼도 마지막 설명은 그대로 둔다
@@ -210,6 +216,13 @@ function PlanetCreatePage() {
     navigate("/game", { replace: true });
   };
 
+  const handleResume = () => {
+    const snapshot = resumeSnapshotRef.current;
+    CLIMATE_VARIABLES.forEach((v) => setValue(v.key, snapshot.values[v.key]));
+    setCurrentTemperature(snapshot.currentTemperature);
+    navigate("/game", { replace: true });
+  };
+
   return (
     <div className="create">
       <div className="create__starfield" aria-hidden="true" />
@@ -235,11 +248,7 @@ function PlanetCreatePage() {
           <p className="create__resume-text">
             진행 중인 게임이 있습니다. 여기서 새 행성을 만들면 지금까지의 진행 내용은 사라집니다.
           </p>
-          <button
-            type="button"
-            className="create__resume-btn"
-            onClick={() => navigate("/game", { replace: true })}
-          >
+          <button type="button" className="create__resume-btn" onClick={handleResume}>
             게임으로 돌아가기
           </button>
         </div>

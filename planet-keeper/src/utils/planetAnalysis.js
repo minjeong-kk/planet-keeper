@@ -114,7 +114,7 @@ export function deltaEnergyLines(deltaEnergy) {
 // 처럼 숫자와 문장이 서로 반대로 말하게 된다. 나눠서 보여주면 "아이템은 악화시켰고
 // (-121.4) 행성이 식으면서 일부 상쇄했다(-111.6)"로 읽혀 둘이 같은 이야기를 한다.
 // (온도 이동은 이 게임이 가르치려는 되먹임 그 자체라 감추는 것보다 드러내는 편이 낫다.)
-function deltaEnergyTransitionLines(before, after, itemDeltaEnergy, beforeTemperature, afterTemperature) {
+function deltaEnergyTransitionLines(before, after, itemDeltaEnergy, { beforeTemperature, afterTemperature } = {}) {
   const [, directionLine] = deltaEnergyLines(after);
 
   // itemDeltaEnergy를 모르면(예전 저장본의 리포트 등) 예전처럼 한 줄로 둔다.
@@ -571,22 +571,27 @@ function describeStableLabel(label) {
 // 쓰면, MAX_TEMPERATURE_STEP_K(3K)짜리 배경 온도 스텝이 아이템 자체 효과보다 커서
 // 반대 방향 아이템도 "방향이 맞았다"고 잘못 판정하는 문제가 있었다.
 function describeImbalanceChange(before, afterDeltaEnergy, label) {
-  const worsened = Math.abs(afterDeltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
   const warming = label === "Energy Surplus";
+
+  // 부호가 뒤집혔다면(overshot) 방향이 틀린 게 아니라 "너무 세게" 민 것이다 -
+  // 에너지가 부족하던 행성에 온난화 아이템을 써서 평형을 지나 과다로 넘어간 경우가
+  // 그렇다(예: 대기 두께 100·CO2 0에서 온실가스 방출기는 ΔE를 -18.5에서 +36.4로
+  // 옮긴다). 이걸 "방향이 반대인 아이템"이라고 말하면 정확히 반대로 가르치게 된다 -
+  // 다음에 골라야 할 것도 같은 계열의 약한 아이템이 아니라 반대 계열이다. |ΔE|가
+  // 커졌는지 작아졌는지와 무관하게 부호만으로 판단해야 한다 - 예전엔 이 판정이
+  // "|ΔE|가 커진" 경우에만 걸려 있어서, 작은 과다/부족을 지나쳐 반대쪽으로 넘어갔지만
+  // 크기 자체는 작아진 경우(예: -18.5 → +5)를 "부족이 줄었다"로 잘못 설명했다.
+  const overshot = afterDeltaEnergy * before.deltaEnergy < 0;
+  if (overshot) {
+    return [
+      warming
+        ? "🔥 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 과다하니 냉각 아이템이 필요합니다."
+        : "❄️ 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 부족하니 온난화 아이템이 필요합니다.",
+    ];
+  }
+
+  const worsened = Math.abs(afterDeltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
   if (worsened) {
-    // |ΔE|가 커졌어도 부호가 뒤집혔다면 방향이 틀린 게 아니라 "너무 세게" 민 것이다 -
-    // 에너지가 부족하던 행성에 온난화 아이템을 써서 평형을 지나 과다로 넘어간 경우가
-    // 그렇다(예: 대기 두께 100·CO2 0에서 온실가스 방출기는 ΔE를 -18.5에서 +36.4로
-    // 옮긴다). 이걸 "방향이 반대인 아이템"이라고 말하면 정확히 반대로 가르치게 된다 -
-    // 다음에 골라야 할 것도 같은 계열의 약한 아이템이 아니라 반대 계열이다.
-    const overshot = afterDeltaEnergy * before.deltaEnergy < 0;
-    if (overshot) {
-      return [
-        warming
-          ? "🔥 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 과다하니 냉각 아이템이 필요합니다."
-          : "❄️ 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 부족하니 온난화 아이템이 필요합니다.",
-      ];
-    }
     return [
       warming
         ? "🔥 오히려 에너지가 더 과다해졌습니다 - 방향이 반대인 아이템을 골랐습니다."
@@ -629,13 +634,10 @@ export function describeItemJudgment(item, before, after, label, immediateDeltaE
   ];
 
   blocks.push(
-    deltaEnergyTransitionLines(
-      before.deltaEnergy,
-      after.deltaEnergy,
-      immediateDeltaEnergy,
-      before.currentTemperature,
-      after.currentTemperature,
-    ),
+    deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy, immediateDeltaEnergy, {
+      beforeTemperature: before.currentTemperature,
+      afterTemperature: after.currentTemperature,
+    }),
   );
   blocks.push(["물리엔진이 최종 기후 상태를 분석합니다."]);
   blocks.push(
@@ -697,13 +699,10 @@ export function describeTransition(before, after, label, itemKey, itemDelta, imm
   }
 
   blocks.push(
-    deltaEnergyTransitionLines(
-      before.deltaEnergy,
-      after.deltaEnergy,
-      immediateDeltaEnergy,
-      before.currentTemperature,
-      after.currentTemperature,
-    ),
+    deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy, immediateDeltaEnergy, {
+      beforeTemperature: before.currentTemperature,
+      afterTemperature: after.currentTemperature,
+    }),
   );
 
   // 아직 불평형(Energy Surplus/Deficit)이면 describeItemJudgment와 같은 기준으로

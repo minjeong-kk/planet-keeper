@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Target, BookOpen, ChevronRight, X } from "lucide-react";
 import ConceptBook from "./ConceptBook";
+import useEscapeKey from "../common/useEscapeKey.js";
 import { CONCEPT_PAGES } from "./conceptPages";
 
 // 첫 화면에는 버튼 2개만 두고, 내용은 전부 팝업에서 보여준다.
@@ -41,14 +42,7 @@ function InfoSection() {
 
   const close = () => setPanel(null);
 
-  useEffect(() => {
-    if (!panel) return;
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [panel]);
+  useEscapeKey(panel ? close : null);
 
   return (
     <div className="start-page__menu">

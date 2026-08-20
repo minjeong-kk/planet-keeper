@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import useEscapeKey from "./useEscapeKey.js";
 import "./Tutorial.css";
 
 // 페이지 온보딩(공용). 설명만 읽는 튜토리얼이 아니라 실제 화면의 UI를 하나씩
@@ -116,13 +117,16 @@ function Tutorial({ onFinish, steps }) {
     }
   };
 
-  // ESC로 건너뛰고, Enter/Space/→로 다음, ←로 이전 단계로 간다.
+  // ESC는 useEscapeKey 공유 스택에 맡긴다 - 이 화면 위에 아이템 모달 등이 겹쳐
+  // 열려 있으면(스포트라이트가 클릭을 막지 않아 가능하다) 그 모달의 useEscapeKey가
+  // 나중에(더 위에) 쌓여 ESC를 먼저 받고, 여기 onFinish는 그 모달이 닫힌 뒤에만
+  // 반응한다 - 예전엔 독립된 리스너였어서 ESC 한 번에 모달과 튜토리얼이 동시에
+  // 닫히는 사고가 있었다.
+  useEscapeKey(onFinish);
+
+  // Enter/Space/→로 다음, ←로 이전 단계로 간다.
   useEffect(() => {
     const onKey = (e) => {
-      if (e.key === "Escape") {
-        onFinish();
-        return;
-      }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         setIndex((i) => Math.max(0, i - 1));

@@ -72,13 +72,12 @@ export const MOCK_ITEMS = [
     delta: 6,
   },
   {
-    // ponytail: 원본 설명(태양 유입 에너지 총량 조정)은 지금 코드에 없는 값이다
-    // (SOLAR_CONSTANT는 고정 상수, 슬라이더가 아님) - 반사판 효과를 구름 슬라이더로 근사함.
-    // 실제로 "태양 유입 총량"을 조절하는 기능이 생기면 그때 제대로 연결할 것.
+    // 반사판 효과를 구름 슬라이더로 근사함 - "태양 유입 총량"(SOLAR_CONSTANT)은
+    // 고정 상수라 실제로 바뀌는 건 알베도 하나뿐이다. 그 기능이 따로 생기면 연결할 것.
     id: "space_mirror",
     name: "반사판 설치",
     emoji: "☀️",
-    description: "행성 외곽의 궤도 반사경을 조절해 태양 유입 에너지 총량과 알베도를 미세하게 조정합니다.",
+    description: "행성 외곽의 궤도 반사경을 조절해 지표면 알베도를 높이고 태양 에너지 반사량을 늘립니다.",
     key: "cloud",
     delta: 8,
   },
@@ -91,7 +90,7 @@ export const MOCK_ITEMS = [
     id: "density_regulator",
     name: "대기 밀도 조절기",
     emoji: "🌫️",
-    description: "대기의 전반적인 두께를 압축 및 팽창시켜 대기 흡수율과 복사 보유 능력을 동시 조정합니다.",
+    description: "대기의 전반적인 두께를 팽창시켜 온실효과를 강화하고 지표 복사가 우주로 빠져나가는 양을 줄입니다.",
     key: "atmThickness",
     delta: 8,
   },

@@ -170,13 +170,17 @@ const glowFragment = /* glsl */ `
 
 /* ═══════════════ 컴포넌트 ═══════════════ */
 
+// 이 Canvas 루트에 정확히 바인딩된 invalidate (모듈 전역 invalidate는 같은 페이지에
+// 함께 떠 있는 다른 Canvas(LocationPhoto3D)까지 매 프레임 깨운다) - PlanetBody/
+// BasicPlanet/Clouds/AtmosphereRing이 전부 같은 이유로 필요해 한 곳으로 모은다.
+const useCanvasInvalidate = () => useThree((s) => s.invalidate)
+
 /* 본체: 하이트맵 기반 셰이더 하나로 지형/바다/빙하를 표현.
    memo → seaLevel/ice/oceanRatio 가 안 바뀌면(구름·CO₂ 조작 등) 리렌더 skip. */
 const PlanetBody = memo(function PlanetBody({ seaLevel, ice, oceanRatio }) {
   const [day, height] = useTexture([DAY_URL, HEIGHT_URL])
   const matRef = useRef()
-  // 이 Canvas 루트에 정확히 바인딩된 invalidate (모듈 전역 invalidate 의 루트 불일치 방지)
-  const invalidateThis = useThree((s) => s.invalidate)
+  const invalidateThis = useCanvasInvalidate()
 
   // '단 1개의 고정된' uniforms 객체 (초기값). 이후엔 material 의 실제 uniforms 를 직접 수정.
   const uniforms = useMemo(
@@ -223,7 +227,7 @@ const PlanetBody = memo(function PlanetBody({ seaLevel, ice, oceanRatio }) {
 
 /* 텍스처 로딩/실패 시 안전 폴백 (basic material) */
 function BasicPlanet({ color = '#2a3a5a' }) {
-  const invalidateThis = useThree((s) => s.invalidate)
+  const invalidateThis = useCanvasInvalidate()
   useEffect(() => {
     invalidateThis()
   }, [color, invalidateThis])
@@ -245,19 +249,21 @@ const CLOUD_SPIN_RAD_PER_SEC = 0.04
 const Clouds = memo(function Clouds({ ratio }) {
   const map = useTexture(CLOUD_URL)
   const ref = useRef()
-  // 이 Canvas 루트에 바인딩된 invalidate - 전역 invalidate()는 같은 페이지에 함께
-  // 떠 있는 다른 Canvas(LocationPhoto3D)까지 매 프레임 깨운다(위 PlanetBody가
-  // invalidateThis를 쓰는 것과 같은 이유).
-  const invalidateThis = useThree((s) => s.invalidate)
-  const frame = useRef(0)
+  const invalidateThis = useCanvasInvalidate()
   useFrame((_, dt) => {
     if (!ref.current) return
     ref.current.rotation.y += dt * CLOUD_SPIN_RAD_PER_SEC
-    // 격프레임만 다시 그린다(≈30fps) - 이만큼 느린 드리프트는 60fps와 육안 차이가
-    // 없는데 GPU 부하는 절반이 된다. frameloop="demand"라 우리가 부르지 않으면
-    // 아예 그리지 않는다.
-    if (++frame.current % 2 === 0) invalidateThis()
   })
+  // frameloop="demand"에서는 useFrame 자체가 invalidate()로 예약된 렌더 위에서만
+  // 돌아간다 - useFrame 안에서 격프레임만 invalidate를 걸렀더니(이전 코드) 건너뛴
+  // 바로 그 틱에 남은 예약 프레임이 0이 되어 루프 자체가 멈춰버렸다(자전이 영원히
+  // 멈춤, 매 프레임 invalidate하던 예전 코드보다 더 나쁜 결과). 대신 루프 밖에서
+  // 타이머로 ~30fps만 invalidate를 예약한다 - 그 주기로만 렌더가 일어나고, 그때마다
+  // useFrame이 dt만큼 회전을 갱신하니 60fps 대비 렌더 부하는 여전히 절반이다.
+  useEffect(() => {
+    const id = setInterval(invalidateThis, 1000 / 30)
+    return () => clearInterval(id)
+  }, [invalidateThis])
   return (
     <mesh ref={ref} scale={1.015}>
       <sphereGeometry args={[R, 64, 64]} />
@@ -276,7 +282,7 @@ const Clouds = memo(function Clouds({ ratio }) {
 /* 외곽 대기 프레넬 링 (CO₂ 상승: 파랑 → 보라 → 붉은빛, 은은한 글로우).
    memo → scale/co2Level 안 바뀌면 리렌더 skip. 색상은 기존 uColor.value 를 mutate(할당 0). */
 const AtmosphereRing = memo(function AtmosphereRing({ scale, co2Level }) {
-  const invalidateThis = useThree((s) => s.invalidate)
+  const invalidateThis = useCanvasInvalidate()
   const uniforms = useMemo(
     () => ({ uColor: { value: ATM_BLUE.clone() }, uStrength: { value: 0.85 } }),
     [], // eslint-disable-line react-hooks/exhaustive-deps

@@ -2,6 +2,11 @@
 // 커스텀 팝오버 없이 브라우저 기본 title 툴팁만 쓴다 - 이 정도 용도엔 충분하고,
 // 새 의존성이나 위치 계산 로직이 필요 없다.
 function Term({ concept, children }) {
+  // concept이 없어도(옵셔널 체이닝) 화면은 안 죽는다 - 대신 개발 중에는 잘못된
+  // concept 키가 조용히 빈 툴팁으로 묻히지 않도록 콘솔에 남긴다.
+  if (import.meta.env.DEV && !concept) {
+    console.warn("Term: concept이 없습니다.", { children });
+  }
   return (
     <span className="concept-term" title={concept?.detail}>
       {children ?? concept?.term}

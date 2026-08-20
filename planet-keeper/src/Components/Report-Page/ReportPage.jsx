@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
-import useGameStore from "../../store/useGameStore";
+import useGameStore, { isGameInProgress } from "../../store/useGameStore";
 import useEscapeKey from "../common/useEscapeKey.js";
 import { PLANET_STATES, planetStateOf, ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
 import {
@@ -106,6 +106,7 @@ function CollapsibleSection({ title, defaultOpen = true, children }) {
 function ReportPage() {
   const navigate = useNavigate();
   const resetClimate = useClimateStore((state) => state.resetClimate);
+  const currentStage = useGameStore((state) => state.currentStage);
   const gameOverReason = useGameStore((state) => state.gameOverReason);
   const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
   const timeline = useGameStore((state) => state.timeline);
@@ -117,15 +118,17 @@ function ReportPage() {
   // 행성 만들기를 거쳐도 유지된다).
   const skipTutorials = useGameStore((state) => state.skipTutorials);
 
-  // 한 판도 하지 않고 주소창으로 /report에 직접 들어왔는지 - 마운트 시점에 한 번만
-  // 판단하고 그 뒤로는 다시 보지 않는다.
+  // 한 판도 안 했거나(timeline 비어있음) 게임이 아직 진행 중인데(PlanetCreatePage의
+  // gameInProgress와 같은 기준) 주소창으로 /report에 직접 들어왔는지 - 마운트
+  // 시점에 한 번만 판단하고 그 뒤로는 다시 보지 않는다.
   //
-  // 렌더마다 timeline.length를 보면 "다시 플레이"가 깨진다: replayGame이 async라
-  // 내부에서 resetGame()으로 timeline을 비운 뒤 await 지점에서 렌더가 한 번 끼어드는데,
-  // 그때 이 페이지가 "기록이 없네"로 판단해 시작 화면으로 튕겨 보내버린다(뒤이어
-  // 실행될 navigate("/game")이 도달하지 못한다). "직접 들어왔는가"는 원래 진입
-  // 시점의 성질이라 마운트 때 한 번 정하는 편이 의미상으로도 맞다.
-  const [enteredWithoutGame] = useState(() => timeline.length === 0);
+  // 렌더마다 다시 보면 "다시 플레이"가 깨진다: replayGame이 async라 내부에서
+  // resetGame()으로 timeline을 비우고 currentStage를 CREATOR로 되돌린 뒤 await
+  // 지점에서 렌더가 한 번 끼어드는데, 그때 이 페이지가 "기록이 없네/진행 중이
+  // 아니네"로 판단해 시작 화면으로 튕겨 보내버린다(뒤이어 실행될 navigate("/game")이
+  // 도달하지 못한다). "직접 들어왔는가"는 원래 진입 시점의 성질이라 마운트 때 한
+  // 번 정하는 편이 의미상으로도 맞다.
+  const [enteredWithoutGame] = useState(() => timeline.length === 0 || isGameInProgress(currentStage));
 
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
     title: "행성 진단 결과",
