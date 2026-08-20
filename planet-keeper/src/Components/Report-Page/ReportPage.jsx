@@ -4,26 +4,53 @@ import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import useEscapeKey from "../common/useEscapeKey.js";
 import { PLANET_STATES, planetStateOf, ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
-import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys, labelTone } from "../../utils/planetAnalysis.js";
+import {
+  describeTransition,
+  deltaEnergyLines,
+  formatSigned,
+  labelTone,
+} from "../../utils/planetAnalysis.js";
+import { causeFamilyOf, renderHighlightedParts } from "../../utils/explanationHighlight.jsx";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
 
 // 타임라인 항목의 label("☁️ 인공 구름 생성기" 등, useGameStore.applyEquipment가 `${item.emoji}
-// ${item.name}`로 저장)을 아이템 key로 되돌린다 - "아이템" 단계만 이 형식과 일치하고,
-// "행성 생성"/"⚠️ ..."/"최종 확인 N/3" 같은 다른 단계 label은 매칭되지 않아 undefined를
-// 돌려준다(원인을 하나로 특정할 수 없는 단계에 잘못 아이템 설명을 붙이지 않기 위함).
-const ITEM_KEY_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${item.name}`, item.key]));
+// ${item.name}`로 저장)을 아이템 원본으로 되돌린다(key뿐 아니라 delta도 필요 -
+// describeTransition이 "대기 두께가 감소했습니다" 같은 슬라이더 변화 줄을 만들려면
+// 어느 슬라이더인지(key)만으로는 부족하고 방향(delta 부호)도 알아야 한다).
+// "아이템" 단계만 이 형식과 일치하고, "행성 생성"/"⚠️ ..."/"최종 확인 N/3" 같은
+// 다른 단계 label은 매칭되지 않아 undefined를 돌려준다(원인을 하나로 특정할 수
+// 없는 단계에 잘못 아이템 설명을 붙이지 않기 위함).
+const ITEM_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${item.name}`, item]));
 
 // 퀴즈 데이터의 concepts 태그(예: "피드백", "에너지 평형")를 용어집 항목에 연결한다.
 // 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
 const CONCEPT_ALIASES = {
-  피드백: "climateFeedback",
-  "에너지 평형": "energyBalance",
-  평균기온: "currentTemperature",
+  피드백: "climateFeedback",       // 태그 "피드백" vs term "기후 피드백" - 다름
+  "에너지 평형": "energyBalance",   // 이미 term과 동일하지만 있어도 무해
+  평균기온: "currentTemperature",   // 태그 "평균기온" vs term "현재 평균 온도" - 다름
 };
+
+// concept 태그(예: "피드백", "알베도")로부터 CLIMATE_CONCEPTS의 키(예: "climateFeedback")를
+// 찾는다. lookupConcept은 개념 "객체"를 돌려주지만, 카드 하이라이트는 relevantKeys와
+// 비교할 "키"가 필요해서 별도로 둔다.
+const KEY_BY_TERM = Object.fromEntries(Object.entries(CLIMATE_CONCEPTS).map(([key, c]) => [c.term, key]));
+const conceptKeyOf = (tag) => CONCEPT_ALIASES[tag] ?? KEY_BY_TERM[tag] ?? null;
+
 const CONCEPTS_BY_TERM = Object.fromEntries(Object.values(CLIMATE_CONCEPTS).map((c) => [c.term, c]));
 const lookupConcept = (name) => CLIMATE_CONCEPTS[CONCEPT_ALIASES[name]] ?? CONCEPTS_BY_TERM[name] ?? null;
+
+// 타임라인 설명 한 줄을 색 클래스가 붙은 <p>로 렌더링한다(강조/계열 분류 자체는
+// explanationHighlight.jsx 공용 로직 - ItemResultModal도 같은 걸 쓴다).
+function renderExplanationLine(line, key) {
+  const family = causeFamilyOf(line);
+  return (
+    <p key={key} className={family ? `report-page__timeline-explain-line--${family}` : undefined}>
+      {renderHighlightedParts(line)}
+    </p>
+  );
+}
 
 // gameOverReason별 결과 배너. 성공 조건은 오직 "planet_stabilized"(Earth-like
 // Stable 도달) 하나뿐이다 - Warm/Cold Stable, Energy Surplus/Deficit는 클리어가 아니다.
@@ -83,7 +110,6 @@ function ReportPage() {
   const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
   const timeline = useGameStore((state) => state.timeline);
   const quizLog = useGameStore((state) => state.quizLog);
-  const inventory = useGameStore((state) => state.inventory);
   const resetGame = useGameStore((state) => state.resetGame);
   const replayGame = useGameStore((state) => state.replayGame);
   // 여기서 다시 시작하는 사람은 이미 한 판을 끝낸 사람이라 온보딩을 띄우지 않는다
@@ -106,18 +132,22 @@ function ReportPage() {
     detail: "",
     statusClass: "",
   };
-
-  // timeline[0]=행성 생성 시점, 마지막=최종 상태. 정상 플레이라면 항상 최소 1개는
-  // 있지만(nextProblem이 "초기"를 채운다), 방어적으로 없을 때도 깨지지 않게 한다.
-  const initial = timeline[0] ?? null;
+  
+// 최종 결과 배너("최종 행성 상태" 등)에서 쓰는 마지막 타임라인 스냅샷.
   const final = timeline[timeline.length - 1] ?? null;
   const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
 
   // "핵심 개념 정리"에서 9개 전부가 아니라 이번 판에 실제로 나타난 개념만 고른다.
-  const relevantKeys = useMemo(
-    () => relevantConceptKeys({ initial, final, timeline, gameOverReason }),
-    [initial, final, timeline, gameOverReason],
-  );
+  const quizConceptKeys = useMemo(() => {
+    const keys = new Set();
+    quizLog.forEach((q) => {
+      (q.concepts ?? []).forEach((tag) => {
+        const key = conceptKeyOf(tag);
+        if (key) keys.add(key);
+      });
+    });
+    return keys;
+  }, [quizLog]);
 
   // 연속으로 동일한 상태나 행동이 중복 기록된 타임라인 제거
   const uniqueTimeline = useMemo(() => {
@@ -132,32 +162,83 @@ function ReportPage() {
     });
   }, [timeline]);
 
-  // 원인->과정->결과 설명이 완전히 같은 단계(똑같은 방향의 아이템을 여러 번 쓴
-  // 경우 등)는 설명을 반복해서 보여주지 않고 하나로 묶는다 - 숫자만 다르고
-  // 문장이 같은 설명 박스가 줄줄이 나오는 걸 막는다.
-  const timelineGroups = useMemo(() => {
-    const groups = [];
-    const bySignature = new Map();
-    uniqueTimeline.forEach((entry, i) => {
-      const prev = i > 0 ? uniqueTimeline[i - 1] : null;
-      const explanation = prev
-        ? describeTransition(prev.physics, entry.physics, entry.ml?.label, ITEM_KEY_BY_LABEL.get(entry.label))
-        : deltaEnergyLines(entry.physics.deltaEnergy);
-      const signature = `${entry.stage}::${explanation.join("|").replace(/[-+]?\d+(\.\d+)?/g, "#")}`;
-      const existing = bySignature.get(signature);
-      if (existing) {
-        existing.entries.push(entry);
+  const displayTimeline = useMemo(() => {
+    const result = [];
+    uniqueTimeline.forEach((entry) => {
+      const last = result[result.length - 1];
+      if (entry.stage === "최종" && last?.stage === "최종") {
+        last.attempts += 1;
+        last.label = entry.label;
+        last.physics = entry.physics;
+        last.ml = entry.ml;
       } else {
-        const group = { stage: entry.stage, explanation, entries: [entry] };
-        bySignature.set(signature, group);
-        groups.push(group);
+        result.push({ ...entry, attempts: entry.stage === "최종" ? 1 : undefined });
       }
     });
-    return groups;
+    return result;
   }, [uniqueTimeline]);
 
-  // 사용한 아이템 중복 제거
-  const uniqueInventory = useMemo(() => [...new Set(inventory)], [inventory]);
+  const chartPoints = useMemo(
+    () =>
+      displayTimeline.map((entry, i) => ({
+        index: i,
+        stage: entry.stage,
+        label:
+          entry.stage === "최종" && entry.attempts > 1
+            ? `최종 확인 완료 (${entry.attempts}회 시도)`
+            : entry.label,
+        temperature: entry.physics.currentTemperature,
+        deltaEnergy: entry.physics.deltaEnergy,
+        tone: labelTone(entry.ml?.label),
+        mlLabel: entry.ml?.label ?? null,
+        isItem: entry.stage === "아이템",
+      })),
+    [displayTimeline],
+  );
+
+  const [selectedStep, setSelectedStep] = useState(null);
+  const activeStep = selectedStep ?? chartPoints.length - 1;
+  const activePoint = chartPoints[activeStep] ?? null;
+
+  // 선택된 지점 하나만 그때그때 계산한다(전체를 미리 계산해두지 않음) - 카드
+  // 그리드였을 때처럼 모든 스텝의 설명을 항상 들고 있을 필요가 없다.
+  const activeExplanation = useMemo(() => {
+    if (!activePoint) return null;
+    const entry = displayTimeline[activeStep];
+    const prev = activeStep > 0 ? displayTimeline[activeStep - 1] : null;
+    const item = ITEM_BY_LABEL.get(entry.label);
+    return prev
+      ? describeTransition(
+          prev.physics,
+          entry.physics,
+          entry.ml?.label,
+          item?.key,
+          item?.delta,
+          entry.immediateDeltaEnergy,
+          entry.immediateOutgoingRadiation,
+        )
+      : deltaEnergyLines(entry.physics.deltaEnergy);
+  }, [activeStep, activePoint, displayTimeline]);
+
+  // 그래프 좌표 계산 - ΔE=0이 세로 가운데, 위쪽은 에너지 과다(온난화/양의
+  // 되먹임), 아래쪽은 에너지 부족(냉각/음의 되먹임) 방향이다. 실제 데이터가
+  // epsilon보다 훨씬 작아도 평형 띠가 안 보일 만큼 안 찌그러지도록 최소
+  // 스케일(epsilon×1.4)을 보장한다.
+  const CHART_W = 640;
+  const CHART_H = 200;
+  const CHART_PAD_X = 20;
+  const CHART_PAD_Y = 18;
+  const maxAbsDeltaEnergy = Math.max(
+    ENERGY_BALANCE_EPSILON * 1.4,
+    ...chartPoints.map((p) => Math.abs(p.deltaEnergy)),
+  );
+  const xOf = (i) =>
+    CHART_PAD_X + (chartPoints.length > 1 ? (i / (chartPoints.length - 1)) * (CHART_W - CHART_PAD_X * 2) : 0);
+  const yOf = (deltaEnergy) =>
+    CHART_H / 2 - (deltaEnergy / maxAbsDeltaEnergy) * (CHART_H / 2 - CHART_PAD_Y);
+  const polylinePoints = chartPoints.map((p) => `${xOf(p.index)},${yOf(p.deltaEnergy)}`).join(" ");
+  const bandTop = yOf(ENERGY_BALANCE_EPSILON);
+  const bandBottom = yOf(-ENERGY_BALANCE_EPSILON);
 
   // 오답 후 같은 문제를 다시 제출하면 quizLog에는 시도마다 한 줄씩 쌓인다 -
   // id로 묶어서 "문제 하나당 한 줄 + 시도 목록"으로 보여준다. 오답이었다가
@@ -199,6 +280,15 @@ function ReportPage() {
   // 해설 모달은 열려 있을 때만 ESC로 닫는다(닫혀 있을 땐 null을 넘겨 아무 일도 안 함).
   useEscapeKey(selectedGroup ? () => setSelectedGroupKey(null) : null);
 
+  // 문제 목록에서 마우스를 올린 항목 - 그 문제가 다루는 개념 카드를 옆에서
+  // 강조하기 위한 용도(클릭 선택과는 별개라 selectedGroupKey를 건드리지 않는다).
+  const [hoveredQuizKey, setHoveredQuizKey] = useState(null);
+  const hoveredConceptKeys = useMemo(() => {
+    const group = hoveredQuizKey != null ? quizGroups.find((g) => g.key === hoveredQuizKey) : null;
+    if (!group?.concepts) return new Set();
+    return new Set(group.concepts.map(conceptKeyOf).filter(Boolean));
+  }, [hoveredQuizKey, quizGroups]);
+
   // 둘 다 replace로 건다 - push로 쌓으면 "다시 플레이"를 누를 때마다 히스토리에
   // /game과 /report가 번갈아 계속 쌓여서, 몇 판만 돌려도 뒤로 가기가 사실상
   // 무의미해진다. 방금 본 리포트는 새 판을 시작한 시점에 돌아갈 데가 아니다.
@@ -222,7 +312,10 @@ function ReportPage() {
 
   return (
     <div className="report-page">
-      <h1 className="report-page__title">피드백 창</h1>
+      <div className="report-page__masthead">
+        <span className="report-page__tag">MISSION REPORT</span>
+        <h1 className="report-page__title">피드백 창</h1>
+      </div>
 
       {/* 최종 결과 위주 배너 */}
       <div className={`report-page__section report-page__summary-card ${resultBanner.statusClass}`}>
@@ -239,7 +332,7 @@ function ReportPage() {
             </span>
           </div>
           <div className="report-page__metric-box">
-            <span className="report-page__metric-label">에너지 수지 판정</span>
+            <span className="report-page__metric-label">에너지 불균형 판정</span>
             <span className="report-page__metric-value">
               {final?.ml ? final.ml.label : "-"}
             </span>
@@ -265,42 +358,86 @@ function ReportPage() {
 
       <hr className="report-page__divider" />
 
-      {/* 행성 변화 타임라인: 가로 2열 컴팩트 카드 그리드 방식 */}
+      {/* 행성 변화 타임라인: ΔE 추이 하나로 통합한 그래프 */}
+      {/* 타임라인 그래프와 선택한 지점의 설명을 하나의 섹션으로 통합 -
+          접기/펼치기를 같이 하도록 CollapsibleSection 하나로 감싼다. */}
       <CollapsibleSection title="행성 변화 타임라인">
-        {timelineGroups.length ? (
-          <div className="report-page__timeline-grid">
-            {timelineGroups.map((group, i) => (
-              <div key={i} className="report-page__timeline-card">
-                <div className="report-page__timeline-card-header">
-                  <span className="report-page__timeline-step-tag">Step {i + 1}</span>
-                  <span className="report-page__timeline-stage">{group.stage}</span>
-                  <div className="report-page__timeline-chips">
-                    {group.entries.map((e, idx) => (
-                      <span key={idx} className="report-page__timeline-chip">
-                        {e.label}
-                      </span>
-                    ))}
+        {chartPoints.length ? (
+          <div className="report-page__timeline-row">
+            <div className="report-page__timeline-chart-col">
+              <p className="report-page__subtext">
+                선을 따라가면 에너지가 어느 방향으로 움직였는지 한눈에 보입니다. 초록 띠는 평형 범위(±
+                {ENERGY_BALANCE_EPSILON.toFixed(1)})를 나타내며, 띠 위쪽은 에너지 과다(온난화), 아래쪽은 에너지 부족(냉각)을 뜻합니다.
+                점을 클릭하면 옆에 해당 지점의 원인과 결과가 표시됩니다.
+              </p>
+              <svg
+                className="report-page__timeline-chart"
+                viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+                role="img"
+                aria-label="ΔE(에너지 불균형) 추이 그래프"
+              >
+                <rect
+                  className="report-page__timeline-chart-band"
+                  x={CHART_PAD_X}
+                  y={bandTop}
+                  width={CHART_W - CHART_PAD_X * 2}
+                  height={bandBottom - bandTop}
+                />
+                <line
+                  className="report-page__timeline-chart-zero"
+                  x1={CHART_PAD_X}
+                  x2={CHART_W - CHART_PAD_X}
+                  y1={CHART_H / 2}
+                  y2={CHART_H / 2}
+                />
+                <polyline className="report-page__timeline-chart-line" points={polylinePoints} />
+                {chartPoints.map((p) => (
+                  <g
+                    key={p.index}
+                    className="report-page__timeline-chart-point"
+                    transform={`translate(${xOf(p.index)}, ${yOf(p.deltaEnergy)})`}
+                    onClick={() => setSelectedStep(p.index)}
+                  >
+                    <circle
+                      r={p.index === activeStep ? 7 : 5}
+                      className={`report-page__timeline-chart-dot report-page__timeline-chart-dot--${p.tone}${
+                        p.index === activeStep ? " is-active" : ""
+                      }`}
+                    />
+                    {p.isItem && (
+                      <text className="report-page__timeline-chart-emoji" y={-8}>
+                        {p.label.split(" ")[0]}
+                      </text>
+                    )}
+                  </g>
+                ))}
+              </svg>
+            </div>
+
+            <div className="report-page__timeline-detail-col">
+              {activePoint ? (
+                <div className="report-page__timeline-detail">
+                  <div className="report-page__timeline-card-header">
+                    <span className="report-page__timeline-step-tag">Step {activeStep + 1}</span>
+                    <span className="report-page__timeline-stage">{activePoint.stage}</span>
+                    {activePoint.label && <span className="report-page__timeline-chip">{activePoint.label}</span>}
                   </div>
-                </div>
 
-                <div className="report-page__timeline-explain">
-                  {group.explanation.map((line, j) => (
-                    <p key={j}>{line}</p>
-                  ))}
-                </div>
+                  <div className="report-page__timeline-explain">
+                    {activeExplanation.map((line, j) => renderExplanationLine(line, j))}
+                  </div>
 
-                <div className="report-page__timeline-metrics">
-                  {group.entries.map((e, idx) => (
-                    <span key={idx} className="report-page__metric-badge">
-                      🌡️ {e.physics.currentTemperature.toFixed(1)}K · ΔE {formatSigned(e.physics.deltaEnergy)} ·{" "}
-                      <span className={`report-page__metric-badge-label report-page__metric-badge-label--${labelTone(e.ml?.label)}`}>
-                        {e.ml?.label ?? "-"}
-                      </span>
+                  <span className="report-page__metric-badge">
+                    🌡️ {activePoint.temperature.toFixed(1)}K · ΔE {formatSigned(activePoint.deltaEnergy)} ·{" "}
+                    <span className={`report-page__metric-badge-label report-page__metric-badge-label--${activePoint.tone}`}>
+                      {activePoint.mlLabel ?? "-"}
                     </span>
-                  ))}
+                  </span>
                 </div>
-              </div>
-            ))}
+              ) : (
+                <p>그래프의 지점을 클릭하면 설명이 여기 표시됩니다.</p>
+              )}
+            </div>
           </div>
         ) : (
           <p>기록된 변화가 없습니다.</p>
@@ -309,34 +446,60 @@ function ReportPage() {
 
       <hr className="report-page__divider" />
 
-      {/* 문제 풀이 결과 */}
+      {/* 문제 풀이 결과 + 관련 개념 카드를 한 섹션으로 통합 - 접기/펼치기 공유.
+          문제에 마우스를 올리면 그 문제가 다루는 개념 카드가 강조된다. */}
       <CollapsibleSection title="문제 풀이 결과">
         <p className="report-page__subtext">
-          맞은 문제 <strong>{correctGroups.length}</strong>개 / 틀린 문제 <strong>{wrongGroups.length}</strong>개 — 문제를 클릭하면 해설을 볼 수 있습니다.
+          맞은 문제 <strong>{correctGroups.length}</strong>개 / 틀린 문제 <strong>{wrongGroups.length}</strong>개 — 문제를 클릭하면 해설을, 마우스를 올리면 관련 개념이 옆에서 강조됩니다.
         </p>
 
-        {quizGroups.length ? (
-          <ul className="report-page__quiz-list">
-            {quizGroups.map((g) => (
-              <li
-                key={g.key}
-                className={`report-page__quiz-item ${
-                  g.correct ? "report-page__quiz-item--correct" : "report-page__quiz-item--wrong"
-                }`}
-                onClick={() => setSelectedGroupKey(g.key)}
-              >
-                <span className="report-page__quiz-mark">{g.correct ? "✓" : "✗"}</span>
-                <span className="report-page__quiz-title">{g.title}</span>
-                {g.isRetry && <span className="report-page__quiz-retry-badge">재도전 문제</span>}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>푼 문제가 없습니다.</p>
-        )}
+        <div className="report-page__quiz-concept-row">
+          <div className="report-page__quiz-col">
+            {quizGroups.length ? (
+              <ul className="report-page__quiz-list">
+                {quizGroups.map((g) => (
+                  <li
+                    key={g.key}
+                    className={`report-page__quiz-item ${
+                      g.correct ? "report-page__quiz-item--correct" : "report-page__quiz-item--wrong"
+                    }`}
+                    onClick={() => setSelectedGroupKey(g.key)}
+                    onMouseEnter={() => setHoveredQuizKey(g.key)}
+                    onMouseLeave={() => setHoveredQuizKey(null)}
+                  >
+                    <span className="report-page__quiz-mark">{g.correct ? "✓" : "✗"}</span>
+                    <span className="report-page__quiz-title">{g.title}</span>
+                    {g.isRetry && <span className="report-page__quiz-retry-badge">재도전 문제</span>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>푼 문제가 없습니다.</p>
+            )}
+          </div>
+
+          <div className="report-page__concept-col">
+            <div className="report-page__concept-grid">
+              {Object.entries(CLIMATE_CONCEPTS)
+                .filter(([key]) => quizConceptKeys.has(key))
+                .map(([key, concept]) => (
+                  <div
+                    key={key}
+                    className={`report-page__concept-card${
+                      hoveredConceptKeys.has(key) ? " is-highlighted" : ""
+                    }`}
+                  >
+                    <p className="report-page__concept-card-term">{concept.term}</p>
+                    <p>{concept.detail}</p>
+                  </div>
+                ))}
+            </div>
+          </div>
+        </div>
       </CollapsibleSection>
 
-      {/* 고급화된 문제 해설 모달 */}
+      {/* 문제 해설 모달 - CollapsibleSection 밖에 둔다. 접기/펼치기와는 무관한
+          화면 전체 오버레이라 콘텐츠 트리 안에 있으면 안 된다. */}
       {selectedGroup && (
         <div className="report-page__modal-overlay" onClick={() => setSelectedGroupKey(null)}>
           <div
@@ -399,30 +562,6 @@ function ReportPage() {
           </div>
         </div>
       )}
-
-      <hr className="report-page__divider" />
-
-      {/* 사용한 아이템 */}
-      <CollapsibleSection title="사용한 아이템">
-        <p>{uniqueInventory.length ? uniqueInventory.join(", ") : "없음"}</p>
-      </CollapsibleSection>
-
-      <hr className="report-page__divider" />
-
-      {/* 교과 개념 정리 - 지구과학Ⅰ 수준으로 핵심 개념만 짧게 다시 정리한다. */}
-      <CollapsibleSection title="핵심 개념 정리">
-        <p className="report-page__subtext">이번 플레이에서 실제로 나타난 개념만 골랐습니다.</p>
-        <div className="report-page__concept-grid">
-          {Object.entries(CLIMATE_CONCEPTS)
-            .filter(([key]) => relevantKeys.has(key))
-            .map(([key, concept]) => (
-              <div key={key} className="report-page__concept-card">
-                <p className="report-page__concept-card-term">{concept.term}</p>
-                <p>{concept.detail}</p>
-              </div>
-            ))}
-        </div>
-      </CollapsibleSection>
 
       <div className="report-page__actions">
         <button className="btn-primary" onClick={handleReplay}>

@@ -7,9 +7,11 @@
   text-align: left;
   border: 1px solid var(--border);
   border-radius: 12px;
-  margin: 24px;
   position: relative;
   box-shadow: var(--shadow);
+  /* 라이트 모드 전용 - 순백(#fff)이 너무 밋밋해서 살짝 어둡게(sage 톤) 잡는다.
+     다크 모드는 아래 미디어쿼리가 --bg를 다시 정의하므로 여기 값과 무관하다. */
+  --bg: #eef4f1;
   /* 라이트/다크 모두 살짝 accent 색을 얹어 - 밋밋한 var(--bg) 단색 대신 위쪽에서
      은은하게 색이 도는 느낌을 준다(index.css 바디 배경과 같은 방식). */
   background: linear-gradient(180deg, var(--accent-bg), transparent 220px), var(--bg);
@@ -22,32 +24,36 @@
    하나도 안 건드려도 된다. */
 @media (prefers-color-scheme: dark) {
   .report-page {
-    --bg: #0f2027;
+    --bg: #060d18;
     --text: var(--panel-ink-dim);
     --text-h: #ffffff;
     --text-muted: var(--panel-ink-dim);
-    --border: rgba(8, 145, 178, 0.26);
+    /* GamePage(HUD)의 --line/--line-strong과 같은 cyan 계열로 통일 */
+    --border: rgba(45, 212, 191, 0.2);
     --code-bg: rgba(255, 255, 255, 0.05);
     --shadow: 0 14px 32px rgba(3, 7, 16, 0.45);
-    --accent: #22b8cf;
-    --accent-bg: rgba(8, 145, 178, 0.16);
-    --accent-border: rgba(8, 145, 178, 0.48);
+    /* GamePage --cyan과 정확히 같은 값 */
+    --accent: #2dd4bf;
+    --accent-bg: rgba(45, 212, 191, 0.16);
+    --accent-border: rgba(45, 212, 191, 0.45);
 
     --info: #38bdf8;
     --info-bg: rgba(56, 189, 248, 0.15);
     --info-border: rgba(56, 189, 248, 0.4);
-    /* 형광 라임그린 대신 페이지 전체 톤과 맞는 청록(teal) - index.css의 --neon과 같은 계열 */
-    --success: #2dd4bf;
-    --success-bg: rgba(45, 212, 191, 0.15);
-    --success-border: rgba(45, 212, 191, 0.4);
+    /* GamePage --ok와 정확히 같은 값(accent와 겹치던 cyan을 success에서 분리) */
+    --success: #34d399;
+    --success-bg: rgba(52, 211, 153, 0.15);
+    --success-border: rgba(52, 211, 153, 0.4);
     --danger: #f87171;
     --danger-bg: rgba(248, 113, 113, 0.15);
     --danger-border: rgba(248, 113, 113, 0.4);
     --warm: #fb923c;
     --warm-bg: rgba(251, 146, 60, 0.15);
     --warm-border: rgba(251, 146, 60, 0.4);
+    /* GamePage .item-result__step--greenhouse와 같은 값(다크 배경에서 더 밝은 violet) */
+    --violet: #a78bfa;
 
-    background: linear-gradient(160deg, #11242c 0%, #060e12 100%);
+    background: linear-gradient(160deg, #060d18 0%, #03060d 100%);
     color: var(--panel-ink);
   }
 
@@ -59,16 +65,46 @@
   }
 }
 
+.report-page__masthead {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+/* GamePage의 STAGE_META("MISSION 01" 등) 태그와 같은 어휘 - 이 페이지가 그
+   미션의 결과 보고라는 걸 같은 톤으로 이어준다. */
+.report-page__tag {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
 .report-page__title {
   text-align: center;
   margin: 0;
   font-size: 1.8rem;
 }
 
+/* 타임라인/문제풀이 등 섹션마다 카드로 띄워 - 이전엔 <hr> 한 줄로만 나뉘어
+   위아래 섹션이 페이지 배경과 구별이 안 됐다. --panel/--panel-border는
+   GamePage(HUD)·StartPage가 이미 쓰는 "콘솔 패널" 톤(라이트: 흰색→민트 그라디언트,
+   다크: 옅은 네이비)이라 새 색을 만들지 않고 그대로 가져와 페이지 배경과 대비를 준다. */
 .report-page__section {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  box-shadow: 0 0 20px var(--accent-bg);
 }
 
 /* 섹션 제목을 감싸는 접기/펼치기 버튼 - 버튼 기본 스타일(테두리/배경)을 지우고
@@ -85,8 +121,30 @@
   color: inherit;
 }
 
+/* 마우스로 클릭한 직후 브라우저 기본 포커스 사각형이 남아 "행성 변화 타임라인"과
+   "문제 풀이 결과"가 접혔을 때 서로 다르게 보이는 문제 - 클릭(포커스)에서는
+   지우고, 키보드 탐색(:focus-visible)일 때만 접근성용 링을 남긴다. */
+.report-page__section-toggle:focus {
+  outline: none;
+}
+
+.report-page__section-toggle:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 4px;
+  border-radius: 6px;
+}
+
 .report-page__section-toggle h3 {
   margin: 0;
+}
+
+/* 미션 브리핑 화면(GamePage)의 코드/HUD 느낌을 가볍게 가져온다 - 새 JSX 없이
+   섹션 제목 앞에 accent색 마커만 붙인다. */
+.report-page__section-toggle h3::before {
+  content: "// ";
+  color: var(--accent);
+  font-family: var(--mono);
+  font-weight: 400;
 }
 
 .report-page__section-toggle-icon {
@@ -94,59 +152,74 @@
   color: var(--text-muted);
 }
 
-/* 상단 최종 결과 배너 카드 */
+/* 상단 최종 결과 배너 카드 - 세로를 조금 더 낮게(패딩/간격 축소) */
 .report-page__summary-card {
   border-radius: 12px;
-  padding: 24px;
+  padding: 8px 18px;
   background: var(--accent-bg);
   border: 1px solid var(--border);
+  backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 6px;
+  transition: box-shadow 0.2s ease;
 }
 
+/* item-result--ok의 "테두리로 한 번 더 알려준다" 글로우와 같은 톤 언어 -
+   결과 배너도 그 판정의 색으로 은은하게 빛나게 한다. 배너 바탕색(--success-bg 등)이
+   페이지 배경과 거의 구별 안 될 만큼 옅어서, 판정색을 살짝 섞어 채도를 올린다
+   (color-mix라 라이트/다크 각 --success 값을 그대로 따라간다 - 별도 하드코딩 불필요). */
 .report-page__banner--success {
   border-color: var(--success);
-  background-color: var(--success-bg);
+  /* 청록 방향은 유지하되 32%는 너무 진하다는 피드백으로 비율을 낮춰 더 옅게. */
+  background-color: color-mix(in srgb, var(--accent) 18%, var(--success-bg));
+  box-shadow: 0 0 32px var(--success-bg);
 }
 
 .report-page__banner--failure {
   border-color: var(--danger);
-  background-color: var(--danger-bg);
+  background-color: color-mix(in srgb, var(--danger) 16%, var(--danger-bg));
+  box-shadow: 0 0 32px var(--danger-bg);
 }
 
 /* 목숨은 남았지만 지구형 범위에 못 든 종료 - 실패(빨강)와 성공(초록) 사이의 톤. */
 .report-page__banner--partial {
   border-color: var(--warm);
-  background-color: var(--warm-bg);
+  background-color: color-mix(in srgb, var(--warm) 16%, var(--warm-bg));
+  box-shadow: 0 0 32px var(--warm-bg);
 }
 
 .report-page__summary-main h2 {
-  margin: 0 0 8px 0;
-  font-size: 1.4rem;
+  margin: 0 0 4px 0;
+  font-size: 1.15rem;
 }
 
 .report-page__summary-detail {
   margin: 0;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 
 .report-page__summary-metrics {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px;
-  margin-top: 8px;
+  gap: 10px;
 }
 
 .report-page__metric-box {
   background: var(--bg);
-  padding: 12px 16px;
+  padding: 8px 14px;
   border-radius: 8px;
   border: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.report-page__metric-box:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
 }
 
 .report-page__metric-label {
@@ -154,14 +227,19 @@
   color: var(--text-muted);
 }
 
+/* item-result/stage-clear의 HUD 판독값(모노스페이스 + tabular-nums)과 같은
+   방식 - 숫자가 자릿수 흔들림 없이 안정적으로 보인다. */
 .report-page__metric-value {
   font-weight: 700;
   font-size: 1.05rem;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 .report-page__subtext {
   margin: 0;
   color: var(--text);
+  font-size: 0.8rem;
 }
 
 .report-page__divider {
@@ -180,18 +258,116 @@
 
 .report-page__actions button {
   padding: 12px 20px;
+  font-weight: 700;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+
+/* item-result__close/stage-clear__cta와 같은 호버 반응(살짝 뜨고 accent색으로
+   빛남) - .btn-primary는 index.css가 이미 배경/글자색을 정해두므로 여기서는
+   호버 동작만 더한다. */
+.report-page__actions .btn-primary:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+  box-shadow: 0 0 24px var(--accent-bg);
+}
+
+.report-page__actions button:not(.btn-primary):hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
+}
+
+/* 그래프(넓게)와 과정 설명(좁게)을 한 행에 나란히 - 이제 같은 CollapsibleSection
+   안이라 접기/펼치기가 항상 함께 움직인다. 세로선으로 시각적으로만 구분한다. */
+.report-page__timeline-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.report-page__timeline-chart-col {
+  flex: 2 1 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.report-page__timeline-detail-col {
+  flex: 1 1 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 24px;
+  border-left: 1px solid var(--accent-border);
+  min-width: 0;
 }
 
 /* =========================================
-   행성 타임라인: 가로 2열 컴팩트 그리드 레이아웃
+   행성 타임라인: ΔE 추이 그래프 하나로 통합
    ========================================= */
-.report-page__timeline-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 14px;
+.report-page__timeline-chart {
+  width: 100%;
+  height: auto;
+  margin: 8px 0 14px;
 }
 
-.report-page__timeline-card {
+.report-page__timeline-chart-band {
+  fill: var(--success-bg);
+}
+
+.report-page__timeline-chart-zero {
+  stroke: var(--accent-border);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.report-page__timeline-chart-line {
+  fill: none;
+  stroke: var(--info);
+  stroke-width: 2;
+}
+
+.report-page__timeline-chart-point {
+  cursor: pointer;
+}
+
+.report-page__timeline-chart-dot {
+  stroke: var(--bg);
+  stroke-width: 2;
+  transition: r 0.1s ease;
+}
+
+.report-page__timeline-chart-dot--neutral {
+  fill: var(--text-muted);
+}
+
+.report-page__timeline-chart-dot--earth {
+  fill: var(--success);
+}
+
+.report-page__timeline-chart-dot--warm {
+  fill: var(--warm);
+}
+
+.report-page__timeline-chart-dot--cold {
+  fill: var(--info);
+}
+
+.report-page__timeline-chart-dot.is-active {
+  stroke: var(--text-h);
+}
+
+.report-page__timeline-chart-emoji {
+  font-size: 20px;
+  text-anchor: middle;
+}
+
+.report-page__timeline-detail {
+  /* var(--bg)는 페이지 배경과 완전히 같은 색이라 지금까지 테두리 하나로만
+     구분됐다 - 그림자를 더해 카드가 페이지에서 확실히 떠 보이게 한다(안쪽의
+     --code-bg 칩/--accent-bg 설명 블록은 이 카드보다 한 단계 더 진한 톤이라
+     그대로 둬도 카드 경계와는 계속 구분된다). */
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -199,13 +375,8 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
-
-.report-page__timeline-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(0,0,0,0.06);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
 }
 
 .report-page__timeline-card-header {
@@ -230,13 +401,6 @@
   color: var(--text-h);
 }
 
-.report-page__timeline-chips {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-  margin-left: auto;
-}
-
 .report-page__timeline-chip {
   background: var(--code-bg);
   color: var(--text);
@@ -245,6 +409,28 @@
   border-radius: 10px;
   font-weight: 600;
   font-size: 0.8rem;
+  margin-left: auto;
+}
+
+/* 라벨 변화 / ΔE 변화를 원인->과정->결과 설명보다 먼저, 더 눈에 띄게 보여준다 -
+   "무엇이 얼마나 바뀌었는지"를 숫자로 바로 확인시키는 용도. */
+.report-page__timeline-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  border: 1px solid var(--border);
+  font-size: 0.88rem;
+}
+
+.report-page__timeline-summary p {
+  margin: 0;
+}
+
+.report-page__timeline-summary strong {
+  color: var(--text-h);
 }
 
 .report-page__timeline-explain {
@@ -264,10 +450,31 @@
   margin: 0;
 }
 
-.report-page__timeline-metrics {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+/* 중요 용어 강조(알베도/온실효과/ΔE/OLR/ASR 등) - renderExplanationLine 참고.
+   계열 색이 없는 줄(ΔE 등)에서만 쓰인다 - 계열 색이 있으면 아래 규칙이 이긴다. */
+.report-page__timeline-explain strong {
+  color: var(--text-h);
+  font-weight: 500;
+}
+
+/* 알베도->ASR 계열 / 온실효과->OLR 계열을 다른 색으로 구분한다 - 하나의 조작이
+   둘 다 움직일 때 어느 결과가 어느 원인 때문인지 색으로 바로 보이게 한다. 이유
+   문장("구름은 태양빛을 반사하는...")은 강조할 키워드가 없어 문장 전체를
+   물들인다 - strong도 같은 색으로 맞춰서 한 줄 안에서 색이 갈리지 않게 한다. */
+.report-page__timeline-explain-line--albedo {
+  color: var(--accent);
+}
+.report-page__timeline-explain-line--albedo strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.report-page__timeline-explain-line--greenhouse {
+  color: var(--violet);
+}
+.report-page__timeline-explain-line--greenhouse strong {
+  color: var(--violet);
+  font-weight: 600;
 }
 
 .report-page__metric-badge {
@@ -276,7 +483,8 @@
   background: var(--code-bg);
   padding: 2px 6px;
   border-radius: 4px;
-  font-family: monospace;
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
 }
 
 /* 칩 안의 상태 라벨(Energy Surplus/Earth-like Stable 등)만 따로 떼어 - 톤별로
@@ -307,10 +515,13 @@
   background: var(--info-bg);
 }
 
+/* 상단 배너의 최종 물리값 줄 - 배너 자체의 제목/지표 카드보다 훨씬 눈에 덜
+   띄어야 해서, 크기를 줄이고 무게를 가볍게 하고 색도 muted로 낮췄다. */
 .report-page__final-physics {
   margin: 0;
-  font-size: 0.9rem;
-  color: var(--text);
+  font-size: 0.78rem;
+  font-weight: 400;
+  color: var(--text-muted);
   word-break: keep-all;
 }
 
@@ -330,6 +541,7 @@
   flex-direction: column;
   gap: 8px;
   margin: 0;
+  font-size: 0.9rem;
 }
 
 .report-page__quiz-item {
@@ -341,11 +553,12 @@
   border-radius: 8px;
   border: 1px solid var(--border);
   cursor: pointer;
-  transition: background-color 0.2s ease;
+  transition: background-color 0.2s ease, transform 0.15s ease;
 }
 
 .report-page__quiz-item:hover {
   background: var(--accent-bg);
+  transform: translateY(-1px);
 }
 
 .report-page__quiz-item--correct {
@@ -391,22 +604,49 @@
   justify-content: center;
   z-index: 100;
   backdrop-filter: blur(3px);
+  animation: reportModalFade 0.15s ease-out;
 }
 
 .report-page__modal {
-  background: var(--bg);
+  /* var(--bg)는 리포트 페이지 전체 배경(이제 살짝 어둡게 조정됨)과 같은 값이라
+     안의 --code-bg 블록들과 거의 구별이 안 됐다 - GamePage 등이 쓰는 순백/딥
+     네이비 콘솔 패널 톤(--panel-solid)으로 모달만 확실히 밝게 띄운다. */
+  background: var(--panel-solid);
   color: var(--text-h);
-  padding: 28px;
+  padding: 22px 26px;
   border-radius: 16px;
-  max-width: 540px;
+  max-width: 600px;
   width: 90%;
   max-height: 85vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  border: 1px solid var(--border);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  gap: 14px;
+  border: 1px solid var(--accent-border);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1),
+    0 0 40px var(--accent-bg);
+  animation: reportModalPop 0.22s cubic-bezier(0.2, 1.1, 0.4, 1);
+}
+
+
+@keyframes reportModalFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes reportModalPop {
+  from {
+    opacity: 0;
+    transform: scale(0.96) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
 }
 
 .report-page__modal-header {
@@ -416,9 +656,9 @@
 }
 
 .report-page__modal-badge {
-  padding: 4px 10px;
+  padding: 3px 9px;
   border-radius: 6px;
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 700;
   flex-shrink: 0;
 }
@@ -437,20 +677,19 @@
 }
 
 .report-page__modal-question {
-  font-weight: 700;
-  font-size: 1.05rem;
+  font-weight: 600;
+  font-size: 0.95rem;
   margin: 0;
   line-height: 1.45;
   color: var(--text-h);
 }
 
-/* 형광색 제거한 차분하고 가독성 높은 내 답 / 정답 박스 */
 .report-page__modal-answers {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  background: var(--code-bg);
-  padding: 14px 16px;
+  gap: 6px;
+  background: color-mix(in srgb, var(--accent) 8%, var(--code-bg));
+  padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid var(--border);
 }
@@ -459,25 +698,25 @@
   display: flex;
   align-items: baseline;
   gap: 12px;
-  font-size: 0.95rem;
+  font-size: 0.82rem;
 }
 
 .report-page__modal-label {
   font-weight: 600;
   color: var(--text-muted);
-  min-width: 75px;
-  font-size: 0.88rem;
+  min-width: 60px;
+  font-size: 0.76rem;
 }
 
 /* 차분하고 신뢰감을 주는 딥 그린 (형광 텍스트 완전 제거) */
 .text-correct {
   color: var(--success);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .text-wrong {
   color: var(--danger);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .report-page__modal-section {
@@ -488,16 +727,16 @@
 
 .report-page__modal-subtitle {
   margin: 0;
-  font-size: 0.95rem;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--text);
 }
 
 .report-page__modal-explanation {
-  background: var(--code-bg);
-  padding: 12px 14px;
+  background: color-mix(in srgb, var(--info) 10%, var(--code-bg));
+  padding: 10px 12px;
   border-radius: 8px;
-  font-size: 0.92rem;
+  font-size: 0.8rem;
   line-height: 1.55;
   color: var(--text);
   border-left: 3px solid var(--info);
@@ -507,35 +746,24 @@
   margin: 0;
 }
 
-.report-page__concept-list {
-  margin: 0;
-  padding-left: 20px;
-  font-size: 0.9rem;
-  color: var(--text);
-  line-height: 1.5;
-}
-
-.report-page__concept-term {
-  color: var(--info);
-}
-
 .report-page__modal-close-btn {
   align-self: flex-end;
-  margin-top: 4px;
-  padding: 8px 20px;
+  margin-top: 2px;
+  padding: 6px 16px;
   border-radius: 8px;
   border: 1px solid var(--border);
   background: var(--bg);
   color: var(--text);
   cursor: pointer;
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
   transition: all 0.15s ease;
 }
 
 .report-page__modal-close-btn:hover {
   background: var(--code-bg);
-  border-color: var(--text-muted);
+  border-color: var(--accent-border);
+  transform: translateY(-2px);
 }
 
 /* 개념 카드 그리드 */
@@ -553,6 +781,12 @@
   flex-direction: column;
   gap: 4px;
   background: var(--bg);
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.report-page__concept-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-border);
 }
 
 .report-page__concept-card p {
@@ -562,4 +796,74 @@
 .report-page__concept-card-term {
   font-weight: 700;
   color: var(--info);
+}
+
+/* 문제 목록(넓게)과 관련 개념 카드(좁게)를 한 행에 나란히 - 타임라인 행과 같은
+   방식이지만 별도 클래스로 둬서 flex 비율을 독립적으로 조절할 수 있게 한다. */
+.report-page__quiz-concept-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+
+.report-page__quiz-col {
+  flex: 3 1 320px;
+  min-width: 0;
+}
+
+.report-page__concept-col {
+  flex: 2 1 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-left: 24px;
+  border-left: 1px solid var(--accent-border);
+  min-width: 0;
+}
+
+.report-page__concept-card p:not(.report-page__concept-card-term) {
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: var(--text-muted);
+}
+
+.report-page__concept-list {
+  margin: 0;
+  padding-left: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  color: var(--text);
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.report-page__concept-list li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-solid));
+  border-left: 3px solid var(--accent);
+}
+
+.report-page__concept-term {
+  color: var(--accent);
+  background: var(--bg);
+  padding: 1px 7px;
+  border-radius: 5px;
+  font-weight: 800;
+}
+
+/* 문제에 마우스를 올리면 그 문제가 다루는 개념 카드가 색이 바뀌고 살짝
+   떠오른다 - report-page__metric-box의 hover 승격 방식과 같은 언어를 쓴다. */
+.report-page__concept-card.is-highlighted {
+  border-color: var(--accent-border);
+  background: var(--accent-bg);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px var(--accent-bg);
+}
+
+.report-page__concept-card.is-highlighted .report-page__concept-card-term {
+  color: var(--accent);
 }

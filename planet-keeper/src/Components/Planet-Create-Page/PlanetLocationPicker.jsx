@@ -63,6 +63,7 @@ function PlanetLocationPicker({ onStart }) {
 
       <div className="picker__body">
         <div className="picker__map">
+          <div className="picker__map-frame">
           {CLIMATE_POINTS.map((point) => {
             const { top, left } = latLngToPercent(point.lat, point.lng);
             // 그 지점 값이 "지금 적용 중"일 때만 강조한다 - 슬라이더를 직접 움직여
@@ -91,6 +92,7 @@ function PlanetLocationPicker({ onStart }) {
               </button>
             );
           })}
+          </div>
         </div>
 
         {/* 선택 여부를 확인하는 정도의 요약만 - 결과 수치를 나열하지 않는다 */}
@@ -99,14 +101,16 @@ function PlanetLocationPicker({ onStart }) {
             <>
               <p className="picker__info-name">
                 📍 {selectedLocation.name}
-                {balanceNote?.imbalanced && (
-                  <span
-                    className="picker__flag-note"
-                    title="이 지점은 실제로 에너지 불균형 상태입니다. 실제 지구에서는 대기와 해류가 이 열을 다른 지역으로 옮겨 지구 전체는 균형을 이룹니다. 이 게임은 한 지점만 계산하므로 그 이동 효과는 반영되지 않습니다."
-                  >
-                    ⚠ 실제 불균형
-                  </span>
-                )}
+                {/* 배지 유무로 카드 높이가 바뀌면 grid align-items:stretch 때문에
+                    지도 칸 높이(=picker__map-frame 크기)까지 지점마다 달라진다.
+                    항상 렌더링하고 visibility만 토글해 자리를 고정한다. */}
+                <span
+                  className={`picker__flag-note${balanceNote?.imbalanced ? "" : " picker__flag-note--hidden"}`}
+                  title="이 지점은 실제로 에너지 불균형 상태입니다. 실제 지구에서는 대기와 해류가 이 열을 다른 지역으로 옮겨 지구 전체는 균형을 이룹니다. 이 게임은 한 지점만 계산하므로 그 이동 효과는 반영되지 않습니다."
+                  aria-hidden={!balanceNote?.imbalanced}
+                >
+                  ⚠ 실제 불균형
+                </span>
               </p>
               <dl className="picker__info-list">
                 {typeof selectedLocation.t2m === "number" && (

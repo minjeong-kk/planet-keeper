@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { formatSigned } from "../../utils/planetAnalysis.js";
 import useEscapeKey from "../common/useEscapeKey.js";
+import { causeFamilyOf, renderHighlightedParts } from "../../utils/explanationHighlight.jsx";
 
 // 장비를 쓴 직후 뜨는 "사용 결과" 모달.
 //
@@ -57,23 +58,30 @@ function ItemResultModal({ item, before, after, lines, ok, onClose }) {
 
         {!temperatureChanged && (
           <p className="item-result__hint">
-            조성이 바뀌어도 온도는 한 걸음씩만 움직입니다 - 지금은 에너지 수지가 먼저 변했습니다.
+            조성이 바뀌어도 온도는 한 걸음씩만 움직입니다 - 지금은 에너지 불균형이 먼저 변했습니다.
           </p>
         )}
 
         {/* 인과 사슬 - 조성 변화가 왜 그 결과로 이어지는지 */}
         <ol className="item-result__chain">
-          {lines.slice(1).map((line, i) =>
-            line === "↓" ? (
-              <li key={i} className="item-result__arrow" aria-hidden="true">
-                ↓
+          {lines.slice(1).map((line, i) => {
+            if (line === "↓") {
+              return (
+                <li key={i} className="item-result__arrow" aria-hidden="true">
+                  ↓
+                </li>
+              );
+            }
+            // 리포트 페이지 타임라인과 같은 색 구분(알베도/온실효과 계열)·핵심 용어
+            // 강조를 여기서도 재사용한다(explanationHighlight.jsx) - 같은 설명 문구를
+            // 두 화면이 서로 다르게 보여주면 안 되므로 로직을 공유한다.
+            const family = causeFamilyOf(line);
+            return (
+              <li key={i} className={`item-result__step${family ? ` item-result__step--${family}` : ""}`}>
+                {renderHighlightedParts(line)}
               </li>
-            ) : (
-              <li key={i} className="item-result__step">
-                {line}
-              </li>
-            ),
-          )}
+            );
+          })}
         </ol>
 
         <button type="button" className="item-result__close" onClick={onClose}>

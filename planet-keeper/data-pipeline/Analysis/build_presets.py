@@ -64,7 +64,9 @@ GEOGRAPHY = {
     },
     "amazon": {
         "name": "아마존", "lat": -3.5, "lng": -60.0,
-        "iceThickness": 0, "ocean": 10, "imageUrl": None,
+        "iceThickness": 0, "ocean": 10,
+        # NASA ISS 우주비행사 사진(ISS013-E-74843, 히우네그루/아마조니아).
+        "imageUrl": "/assets/location-amazon.jpg",
     },
 }
 
