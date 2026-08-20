@@ -573,13 +573,19 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
  * 리포트 페이지의 "행성 변화 타임라인" 각 단계(초기 -> 아이템 -> 최종)를 before/after
  * Physics 비교로 설명한다. describeItemJudgment와 같은 원인->과정->결과 문장을
  * 쓰지만, ReportPage의 timeline에는 각 단계의 physics 스냅샷만 남아 있어 기본적으로는
- * 어떤 아이템이었는지 몰라도 physics 값 비교만으로 동작한다. itemKey를 알 때만(예:
- * "아이템" 단계처럼 어느 슬라이더였는지 확실할 때) 넘기면 describeItemJudgment와 같은
- * "왜" 설명도 붙는다 - 슬라이더 여러 개가 동시에 바뀐 단계(이상기후 대응 등)는 원인을
- * 하나로 특정할 수 없으니 호출하는 쪽에서 itemKey를 넘기지 않아야 한다.
+ * 어떤 아이템이었는지 몰라도 physics 값 비교만으로 동작한다. itemKey/itemDelta를 알 때만
+ * (예: "아이템" 단계처럼 어느 슬라이더가 얼마나 움직였는지 확실할 때) describeItemJudgment의
+ * 인트로 줄(SLIDER_CHANGE_LINES)과 "왜" 설명(ALBEDO/GREENHOUSE_REASON)이 둘 다 붙는다 -
+ * 슬라이더 여러 개가 동시에 바뀐 단계(이상기후 대응 등)는 원인을 하나로 특정할 수
+ * 없으니 호출하는 쪽에서 itemKey/itemDelta를 넘기지 않아야 한다.
  */
-export function describeTransition(before, after, label, itemKey) {
-  const blocks = physicsChangeBlocks(before, after, itemKey);
+export function describeTransition(before, after, label, itemKey, itemDelta) {
+  // "온실효과가 약해졌다" 같은 파생 결과만 보여주고 정작 어느 슬라이더를 움직인
+  // 아이템이었는지는 말하지 않는다는 피드백 - describeItemJudgment(게임 내 아이템
+  // 판정)가 이미 쓰는 SLIDER_CHANGE_LINES를 그대로 재사용해 인과 사슬 맨 앞에 붙인다.
+  const sliderChangeLine = itemKey != null && itemDelta != null ? SLIDER_CHANGE_LINES[itemKey]?.(itemDelta) : null;
+  const changeBlocks = physicsChangeBlocks(before, after, itemKey);
+  const blocks = sliderChangeLine ? [[sliderChangeLine], ...changeBlocks] : changeBlocks;
 
   if (blocks.length === 0) {
     // 변화가 전혀 없던 단계(예: 이미 평형이라 문제/아이템 없이 최종 확인만 반복한 경우) -

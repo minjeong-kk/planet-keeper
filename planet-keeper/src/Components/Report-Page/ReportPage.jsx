@@ -15,10 +15,13 @@ import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
 
 // 타임라인 항목의 label("☁️ 인공 구름 생성기" 등, useGameStore.applyEquipment가 `${item.emoji}
-// ${item.name}`로 저장)을 아이템 key로 되돌린다 - "아이템" 단계만 이 형식과 일치하고,
-// "행성 생성"/"⚠️ ..."/"최종 확인 N/3" 같은 다른 단계 label은 매칭되지 않아 undefined를
-// 돌려준다(원인을 하나로 특정할 수 없는 단계에 잘못 아이템 설명을 붙이지 않기 위함).
-const ITEM_KEY_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${item.name}`, item.key]));
+// ${item.name}`로 저장)을 아이템 원본으로 되돌린다(key뿐 아니라 delta도 필요 -
+// describeTransition이 "대기 두께가 감소했습니다" 같은 슬라이더 변화 줄을 만들려면
+// 어느 슬라이더인지(key)만으로는 부족하고 방향(delta 부호)도 알아야 한다).
+// "아이템" 단계만 이 형식과 일치하고, "행성 생성"/"⚠️ ..."/"최종 확인 N/3" 같은
+// 다른 단계 label은 매칭되지 않아 undefined를 돌려준다(원인을 하나로 특정할 수
+// 없는 단계에 잘못 아이템 설명을 붙이지 않기 위함).
+const ITEM_BY_LABEL = new Map(MOCK_ITEMS.map((item) => [`${item.emoji} ${item.name}`, item]));
 
 // 퀴즈 데이터의 concepts 태그(예: "피드백", "에너지 평형")를 용어집 항목에 연결한다.
 // 대부분은 term과 그대로 일치하지만, 일부는 더 구체적인 항목으로 이어준다.
@@ -192,8 +195,9 @@ function ReportPage() {
     if (!activePoint) return null;
     const entry = displayTimeline[activeStep];
     const prev = activeStep > 0 ? displayTimeline[activeStep - 1] : null;
+    const item = ITEM_BY_LABEL.get(entry.label);
     return prev
-      ? describeTransition(prev.physics, entry.physics, entry.ml?.label, ITEM_KEY_BY_LABEL.get(entry.label))
+      ? describeTransition(prev.physics, entry.physics, entry.ml?.label, item?.key, item?.delta)
       : deltaEnergyLines(entry.physics.deltaEnergy);
   }, [activeStep, activePoint, displayTimeline]);
 
