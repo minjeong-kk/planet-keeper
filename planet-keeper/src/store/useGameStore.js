@@ -681,24 +681,43 @@ const useGameStore = create(
     // 보유 장비는 소모하지 않고 그대로 남는다(리포트에 기록).
     if (currentStage !== GAME_STAGES.PROBLEM1) return;
 
-    const nextEquipment = { ...equipment };
-    if (nextEquipment[item.id] > 1) nextEquipment[item.id] -= 1;
-    else delete nextEquipment[item.id];
-
-    get().addItem(`${item.emoji} ${item.name}`); // 사용 기록(리포트/하단 사용 슬롯)
+    // 슬라이더가 이미 한계값(0/100 또는 온실효과 상한)이면 아이템을 써도 이 값
+    // 자체는 안 움직인다 - describeItemJudgment/pushTimeline에 알려줘서 "빙하가
+    // 증가했습니다" 같은, 실제로는 안 일어난 변화를 단정하는 문장을 막는다.
     const nextValues = nextSliderValues(values, item);
-    setValue(item.key, nextValues[item.key]);
+    const sliderChanged = nextValues[item.key] !== values[item.key];
 
-    set({ isComputing: true, equipment: nextEquipment });
+    // 장비 소모/인벤토리 기록/슬라이더 반영은 재계산이 성공한 뒤에만 한다 -
+    // 이 앞에서 먼저 해버리면, computeItemStepResult/describeItemJudgment가
+    // 던지는 예외를 catch가 로그만 남기고 삼키는 사이 장비는 이미 사라졌는데
+    // physicsResult/알림/타임라인은 그대로인 어긋난 상태가 됐다.
+    set({ isComputing: true });
     try {
       const { physics, ml, immediateDeltaEnergy, immediateOutgoingRadiation } = computeItemStepResult(nextValues);
       const balanced = STABLE_LABELS.has(ml.label);
-      const lines = describeItemJudgment(item, physicsResult, physics, ml.label, immediateDeltaEnergy, immediateOutgoingRadiation);
+      const lines = describeItemJudgment(
+        item,
+        physicsResult,
+        physics,
+        ml.label,
+        immediateDeltaEnergy,
+        immediateOutgoingRadiation,
+        sliderChanged,
+      );
+
+      const nextEquipment = { ...equipment };
+      if (nextEquipment[item.id] > 1) nextEquipment[item.id] -= 1;
+      else delete nextEquipment[item.id];
+
+      setValue(item.key, nextValues[item.key]);
+      get().addItem(`${item.emoji} ${item.name}`); // 사용 기록(리포트/하단 사용 슬롯)
       get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml, {
         immediateDeltaEnergy,
         immediateOutgoingRadiation,
+        sliderChanged,
       });
       set({
+        equipment: nextEquipment,
         physicsResult: physics,
         mlResult: ml,
         notice: { ok: balanced, lines },

@@ -622,14 +622,23 @@ function describeImbalanceChange(before, afterDeltaEnergy, label) {
  * immediateOutgoingRadiation: 같은 시점의 OLR(온도 고정) - physicsChangeBlocks의
  * "알베도 vs 온실효과 누가 이겼는지" 서술에 쓴다(같은 온도 스텝 혼입 문제).
  */
-export function describeItemJudgment(item, before, after, label, immediateDeltaEnergy, immediateOutgoingRadiation) {
+// sliderChanged=false는 슬라이더가 이미 한계값(0/100 또는 GREENHOUSE_MAX 등)이라
+// 아이템을 써도 실제로는 그 슬라이더가 움직이지 않은 경우다 - 그런데도 item.delta
+// 부호만 보고 "빙하가 증가했습니다" 같은 줄을 그대로 내보내면, 바로 다음
+// physicsChangeBlocks가 정확하게 말하는 "감지될 만한 변화가 없었다"와 자기모순되는
+// 문장이 나란히 뜬다. 실제로 안 움직였을 때는 그 사실을 그대로 말한다.
+export function describeItemJudgment(item, before, after, label, immediateDeltaEnergy, immediateOutgoingRadiation, sliderChanged = true) {
   const intro = [`${item.emoji} "${item.name}"을 사용했습니다.`];
+
+  const introLine = sliderChanged
+    ? (SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다.")
+    : "이미 한계값에 도달해 있어 이번에는 조성이 변하지 않았습니다.";
 
   // 원인 -> 과정 -> 결과 순서의 블록들. 각 블록은 그 자체로는 화살표 없이 붙어
   // 나오고, 블록과 블록 사이에만 withArrows가 "↓"를 넣는다 - 그래야 "ΔE 값 +
   // 방향 설명"처럼 한 덩어리로 읽혀야 하는 줄들이 화살표로 쪼개지지 않는다.
   const blocks = [
-    [SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다."],
+    [introLine],
     ...physicsChangeBlocks(before, after, item.key, immediateOutgoingRadiation),
   ];
 
@@ -684,11 +693,28 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
  * after.deltaEnergy/after.outgoingRadiation으로 대체하되 배경 온도 스텝이 섞여
  * 부정확할 수 있다.
  */
-export function describeTransition(before, after, label, itemKey, itemDelta, immediateDeltaEnergy, immediateOutgoingRadiation) {
+export function describeTransition(
+  before,
+  after,
+  label,
+  itemKey,
+  itemDelta,
+  immediateDeltaEnergy,
+  immediateOutgoingRadiation,
+  sliderChanged = true,
+) {
   // "온실효과가 약해졌다" 같은 파생 결과만 보여주고 정작 어느 슬라이더를 움직인
   // 아이템이었는지는 말하지 않는다는 피드백 - describeItemJudgment(게임 내 아이템
   // 판정)가 이미 쓰는 SLIDER_CHANGE_LINES를 그대로 재사용해 인과 사슬 맨 앞에 붙인다.
-  const sliderChangeLine = itemKey != null && itemDelta != null ? SLIDER_CHANGE_LINES[itemKey]?.(itemDelta) : null;
+  // sliderChanged=false(이미 한계값이라 실제로는 안 움직인 경우)는 describeItemJudgment와
+  // 같은 이유로 그 사실을 그대로 말한다 - 기본값 true는 옛 리포트 데이터처럼 이
+  // 정보가 없는 경우 예전 동작(항상 변화 줄 표시)을 그대로 유지한다.
+  const sliderChangeLine =
+    itemKey != null && itemDelta != null
+      ? sliderChanged
+        ? SLIDER_CHANGE_LINES[itemKey]?.(itemDelta)
+        : "이미 한계값에 도달해 있어 이번에는 조성이 변하지 않았습니다."
+      : null;
   const changeBlocks = physicsChangeBlocks(before, after, itemKey, immediateOutgoingRadiation);
   const blocks = sliderChangeLine ? [[sliderChangeLine], ...changeBlocks] : changeBlocks;
 

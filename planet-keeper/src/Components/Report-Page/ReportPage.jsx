@@ -219,6 +219,7 @@ function ReportPage() {
           item?.delta,
           entry.immediateDeltaEnergy,
           entry.immediateOutgoingRadiation,
+          entry.sliderChanged,
         )
       : deltaEnergyLines(entry.physics.deltaEnergy);
   }, [activeStep, activePoint, displayTimeline]);
