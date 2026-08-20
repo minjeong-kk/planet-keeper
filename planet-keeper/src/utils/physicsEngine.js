@@ -122,8 +122,11 @@ export const ALBEDO_CLOUD = 0.5 // 구름 — 개발계획서 (3)1의 값
  * 무시되고 하드코딩된 ALBEDO_ICE/ALBEDO_OCEAN이 쓰이는 문제가 있었다.
  *
  * 대체해도 구름은 그대로 덮는다 - 실측은 지표면 값이고 구름은 그 위에 있다.
- * 슬라이더로 빙하·바다를 바꾸면 실측값과 어긋나므로, 호출부(useClimateStore)가
- * 조성이 바뀌는 순간 이 값을 떨어뜨린다.
+ * 슬라이더로 빙하·바다를 바꾸면 이 값도 같이 움직여야 하므로, 호출부
+ * (useClimateStore.nextValuesForChange)가 실측값을 버리지 않고 "그 조정이
+ * surfaceAlbedoFromRatios 기준으로 지표면 반사율을 얼마나 움직이는지"를 델타로
+ * 얹는다 - 통째로 버리면 모델 전환 자체가 빙하 몇 %p 효과보다 크게(때로는 반대
+ * 방향으로) 알베도를 흔들어서 "빙하를 늘렸는데 알베도가 줄어드는" 결과가 나온다.
  */
 // 빙하/바다 면적 비율만으로 지표면 반사율을 계산한다(구름 블렌딩 전 - albedoOf가
 // 마지막에 따로 덮는다). useClimateStore.nextValuesForChange가 실측 알베도에

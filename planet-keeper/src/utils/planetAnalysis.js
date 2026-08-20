@@ -343,9 +343,16 @@ export function climateEventHintFor(event, values, currentTemperature) {
     ...mapSlidersToClimateInputs(nextSliderValues(values, { key: "cloud", delta: event.delta })),
     currentTemperature,
   });
-  const absorbUp = after.absorbedRadiation > before.absorbedRadiation + ENERGY_EPSILON;
+  // itemDescriptionFor와 같이 3분기로 둔다 - 2분기였을 때는 구름이 이미 0이나
+  // 100에 붙어 클램프로 아무 변화가 없는데도 "줄어듭니다"라고 단정해서, 대응
+  // 중에 플레이어가 슬라이더를 끝까지 밀면 힌트가 사실과 반대가 됐다.
+  const diff = after.absorbedRadiation - before.absorbedRadiation;
   const verb = event.delta > 0 ? "짙어지면" : "옅어지면";
-  return `구름도 햇빛을 반사하는 밝은 표면입니다. 지금 이 행성에서는 구름이 ${verb} 지표가 받는 태양에너지가 ${absorbUp ? "늘어납니다" : "줄어듭니다"}.`;
+  const effect =
+    Math.abs(diff) <= ENERGY_EPSILON
+      ? "지표가 받는 태양에너지는 거의 그대로입니다"
+      : `지표가 받는 태양에너지가 ${diff > 0 ? "늘어납니다" : "줄어듭니다"}`;
+  return `구름도 햇빛을 반사하는 밝은 표면입니다. 지금 이 행성에서는 구름이 ${verb} ${effect}.`;
 }
 
 // planetStateOf/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(상태 판정 배지)와
