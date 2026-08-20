@@ -2,7 +2,8 @@ import { useState } from "react";
 import ItemInfoModal from "./ItemInfoModal";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
 import { MAX_EQUIPMENT_CAPACITY, equipmentTotalCount } from "../../store/useGameStore.js";
-import { itemEffectKeyword } from "../../utils/planetAnalysis.js";
+import useClimateStore from "../../store/useClimateStore";
+import { itemEffectKeyword, itemDescriptionFor } from "../../utils/planetAnalysis.js";
 
 // 왼쪽 패널의 "기후 제어 장비" - 보유 중인 장비 인벤토리다.
 // equipment는 store가 들고 있는 { [itemId]: 수량 } 객체이고, 여기서는 그것을
@@ -15,6 +16,8 @@ import { itemEffectKeyword } from "../../utils/planetAnalysis.js";
 // disabled: 이상기후 대응 중이거나 장비 보급(보상 선택) 중 - 그때는 인벤토리를 잠근다.
 function EquipmentPanel({ equipment, onUse, disabled = false, lockReason = null }) {
   const [infoItem, setInfoItem] = useState(null);
+  const values = useClimateStore((state) => state.values);
+  const currentTemperature = useClimateStore((state) => state.currentTemperature);
 
   // 보유 중인 장비를 MOCK_ITEMS 순서대로 정렬해서 슬롯 위치가 튀지 않게 한다.
   const owned = MOCK_ITEMS.filter((item) => (equipment[item.id] ?? 0) > 0).map((item) => ({
@@ -46,11 +49,11 @@ function EquipmentPanel({ equipment, onUse, disabled = false, lockReason = null 
               className="equipment-card"
               onClick={() => onUse(item)}
               disabled={disabled}
-              title={`${item.name} - ${item.description}`}
+              title={`${item.name} - ${itemDescriptionFor(item, values, currentTemperature)}`}
             >
               <span className="equipment-card__emoji">{item.emoji}</span>
               <span className="equipment-card__name">{item.name}</span>
-              <span className="equipment-card__effect">{itemEffectKeyword(item)}</span>
+              <span className="equipment-card__effect">{itemEffectKeyword(item, values, currentTemperature)}</span>
               <span className="equipment-card__count">×{count}</span>
               <span className="equipment-card__use">사용</span>
             </button>

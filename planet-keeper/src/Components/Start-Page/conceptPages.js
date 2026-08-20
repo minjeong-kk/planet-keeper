@@ -5,8 +5,8 @@ export const CONCEPT_PAGES = [
   {
     key: "heatBalance",
     label: "ENERGY BALANCE",
-    title: "열수지 평형",
-    tab: "열수지",
+    title: "에너지 평형",
+    tab: "에너지",
     summary: "들어온 태양 에너지 = 반사된 에너지 + 방출된 지구 복사 에너지",
     formula: "ΔE = S(1 − a) − ε·σ·T⁴",
     body:

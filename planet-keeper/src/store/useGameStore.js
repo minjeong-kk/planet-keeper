@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
-import useClimateStore, { CLIMATE_VARIABLES, applyIceOceanCoupling } from "./useClimateStore.js";
+import useClimateStore, { CLIMATE_VARIABLES } from "./useClimateStore.js";
 import {
   computeClimateV2,
   mapSlidersToClimateInputs,
@@ -16,7 +16,17 @@ import {
   ENERGY_BALANCE_EPSILON,
   ENERGY_SCALE,
 } from "../utils/physicsEngine.js";
-import { describeItemJudgment, describeFinalizeJudgment } from "../utils/planetAnalysis.js";
+import {
+  describeItemJudgment,
+  describeFinalizeJudgment,
+  nextSliderValues,
+  itemDeltaEnergyChange,
+} from "../utils/planetAnalysis.js";
+
+// ItemInfoModal.jsx가 이 경로(useGameStore.js)로 가져다 쓴다 - 실제 정의는
+// planetAnalysis.js(순수 물리 계산, EquipmentReward/Panel의 itemEffectKeyword와
+// 같은 함수를 공유)에 있다.
+export { itemDeltaEnergyChange };
 
 // 게임 진행(문제/아이템/오답 횟수) 전용 store. 행성 슬라이더 값은 useClimateStore가
 // 들고 있고, 여기서는 아이템 사용 시 그 값을 바꾸고 물리엔진을 재계산한다.
@@ -58,22 +68,35 @@ const FINAL_CO2_STEP = 25;
 // GamePage가 2단계 진행 체크(finalAttempts/MAX_FINAL_ATTEMPTS)를 표시하는 데도 쓴다.
 export const MAX_FINAL_ATTEMPTS = 3;
 
-// 매 틱 지금 물리 상태(ΔE 부호)를 보고 어느 방향으로 악화시킬지 먼저 정한 뒤,
-// 그 방향에 맞는 후보 중 하나를 무작위로 고른다 - "지금 에너지가 과다/부족하니까
-// 이 현상이 일어난다"가 항상 실제 ΔE와 맞아떨어지게 하려는 것이다. warning은 경고
-// 단계(triggerClimateEvent)에서, message는 응답 시간이 끝나 실제로 적용될 때
-// (resolveClimateEvent가 플레이어 대응이 없었을 때의 fallback으로) 보여준다.
+// 이상기후 경고 후보 - 전부 "이 슬라이더가 이 방향으로 움직이려 한다"는 사건이다.
+// 지금 조성에서 실제로 위기가 될 수 있는지(=지금 ΔE를 더 악화시키는 방향인지)는
+// 고정된 온난화/냉각 분류가 아니라 isUsableClimateEvent가 매번 itemDeltaEnergyChange로
+// 다시 계산한다(pickVisibleItems가 아이템 방향을 재계산하는 것과 같은 이유). 구름처럼
+// 표면 상태에 따라 실제 효과가 반전되는 변수를 고정 분류(어느 리스트에 있는지)로만
+// 판단하면, 제목("구름이 옅어지려 합니다")과 실제 대응 방향(힌트/화살표 - GamePage가
+// 이미 매번 물리로 다시 계산한다)이 모순될 수 있다(예: 빙하가 아주 많은 행성에서는
+// 구름이 옅어지는 쪽이 오히려 냉각이라 위기가 아니다).
+//
+// warning은 경고 단계(triggerClimateEvent)에서, message는 응답 시간이 끝나 실제로
+// 적용될 때(resolveClimateEvent가 플레이어 대응이 없었을 때의 fallback으로) 보여준다.
 //
 // hint는 경보 화면에서 "왜 그 방향으로 생각해야 하는지"만 알려주는 문장이다.
 // 정답값(몇 %로 맞춰야 하는지)은 알려주지 않는다 - 어느 슬라이더를 어느 쪽으로
 // 움직여야 하는지는 UI가 delta 부호에서 유도한다(막으려면 delta의 반대 방향).
-const WARMING_EVENTS = [
+const CLIMATE_EVENTS = [
   {
     key: "co2",
     delta: 1,
     warning: "🌡️ CO₂가 배출되려 합니다!",
     message: "🌡️ CO₂가 배출되었습니다.",
     hint: "CO₂가 늘어나면 온실효과가 강해져서 우주로 빠져나가는 에너지가 줄어듭니다.",
+  },
+  {
+    key: "co2",
+    delta: -1,
+    warning: "🌡️ CO₂가 줄어들려 합니다!",
+    message: "🌡️ CO₂가 줄어들었습니다.",
+    hint: "CO₂가 줄면 온실효과가 약해져서 지표의 열이 우주로 더 많이 빠져나갑니다.",
   },
   {
     key: "iceThickness",
@@ -83,15 +106,6 @@ const WARMING_EVENTS = [
     hint: "빙하는 햇빛을 강하게 반사합니다. 빙하가 줄면 반사되지 못한 태양에너지를 그만큼 더 흡수합니다.",
   },
   {
-    key: "cloud",
-    delta: -1,
-    warning: "☁️ 구름이 옅어지려 합니다!",
-    message: "☁️ 구름이 옅어졌습니다.",
-    hint: "구름도 햇빛을 반사하는 밝은 표면입니다. 구름이 옅어지면 지표가 받는 태양에너지가 늘어납니다.",
-  },
-];
-const COOLING_EVENTS = [
-  {
     key: "iceThickness",
     delta: 1,
     warning: "🧊 빙하가 늘어나려 합니다!",
@@ -99,11 +113,11 @@ const COOLING_EVENTS = [
     hint: "빙하가 늘어나면 반사율(알베도)이 커져서 흡수하는 태양에너지가 줄어듭니다.",
   },
   {
-    key: "co2",
+    key: "cloud",
     delta: -1,
-    warning: "🌡️ CO₂가 줄어들려 합니다!",
-    message: "🌡️ CO₂가 줄어들었습니다.",
-    hint: "CO₂가 줄면 온실효과가 약해져서 지표의 열이 우주로 더 많이 빠져나갑니다.",
+    warning: "☁️ 구름이 옅어지려 합니다!",
+    message: "☁️ 구름이 옅어졌습니다.",
+    hint: "구름도 햇빛을 반사하는 밝은 표면입니다. 구름이 옅어지면 지표가 받는 태양에너지가 늘어납니다.",
   },
 ];
 
@@ -132,7 +146,12 @@ const CLIMATE_EVENT_COUNTER_ROOM = 5;
 //      녹으려 합니다"는 clamp에 걸려 아무 일도 일어나지 않는 빈 경고가 된다.
 //   2) 막는 방향(악화의 반대)으로도 최소한의 여유가 있어야 한다 - 안 그러면
 //      대응 자체가 불가능한 경고가 된다.
-function isUsableClimateEvent(event, values) {
+//   3) 실제로 지금 ΔE를 더 악화시키는 방향이어야 한다 - 구름처럼 표면 상태에
+//      따라 방향이 반전되는 변수는 event.key/delta만 봐서는 알 수 없어서,
+//      pickVisibleItems와 같은 방식(itemDeltaEnergyChange)으로 매번 다시
+//      확인한다. 이게 없으면 "구름이 옅어지려 합니다" 같은 위기가 실제로는
+//      그 조성에서 오히려 도움이 되는데도 위기로 뜰 수 있다.
+function isUsableClimateEvent(event, values, currentTemperature, deltaEnergy) {
   const value = values[event.key];
   if (typeof value !== "number") return false;
   const canWorsen = event.delta > 0 ? value < 100 : value > 0;
@@ -140,7 +159,10 @@ function isUsableClimateEvent(event, values) {
     event.delta > 0
       ? value >= CLIMATE_EVENT_COUNTER_ROOM
       : value <= 100 - CLIMATE_EVENT_COUNTER_ROOM;
-  return canWorsen && canRespond;
+  if (!canWorsen || !canRespond) return false;
+
+  const change = itemDeltaEnergyChange(event, values, currentTemperature);
+  return deltaEnergy > 0 ? change > ITEM_EFFECT_EPSILON : change < -ITEM_EFFECT_EPSILON;
 }
 
 // 경고가 뜬 뒤 플레이어가 슬라이더(행성 만들기와 같은 5개 전부를 보여준다)로
@@ -194,18 +216,6 @@ export const equipmentTotalCount = (equipment) =>
 // ItemInfoModal("지금 사용하면" 미리보기)도 같은 기준을 써야 판정이 어긋나지 않는다.
 export const ITEM_EFFECT_EPSILON = 0.01 * ENERGY_SCALE;
 
-// 이 아이템을 지금 조성/온도에 적용하면 ΔE가 실제로 얼마나 움직이는지(적용 전후
-// 차이). 정적 태그가 아니라 매번 물리엔진으로 직접 계산한다 - 정적 태그만 보면
-// clamp에 걸려 효과가 0인 아이템도 "맞는 방향"으로 보이기 때문이다.
-export function itemDeltaEnergyChange(item, values, currentTemperature) {
-  const before = computeClimateV2({ ...mapSlidersToClimateInputs(values), currentTemperature }).deltaEnergy;
-  const after = computeClimateV2({
-    ...mapSlidersToClimateInputs(nextSliderValues(values, item)),
-    currentTemperature,
-  }).deltaEnergy;
-  return after - before;
-}
-
 // 지금 ΔE 방향에 실제로 도움이 되는(clamp에 걸려 무효화되지 않은) 아이템을 후보에
 // 최소 GUARANTEED_WORKING_CHOICES개 고정으로 넣은 뒤 나머지를 무작위로 채운다.
 //
@@ -223,21 +233,42 @@ function pickVisibleItems(deltaEnergy, values, currentTemperature) {
 
   if (!neededDirection) return shuffled(pool).slice(0, ITEM_CHOICES_SHOWN);
 
-  const working = pool.filter((item) => {
-    const change = itemDeltaEnergyChange(item, values, currentTemperature);
-    return neededDirection === "cooling" ? change < -ITEM_EFFECT_EPSILON : change > ITEM_EFFECT_EPSILON;
-  });
-  // 극단적으로 후보 전부가 clamp에 걸려 효과가 없는 경우(사실상 거의 불가능한
-  // 안전망) 보장 없이 무작위로만 채운다.
-  if (working.length === 0) return shuffled(pool).slice(0, ITEM_CHOICES_SHOWN);
+  const working = neededDirection
+    ? pool.filter((item) => {
+        const change = itemDeltaEnergyChange(item, values, currentTemperature);
+        return neededDirection === "cooling" ? change < -ITEM_EFFECT_EPSILON : change > ITEM_EFFECT_EPSILON;
+      })
+    : [];
 
   const guaranteed = shuffled(working).slice(0, Math.min(GUARANTEED_WORKING_CHOICES, working.length));
-  const guaranteedIds = new Set(guaranteed.map((item) => item.id));
-  const rest = shuffled(pool.filter((item) => !guaranteedIds.has(item.id))).slice(
-    0,
-    ITEM_CHOICES_SHOWN - guaranteed.length,
-  );
-  return shuffled([...guaranteed, ...rest]);
+  const picked = [...guaranteed];
+  const pickedIds = new Set(picked.map((item) => item.id));
+
+  // 나머지 후보도 최소한 "뭔가는 바뀌는" 아이템으로 먼저 채운다 - 안 그러면 이미
+  // 슬라이더가 한계(0/100)에 붙어 클램프로 효과가 0인 아이템(예: 남극처럼 빙하가
+  // 이미 거의 100%인 지점에서 빙하를 더 늘리는 아이템)이 필러로 계속 뽑혀서
+  // 써도 아무 일도 안 일어나는 죽은 선택지가 된다.
+  for (const item of shuffled(
+    pool.filter((item) => !pickedIds.has(item.id) && Math.abs(itemDeltaEnergyChange(item, values, currentTemperature)) > ITEM_EFFECT_EPSILON),
+  )) {
+    if (picked.length >= ITEM_CHOICES_SHOWN) break;
+    picked.push(item);
+    pickedIds.add(item.id);
+  }
+
+  // 그래도 카드가 ITEM_CHOICES_SHOWN장에 못 미치면(효과 있는 아이템 자체가 그
+  // 개수보다 적은 극단적인 조성) 나머지는 효과 유무와 무관하게 남은 풀에서
+  // 채운다 - 카드 개수 자체가 "정답 힌트"(효과 있는 아이템이 몇 개인지)가 되지
+  // 않도록, ITEM 단계는 항상 같은 장수로 보여준다.
+  if (picked.length < ITEM_CHOICES_SHOWN) {
+    for (const item of shuffled(pool.filter((item) => !pickedIds.has(item.id)))) {
+      if (picked.length >= ITEM_CHOICES_SHOWN) break;
+      picked.push(item);
+      pickedIds.add(item.id);
+    }
+  }
+
+  return shuffled(picked);
 }
 
 // 행성 상태(0~4) 판정. 예전에는 학습된 ONNX 모델(climateClassifier.js)이 했지만,
@@ -281,6 +312,21 @@ function computeSettledResult() {
 // MAX_TEMPERATURE_STEP_K)만 그 ΔE 방향으로 온도를 옮긴다. 맞는 방향 아이템은
 // |ΔE|가 줄고 온도도 조금 개선되며, 틀린 방향이면 |ΔE|가 커지고 평형온도 자체가
 // 더 극단으로 이동한다 - 여러 번의 아이템 선택에 걸쳐 서서히 수렴하거나 악화된다.
+//
+// immediateDeltaEnergy(온도를 옮기기 "전", 새 조성 + 기존 온도로 계산한 ΔE)를
+// 별도로 반환한다 - MAX_TEMPERATURE_STEP_K(3K)가 커서, |ΔE|가 큰 상태에서는 이
+// 온도 스텝 자체가 아이템의 실제 조성 효과보다 OLR을 더 크게 흔들 수 있다.
+// physics.deltaEnergy(온도까지 반영된 "이후" 값)로 "이 아이템이 맞는 방향이었는지"를
+// 판정하면, 실제로는 반대 방향인 아이템(예: 이미 Energy Deficit인데 알베도를 더
+// 높이는 아이템)을 썼어도 그 턴의 배경 냉각 스텝이 우연히 더 커서 |ΔE|가 줄어든
+// 것처럼 보여 "방향이 맞았다"고 잘못 판정하는 문제가 있었다 - 판정은 반드시
+// immediateDeltaEnergy(온도 고정, 아이템 자체 효과만)로 해야 한다.
+//
+// immediateOutgoingRadiation도 같은 이유로 따로 반환한다 - planetAnalysis의
+// "알베도 vs 온실효과, 어느 쪽이 이겼는지" 서술과 "OLR 증가/감소" 설명 줄이
+// physics.outgoingRadiation(온도 스텝까지 반영된 값)을 쓰면, 온도가 내려간 폭
+// 자체가 OLR을 흔들어서 온실효과가 실제로는 진 경우에도 "온실효과가 이겨서
+// 데워지는 방향"처럼 판정과 반대로 서술되는 문제가 있었다.
 function computeItemStepResult(nextValues) {
   const { currentTemperature, setCurrentTemperature } = useClimateStore.getState();
   const climateInputs = mapSlidersToClimateInputs(nextValues);
@@ -290,16 +336,12 @@ function computeItemStepResult(nextValues) {
   setCurrentTemperature(nextTemperature);
 
   const physics = computeClimateV2({ ...climateInputs, currentTemperature: nextTemperature });
-  return { physics, ml: classifyPlanetState(physics) };
-}
-
-// 아이템 효과를 적용한 다음 슬라이더 값(0~100 범위로 clamp). 빙하/바다 상호제약도
-// useClimateStore.setValue와 똑같이 applyIceOceanCoupling을 쓴다 - 여기서
-// 빠뜨리면 "아이템 적용 예상 ΔE"(이 함수로 미리 계산)와 "실제 저장된 값"
-// (setValue가 따로 제약을 걸어 나온 값)이 서로 달라지는 문제가 생긴다.
-function nextSliderValues(values, item) {
-  const nextValue = Math.min(100, Math.max(0, values[item.key] + item.delta));
-  return applyIceOceanCoupling({ ...values, [item.key]: nextValue }, item.key);
+  return {
+    physics,
+    ml: classifyPlanetState(physics),
+    immediateDeltaEnergy: immediate.deltaEnergy,
+    immediateOutgoingRadiation: immediate.outgoingRadiation,
+  };
 }
 
 const useGameStore = create(
@@ -379,8 +421,8 @@ const useGameStore = create(
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
 
-  pushTimeline: (stage, label, physics, ml) =>
-    set((state) => ({ timeline: [...state.timeline, { stage, label, physics, ml }] })),
+  pushTimeline: (stage, label, physics, ml, extra = {}) =>
+    set((state) => ({ timeline: [...state.timeline, { stage, label, physics, ml, ...extra }] })),
 
   // 이번 플레이에서 정답을 맞힌 문제(correctIds)는 절대 다시 내지 않는다. 아직 한
   // 번도 안 나온 문제(seenIds에 없는 것)를 우선 내고, 풀 전체가 이미 나왔으면
@@ -410,15 +452,16 @@ const useGameStore = create(
     set({ nextClimateEventAt: elapsedSeconds + pickClimateEventInterval() });
 
     const { deltaEnergy } = physicsResult;
-    const pool =
-      deltaEnergy > ENERGY_BALANCE_EPSILON ? WARMING_EVENTS : deltaEnergy < -ENERGY_BALANCE_EPSILON ? COOLING_EVENTS : null;
-    if (!pool) return;
+    if (Math.abs(deltaEnergy) <= ENERGY_BALANCE_EPSILON) return;
 
-    const { values } = useClimateStore.getState();
-    // 지금 조성에서 의미가 있는(악화도 가능하고 대응도 가능한) 후보만 남긴다 -
-    // 빙하가 없는 행성에 빙하 경고가 뜨는 문제를 여기서 막는다. 남는 후보가
-    // 없으면 이번에는 경고를 띄우지 않고 다음 검토 시각을 기다린다.
-    const usable = pool.filter((event) => isUsableClimateEvent(event, values));
+    const { values, currentTemperature } = useClimateStore.getState();
+    // 지금 조성에서 의미가 있는(악화도 가능하고, 대응도 가능하고, 실제로 지금
+    // ΔE를 더 악화시키는) 후보만 남긴다 - 빙하가 없는 행성에 빙하 경고가 뜨는
+    // 문제, 구름처럼 방향이 반전되는 변수가 엉뚱한 쪽으로 뜨는 문제를 여기서
+    // 막는다. 남는 후보가 없으면 이번에는 경고를 띄우지 않고 다음 검토 시각을 기다린다.
+    const usable = CLIMATE_EVENTS.filter((event) =>
+      isUsableClimateEvent(event, values, currentTemperature, deltaEnergy),
+    );
     if (usable.length === 0) return;
 
     const event = pickRandom(usable);
@@ -480,12 +523,24 @@ const useGameStore = create(
       setValue(key, nextSliderValues(values, { key, delta })[key]);
     }
 
+    // 온도를 옮기기(advanceTemperature) 전에, 지금 조성 변화만 반영한(온도 고정)
+    // ΔE를 먼저 계산해 둔다 - computeItemStepResult/describeImbalanceChange와
+    // 같은 이유다. advanceTemperature도 최대 MAX_TEMPERATURE_STEP_K(3K)까지 배경
+    // 온도를 옮기는데, |ΔE|가 큰 상태에서는 이 스텝 자체가 플레이어의 실제 대응
+    // 효과보다 OLR을 더 크게 흔들 수 있다 - 그래서 반대로 대응했는데도 그 턴의
+    // 배경 스텝이 우연히 더 커서 "위기를 막았다"고 잘못 판정될 수 있었다.
+    const { values: respondedValues } = useClimateStore.getState();
+    const immediate = computeClimateV2({
+      ...mapSlidersToClimateInputs(respondedValues),
+      currentTemperature: before.currentTemperature,
+    });
+
     advanceTemperature();
     const { values: nextValues, currentTemperature } = useClimateStore.getState();
     const physics = computeClimateV2({ ...mapSlidersToClimateInputs(nextValues), currentTemperature });
 
-    const worsened = Math.abs(physics.deltaEnergy) > Math.abs(before.deltaEnergy) + ITEM_EFFECT_EPSILON;
-    const improved = Math.abs(physics.deltaEnergy) < Math.abs(before.deltaEnergy) - ITEM_EFFECT_EPSILON;
+    const worsened = Math.abs(immediate.deltaEnergy) > Math.abs(before.deltaEnergy) + ITEM_EFFECT_EPSILON;
+    const improved = Math.abs(immediate.deltaEnergy) < Math.abs(before.deltaEnergy) - ITEM_EFFECT_EPSILON;
     const resultMessage = !playerActed
       ? message
       : improved
@@ -628,10 +683,13 @@ const useGameStore = create(
 
     set({ isComputing: true, equipment: nextEquipment });
     try {
-      const { physics, ml } = computeItemStepResult(nextValues);
+      const { physics, ml, immediateDeltaEnergy, immediateOutgoingRadiation } = computeItemStepResult(nextValues);
       const balanced = STABLE_LABELS.has(ml.label);
-      const lines = describeItemJudgment(item, physicsResult, physics, ml.label);
-      get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml);
+      const lines = describeItemJudgment(item, physicsResult, physics, ml.label, immediateDeltaEnergy, immediateOutgoingRadiation);
+      get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml, {
+        immediateDeltaEnergy,
+        immediateOutgoingRadiation,
+      });
       set({
         physicsResult: physics,
         mlResult: ml,

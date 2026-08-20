@@ -18,6 +18,7 @@ import useGameStore, {
   CLIMATE_EVENT_RESPONSE_SECONDS,
   MAX_EQUIPMENT_CAPACITY,
   equipmentTotalCount,
+  ITEM_EFFECT_EPSILON,
 } from "../../store/useGameStore";
 import { slidersToVisual } from "../../utils/climateVisual.js";
 import {
@@ -28,7 +29,7 @@ import {
   COLD_STABLE_MAX_K,
   EARTH_LIKE_MAX_K,
 } from "../../utils/physicsEngine.js";
-import { formatSigned } from "../../utils/planetAnalysis.js";
+import { formatSigned, itemDeltaEnergyChange, climateEventHintFor } from "../../utils/planetAnalysis.js";
 import "./GamePage.css";
 
 // 행성 위에 잠깐 뜨는 정답/오답 플래시가 유지되는 시간(ms).
@@ -71,6 +72,31 @@ const STAGE_META = {
   [GAME_STAGES.ITEM]: { tag: "MISSION 01", objective: "확보할 기후 제어 장비를 선택하라" },
   [GAME_STAGES.FINAL]: { tag: "MISSION 02", objective: "지구와 유사한 목표 온도로 맞춰라" },
   [GAME_STAGES.REPORT]: { tag: "MISSION END", objective: "결과 보고서로 이동합니다" },
+};
+
+// 지점 선택(PlanetLocationPicker)으로 시작했을 때, 그 지점의 첫 판정이 직관과
+// 반대로 보일 수 있는 경우를 설명한다 - 이 엔진은 지점마다 실측 온도/알베도는
+// 반영하지만 위도별 실제 일사량 차이나 대기·해류의 열 수송은 반영하지 않고 모든
+// 지점에 같은 태양상수를 쓴다(PlanetLocationPicker의 picker__flag-note와 같은
+// 이유). 그래서 실제로는 추운 남극이 "에너지 과다"로, 실제로는 더운 사하라/
+// 태평양/아마존이 "에너지 부족"으로 나온다 - 계산이 틀린 게 아니라 이 세 지점
+// 모두 실제로는 대기·해류가 계속 열을 옮겨줘야 그 온도가 유지된다는 뜻이다.
+// 서울은 이미 Earth-like 근처라 해당 없음.
+const LOCATION_IMBALANCE_EXPECTED = {
+  antarctica: "Energy Surplus",
+  sahara: "Energy Deficit",
+  pacific: "Energy Deficit",
+  amazon: "Energy Deficit",
+};
+const LOCATION_IMBALANCE_NOTES = {
+  antarctica:
+    "남극은 실측 온도가 230K로 매우 낮은데도 \"에너지 과다\"로 나옵니다 - 이 엔진은 모든 지점에 같은 태양상수를 적용해서, 실제로는 대기·해류가 계속 열을 밖으로 옮겨야 유지되는 이 낮은 온도를 그 유출 없이 계산하면 오히려 에너지가 남는 것처럼 보입니다.",
+  sahara:
+    "사하라는 실측 온도가 300K로 높은데도 \"에너지 부족\"으로 나옵니다 - 위도에 따라 실제로 크게 다른 일사량 차이를 이 엔진은 반영하지 않아서, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 이 온도를 그 유입 없이 계산하면 오히려 에너지가 부족한 것처럼 보입니다.",
+  pacific:
+    "태평양 중심부는 실측 온도가 301K로 높은데도 \"에너지 부족\"으로 나옵니다 - 사하라와 같은 이유로, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 온도를 그 유입 없이 계산한 결과입니다.",
+  amazon:
+    "아마존은 실측 온도가 299K로 높은데도 \"에너지 부족\"으로 나옵니다 - 사하라와 같은 이유로, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 온도를 그 유입 없이 계산한 결과입니다.",
 };
 
 // 아이템 사용/2단계 확인 후 물리엔진이 판정한 상태 - 행성 옆 배지로 강조 표시한다.
@@ -161,6 +187,7 @@ function GamePage() {
   const values = useClimateStore((state) => state.values);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const resetClimate = useClimateStore((state) => state.resetClimate);
+  const selectedLocation = useClimateStore((state) => state.selectedLocation);
   // 1초마다 도는 elapsedSeconds 틱에도 GamePage가 리렌더되므로, values/physicsResult/
   // inventory가 그대로인데 매번 다시 계산되지 않도록 메모이즈한다.
   const climateInputs = useMemo(() => mapSlidersToClimateInputs(values), [values]);
@@ -231,6 +258,10 @@ function GamePage() {
   // 있다. 열려 있는 동안에는 아래 타이머 effect가 tickSecond를 돌리지 않으므로
   // 이상기후가 끼어들지 않는다.
   const [tutorialOpen, setTutorialOpen] = useState(false);
+  // 지점 프리셋으로 시작했고 그 지점의 첫 판정이 LOCATION_IMBALANCE_EXPECTED와
+  // 일치할 때만(슬라이더를 미리 만져 조성이 달라졌으면 안 뜬다) 온보딩 직후
+  // 한 번 보여주는 설명 문구.
+  const [locationNote, setLocationNote] = useState(null);
   // 1단계를 통과(에너지 평형 달성)한 순간 한 번 띄우는 단계 전환 모달.
   // 2단계 UI(지구 유사 온도 게이지)로 바뀌는 시점을 설명해 준다.
   const [stageClearOpen, setStageClearOpen] = useState(false);
@@ -280,6 +311,10 @@ function GamePage() {
   const handleTutorialFinish = () => {
     setTutorialOpen(false);
     dismissTutorial();
+    const expected = selectedLocation && LOCATION_IMBALANCE_EXPECTED[selectedLocation.id];
+    if (expected && mlResult?.label === expected) {
+      setLocationNote(LOCATION_IMBALANCE_NOTES[selectedLocation.id]);
+    }
   };
 
   // 선택지를 누르면 곧바로 판정한다(별도 제출 버튼 없음).
@@ -383,7 +418,7 @@ function GamePage() {
       ? Math.max(0, pendingClimateEvent.expiresAt - elapsedSeconds)
       : CLIMATE_EVENT_RESPONSE_SECONDS;
 
-  // 경보 대응 중에는 슬라이더를 움직일 때마다 지금 조성의 ΔE/평형 온도를 다시
+  // 경보 대응 중에는 슬라이더를 움직일 때마다 지금 조성의 ΔE/예상 안정 온도를 다시
   // 계산해서 보여준다(표시 전용 - 실제 physicsResult는 resolveClimateEvent가
   // 판정할 때만 갱신된다). 플레이어가 "지금 내가 맞는 방향으로 가고 있나"를
   // 값 자체로 확인할 수 있게 하는 용도다.
@@ -401,9 +436,30 @@ function GamePage() {
           ? "bad"
           : "same";
 
-  // 경보를 막으려면 이벤트가 미는 방향의 반대로 움직여야 한다 - 어느 슬라이더를
-  // 어느 쪽으로 볼지만 알려주고, 목표값(몇 %)은 알려주지 않는다.
-  const counterDirection = pendingClimateEvent ? (pendingClimateEvent.delta > 0 ? -1 : 1) : 0;
+  // 경보를 막는 방향 - 예전에는 "이벤트 delta의 반대 부호"로 고정해서 정했는데,
+  // 구름 슬라이더는 itemEffectKeyword와 같은 이유로 실제 효과 방향이 조성에 따라
+  // 뒤집힐 수 있다(표면이 구름 알베도 0.5보다 밝은 빙하-heavy 행성에서는 구름을
+  // 늘리는 쪽이 오히려 온난화가 된다). 그래서 고정 부호 대신 지금 조성/온도로
+  // itemDeltaEnergyChange를 직접 돌려서 어느 쪽이 실제로 |ΔE|를 줄이는지 본다.
+  const counterDirection = useMemo(() => {
+    if (!pendingClimateEvent) return 0;
+    const fallback = pendingClimateEvent.delta > 0 ? -1 : 1;
+    if (!livePhysics) return fallback;
+    const needsCooling = livePhysics.deltaEnergy > ENERGY_BALANCE_EPSILON;
+    const needsWarming = livePhysics.deltaEnergy < -ENERGY_BALANCE_EPSILON;
+    if (!needsCooling && !needsWarming) return fallback;
+    const probeUp = itemDeltaEnergyChange({ key: pendingClimateEvent.key, delta: 1 }, values, currentTemperature);
+    if (Math.abs(probeUp) < ITEM_EFFECT_EPSILON) return fallback;
+    const upHelps = needsCooling ? probeUp < 0 : probeUp > 0;
+    return upHelps ? 1 : -1;
+  }, [pendingClimateEvent, livePhysics, values, currentTemperature]);
+
+  // 경보 브리핑/힌트 문구도 구름 이벤트는 counterDirection과 같은 이유로 지금
+  // 조성/온도에 맞게 다시 계산한다(climateEventHintFor - co2/빙하 이벤트는 원래
+  // hint 그대로 반환한다).
+  const climateEventHint = pendingClimateEvent
+    ? climateEventHintFor(pendingClimateEvent, values, currentTemperature)
+    : null;
 
   // 지금 무엇을 해야 하는지 한 줄 안내 - 하단 바 오른쪽에 둔다.
   const actionHint = isComputing
@@ -555,7 +611,7 @@ function GamePage() {
               </p>
             </div>
           ) : (
-            /* 1단계: 목표가 "에너지 균형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
+            /* 1단계: 목표가 "에너지 평형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
                온도 안정 구간은 아직 보여주지 않는다. */
             <div className="hud__balance">
               <span className="hud__balance-label">에너지 불균형</span>
@@ -581,10 +637,10 @@ function GamePage() {
           )}
           </div>
 
-          {/* 평형 온도/ΔE는 보조 정보 - 현재 온도보다 작게, 아래쪽에 둔다. */}
+          {/* 예상 안정 온도/ΔE는 보조 정보 - 현재 온도보다 작게, 아래쪽에 둔다. */}
           <div className="hud__substats">
             <div className="hud__substat">
-              <span className="hud__substat-label">평형 온도</span>
+              <span className="hud__substat-label">예상 안정 온도</span>
               <span className="hud__substat-value">
                 {equilibriumTemperature != null ? `${equilibriumTemperature.toFixed(1)} K` : "--"}
               </span>
@@ -603,6 +659,16 @@ function GamePage() {
         </section>
 
         <aside className="hud__column hud__column--right">
+          {locationNote && (
+            <div className="mission mission--notice">
+              <span className="mission__eyebrow">🌍 지점 특이사항</span>
+              <p className="mission__notice-text">{locationNote}</p>
+              <button type="button" className="hud-btn" onClick={() => setLocationNote(null)}>
+                확인했습니다
+              </button>
+            </div>
+          )}
+
           {/* 임무 패널 - 문제를 푼 직후에는 같은 자리가 해설 카드로 바뀐다. */}
           {result ? (
             <QuizResult result={result} onClose={() => setResult(null)} />
@@ -726,10 +792,10 @@ function GamePage() {
             {isBriefing ? (
               <>
                 <p className="climate-event__goal">
-                  <strong>목표</strong> 에너지 균형을 회복하세요 (ΔE를 0에 가깝게)
+                  <strong>목표</strong> 에너지 평형을 회복하세요 (ΔE를 0에 가깝게)
                 </p>
-                {pendingClimateEvent.hint && (
-                  <p className="climate-event__hint">💡 {pendingClimateEvent.hint}</p>
+                {climateEventHint && (
+                  <p className="climate-event__hint">💡 {climateEventHint}</p>
                 )}
                 <p className="climate-event__sub">
                   다음 화면에서 행성 조성을 직접 조절할 수 있습니다. 조절하는 동안에는 시간이 넉넉하게
@@ -742,8 +808,8 @@ function GamePage() {
             ) : (
               /* ③ 조절 -> ④ 확인 */
               <>
-                {pendingClimateEvent.hint && (
-                  <p className="climate-event__hint">💡 {pendingClimateEvent.hint}</p>
+                {climateEventHint && (
+                  <p className="climate-event__hint">💡 {climateEventHint}</p>
                 )}
 
                 <div className="climate-event__timer-track">
@@ -757,7 +823,7 @@ function GamePage() {
                   늘어납니다
                 </p>
 
-                {/* 조절하는 동안 지금 조성의 ΔE/평형 온도를 실시간으로 보여준다. */}
+                {/* 조절하는 동안 지금 조성의 ΔE/예상 안정 온도를 실시간으로 보여준다. */}
                 {livePhysics && (
                   <div className={`climate-event__live climate-event__live--${liveTrend}`}>
                     <div className="climate-event__live-item">
@@ -765,7 +831,7 @@ function GamePage() {
                       <strong>{formatSigned(livePhysics.deltaEnergy)} W/m²</strong>
                     </div>
                     <div className="climate-event__live-item">
-                      <span>평형 온도</span>
+                      <span>예상 안정 온도</span>
                       <strong>{equilibriumTemperatureOf(livePhysics).toFixed(1)} K</strong>
                     </div>
                     <span className="climate-event__live-tag">

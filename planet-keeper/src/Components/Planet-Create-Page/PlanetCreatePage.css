@@ -8,20 +8,25 @@
    ========================================================================= */
 
 .create {
-  /* 이 페이지는 시스템 라이트/다크 설정과 무관하게 항상 어두운 우주 톤이다
-     (게임 화면과 같은 방침). 아래 규칙은 전부 이 토큰만 쓴다. */
-  --void: #03060d;
-  --deep: #070d1a;
-  --panel: rgba(12, 24, 40, 0.72);
-  --panel-solid: #0b1725;
-  --inset: rgba(4, 9, 17, 0.5);
-  --line: rgba(94, 234, 212, 0.16);
-  --line-strong: rgba(45, 212, 191, 0.42);
-  --cyan: #2dd4bf;
-  --cyan-soft: #5eead4;
-  --ink: #eef3fb;
-  --dim: #a8bdd6;
-  --faint: #7b90ab;
+  /* 이 페이지만의 색은 없다 - index.css의 콘솔 팔레트(GamePage .hud와 공유)를
+     그대로 물려받는다. 아래 별칭은 이 파일 안의 기존 var(--cyan)/var(--ink)
+     호출부를 안 건드리기 위한 것일 뿐, 값 자체는 index.css 한 곳에서만 정의한다. */
+  --cyan: var(--neon);
+  --cyan-soft: var(--holo);
+  --ink: var(--panel-ink);
+  --ink-strong: var(--panel-ink-strong);
+  --dim: var(--panel-ink-dim);
+  --faint: var(--text-faint);
+  --inset: var(--panel-inset);
+  --line: var(--panel-border);
+  --line-strong: var(--panel-line-strong);
+  /* --void/--deep/--panel/--panel-solid은 index.css의 같은 이름을 그대로
+     쓴다(별칭 불필요). */
+
+  /* 슬라이더 트랙의 "빈 구간" 색만은 이 페이지 전용 - 콘솔 팔레트에 대응하는
+     토큰이 없어 여기서만 라이트/다크를 나눈다. */
+  --track-empty: rgba(15, 42, 36, 0.12);
+  --track-usable: rgba(15, 42, 36, 0.2);
 
   position: relative;
   flex: 1;
@@ -38,13 +43,31 @@
   text-align: left;
   color: var(--ink);
   background:
-    radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 178, 0.16) 0%, transparent 60%),
-    radial-gradient(70% 50% at 50% 100%, rgba(45, 212, 191, 0.06) 0%, transparent 60%),
+    radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 136, 0.16) 0%, transparent 60%),
+    radial-gradient(70% 50% at 50% 100%, rgba(13, 148, 136, 0.1) 0%, transparent 60%),
     linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
 }
 
-/* 아주 옅은 별 - 배경이 복잡해지면 행성이 죽으므로 개수·밝기 모두 낮게 */
+@media (prefers-color-scheme: dark) {
+  .create {
+    --track-empty: rgba(255, 255, 255, 0.14);
+    --track-usable: rgba(255, 255, 255, 0.16);
+
+    background:
+      radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 178, 0.16) 0%, transparent 60%),
+      radial-gradient(70% 50% at 50% 100%, rgba(45, 212, 191, 0.06) 0%, transparent 60%),
+      linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+  }
+
+  .create__starfield {
+    display: block;
+  }
+}
+
+/* 아주 옅은 별 - 우주 배경 연출이라 다크 모드에서만 보인다. 배경이 복잡해지면
+   행성이 죽으므로 개수·밝기 모두 낮게 */
 .create__starfield {
+  display: none;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -96,7 +119,7 @@
   font-size: 1.4rem;
   font-weight: 800;
   line-height: 1.25;
-  color: #ffffff;
+  color: var(--ink-strong);
   word-break: keep-all;
 }
 
@@ -219,7 +242,7 @@
   border-bottom: 1px solid var(--line);
   font-size: 1.05rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--ink-strong);
 }
 
 .create__controls {
@@ -262,7 +285,7 @@
   font-family: var(--mono);
   font-size: 1.15rem;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--ink-strong);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -316,7 +339,7 @@
   background: linear-gradient(
     90deg,
     var(--cyan) 0 var(--fill, 50%),
-    rgba(255, 255, 255, 0.14) var(--fill, 50%) 100%
+    var(--track-empty) var(--fill, 50%) 100%
   );
 }
 
@@ -341,7 +364,7 @@
 .create-slider--native::-moz-range-track {
   height: 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.14);
+  background: var(--track-empty);
 }
 
 .create-slider--native::-moz-range-progress {
@@ -374,7 +397,7 @@
   right: 0;
   height: 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
+  background: var(--track-empty);
 }
 
 .create-slider--custom:focus-visible {
@@ -389,7 +412,7 @@
   position: absolute;
   height: 8px;
   border-radius: 4px;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--track-usable);
 }
 
 .create-slider__fill {

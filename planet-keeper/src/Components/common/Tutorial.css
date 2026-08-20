@@ -42,9 +42,9 @@
   padding: 22px 24px;
   border: 1px solid rgba(45, 212, 191, 0.45);
   border-radius: 16px;
-  background: linear-gradient(160deg, rgba(13, 28, 44, 0.98), rgba(6, 13, 24, 0.98));
+  background: var(--panel-solid, #0d1c2c);
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(45, 212, 191, 0.14);
-  color: #eaf1fb;
+  color: var(--ink, #eaf1fb);
   text-align: left;
   transition: top 0.28s ease, left 0.28s ease;
 }
@@ -71,11 +71,11 @@
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0.12em;
-  color: #2dd4bf;
+  color: var(--cyan, #2dd4bf);
 }
 
 .tour__step-total {
-  color: #5f7590;
+  color: var(--faint, #5f7590);
 }
 
 .tour__progress {
@@ -91,7 +91,7 @@
 }
 
 .tour__dot--on {
-  background: #2dd4bf;
+  background: var(--cyan, #2dd4bf);
   box-shadow: 0 0 8px rgba(45, 212, 191, 0.6);
 }
 
@@ -100,7 +100,7 @@
   font-size: 1.15rem;
   font-weight: 800;
   line-height: 1.45;
-  color: #ffffff;
+  color: var(--ink-strong, #ffffff);
   word-break: keep-all;
   /* 두 줄이 될 때 한쪽만 길어지지 않게 줄 길이를 고르게 나눈다. */
   text-wrap: balance;
@@ -120,7 +120,7 @@
   margin: 0;
   font-size: 0.98rem;
   line-height: 1.75;
-  color: #d7e5f5;
+  color: var(--ink, #d7e5f5);
   text-align: left;
   /* 어절 중간에서 끊기지 않게 하되(keep-all), URL처럼 공백 없는 긴 토큰이
      들어오면 카드를 넘치는 대신 그때만 강제로 줄바꿈한다. */
@@ -134,7 +134,7 @@
 .tour__card--center .tour__body {
   font-size: 1.08rem;
   line-height: 1.8;
-  color: #e4eefb;
+  color: var(--ink, #e4eefb);
 }
 
 .tour__actions {
@@ -156,7 +156,7 @@
   border: none;
   border-radius: 8px;
   background: transparent;
-  color: #8ba1bd;
+  color: var(--faint, #8ba1bd);
   font-size: 0.88rem;
   cursor: pointer;
 }
@@ -164,7 +164,7 @@
 .tour__skip:hover {
   transform: none;
   box-shadow: none;
-  color: #d7e5f5;
+  color: var(--ink, #d7e5f5);
 }
 
 .tour__prev {
@@ -172,7 +172,7 @@
   border: 1px solid rgba(45, 212, 191, 0.4);
   border-radius: 10px;
   background: transparent;
-  color: #5eead4;
+  color: var(--cyan-soft, #5eead4);
   font-size: 0.9rem;
   font-weight: 700;
   cursor: pointer;
@@ -186,7 +186,7 @@
 
 .tour__prev:disabled {
   border-color: rgba(139, 161, 189, 0.2);
-  color: #5f7590;
+  color: var(--faint, #5f7590);
   cursor: not-allowed;
 }
 
