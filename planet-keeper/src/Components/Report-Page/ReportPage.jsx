@@ -197,7 +197,15 @@ function ReportPage() {
     const prev = activeStep > 0 ? displayTimeline[activeStep - 1] : null;
     const item = ITEM_BY_LABEL.get(entry.label);
     return prev
-      ? describeTransition(prev.physics, entry.physics, entry.ml?.label, item?.key, item?.delta)
+      ? describeTransition(
+          prev.physics,
+          entry.physics,
+          entry.ml?.label,
+          item?.key,
+          item?.delta,
+          entry.immediateDeltaEnergy,
+          entry.immediateOutgoingRadiation,
+        )
       : deltaEnergyLines(entry.physics.deltaEnergy);
   }, [activeStep, activePoint, displayTimeline]);
 

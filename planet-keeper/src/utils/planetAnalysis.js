@@ -365,9 +365,13 @@ function greenhouseChangeLine(before, after) {
 // 조정)으로 둘이 같이 바뀌면 오히려 같은 방향(둘 다 냉각 또는 둘 다 온난화)으로
 // 힘을 보탤 수도 있다. 그래서 매번 실제 ASR/OLR 변화량의 부호를 보고 반대인지
 // 같은 방향인지부터 판단한 뒤에만 "어느 쪽이 이겼는지"를 말한다.
-function netAlbedoGreenhouseEffectLine(before, after) {
-  const asrDelta = after.absorbedRadiation - before.absorbedRadiation; // 알베도발 ΔE 기여
-  const olrDelta = after.outgoingRadiation - before.outgoingRadiation;
+//
+// asrDelta/olrDelta를 physics 객체가 아니라 이미 계산된 숫자로 받는다 - OLR은
+// 온실효과(조성)뿐 아니라 온도(T⁴)에도 좌우되는데, 호출부(physicsChangeBlocks)가
+// "OLR 델타"를 온도 스텝 이전(조성 변화만 반영한) 기준으로 계산해서 넘길 수도,
+// 그런 기준이 없을 때는 after 그대로 넘길 수도 있어야 하기 때문이다 - 이 함수
+// 안에서 physics 객체를 직접 참조하면 그 선택권이 사라진다.
+function netAlbedoGreenhouseEffectLine(asrDelta, olrDelta) {
   const greenhousePull = -olrDelta; // 온실효과발 ΔE 기여(ΔE = ASR - OLR이므로 부호 반전)
 
   const sameDirection = (asrDelta > 0) === (greenhousePull > 0);
@@ -403,8 +407,16 @@ export const GREENHOUSE_REASON = {
 // (describeItemJudgment)과 타임라인 전환(describeTransition)이 그대로 공유한다 -
 // itemKey를 안 넘기면(타임라인처럼 어떤 아이템이었는지 모르거나, 슬라이더 여러 개가
 // 동시에 바뀌어 원인을 하나로 특정할 수 없을 때) physics 값 비교만으로 동작한다.
-function physicsChangeBlocks(before, after, itemKey) {
+//
+// immediateOutgoingRadiation: 온도를 옮기기 "전"(조성 변화만 반영한) OLR -
+// describeImbalanceChange의 방향 판정과 같은 이유로 필요하다. after.outgoingRadiation은
+// 온도 스텝까지 반영된 값이라, 온실효과가 실제로는 진 경우에도(알베도 쪽이 더 크게
+// 이겨서 온도가 내려간 경우) 그 온도 하락이 OLR을 깎아서 "온실효과가 이겨서
+// 데워지는 방향"처럼 판정과 반대로 서술되는 문제가 있었다. 없으면(itemKey 없는
+// 다중 슬라이더 전환 등) after.outgoingRadiation로 대체한다.
+function physicsChangeBlocks(before, after, itemKey, immediateOutgoingRadiation) {
   const blocks = [];
+  const olrAfter = immediateOutgoingRadiation ?? after.outgoingRadiation;
 
   const albedoLine = changeLine(before.albedo, after.albedo, "알베도가 증가했습니다.", "알베도가 감소했습니다.", RATIO_EPSILON);
   const greenhouseLine = greenhouseChangeLine(before, after);
@@ -414,14 +426,26 @@ function physicsChangeBlocks(before, after, itemKey) {
   // 결과일 뿐, 알베도가 바뀌어서 온실효과가 바뀌는 인과관계가 아니다. 그래서 둘 다
   // 있으면 화살표로 잇지 않고 같은 블록에 나란히 묶어(withArrows가 블록 "안"에는
   // 화살표를 안 넣는다) 인과관계처럼 안 읽히면서도 둘 다 보여준다.
+  // itemKey가 있으면(어느 슬라이더인지 확실할 때) ALBEDO_REASON/GREENHOUSE_REASON에
+  // 그 슬라이더가 등록돼 있다는 것 자체가 "이 아이템은 원래 이 계열에 영향을 줘야
+  // 한다"는 뜻이다. 그런데도 albedoLine/greenhouseLine이 안 잡히면(예: 구름이 이미
+  // greenhouseStrength 상한(GREENHOUSE_MAX)에 걸려 있어 그 채널만 더는 안 움직이는
+  // 경우), 아무 말 없이 건너뛰지 않고 "이번엔 이 채널에 감지될 만한 변화가 없었다"고
+  // 밝힌다 - 같은 아이템을 여러 번 써도 설명 줄 개수가 매번 달라져 이상해 보이는
+  // 문제(예: 구름 생성기가 첫 번째는 알베도+온실효과 둘 다, 두 번째는 알베도만
+  // 설명하는데 이유가 안 보임)를 해결한다.
   const causeLines = [];
   if (albedoLine) {
     causeLines.push(albedoLine);
     if (itemKey && ALBEDO_REASON[itemKey]) causeLines.push(ALBEDO_REASON[itemKey]);
+  } else if (itemKey && ALBEDO_REASON[itemKey]) {
+    causeLines.push("이번에는 알베도 쪽에 감지될 만한 변화가 없었습니다.");
   }
   if (greenhouseLine) {
     causeLines.push(greenhouseLine);
     if (itemKey && GREENHOUSE_REASON[itemKey]) causeLines.push(GREENHOUSE_REASON[itemKey]);
+  } else if (itemKey && GREENHOUSE_REASON[itemKey]) {
+    causeLines.push("이번에는 온실효과 쪽에 감지될 만한 변화가 없었습니다.");
   }
   if (causeLines.length) blocks.push(causeLines);
 
@@ -437,7 +461,7 @@ function physicsChangeBlocks(before, after, itemKey) {
   const outgoingLine = greenhouseLine
     ? changeLine(
         before.outgoingRadiation,
-        after.outgoingRadiation,
+        olrAfter,
         "우주로 방출되는 에너지(OLR)가 증가했습니다.",
         "우주로 방출되는 에너지(OLR)가 감소했습니다.",
         ENERGY_EPSILON,
@@ -460,8 +484,14 @@ function physicsChangeBlocks(before, after, itemKey) {
   if (absorbedLine) blocks.push([absorbedLine]);
 
   // 알베도/온실효과가 둘 다 바뀐 경우에만 설명을 붙인다 - 하나만 바뀐 아이템(빙하/
-  // CO2 등)은 애초에 서로 견줄 두 효과가 없다.
-  if (albedoLine && greenhouseLine) blocks.push([netAlbedoGreenhouseEffectLine(before, after)]);
+  // CO2 등)은 애초에 서로 견줄 두 효과가 없다. ASR은 온도 무관이라 after 그대로,
+  // OLR은 위에서 이미 온도 스텝을 뺀 olrAfter를 쓴다(안 그러면 "누가 이겼는지"가
+  // 온도 스텝 크기에 휘둘린다).
+  if (albedoLine && greenhouseLine) {
+    const asrDelta = after.absorbedRadiation - before.absorbedRadiation;
+    const olrDelta = olrAfter - before.outgoingRadiation;
+    blocks.push([netAlbedoGreenhouseEffectLine(asrDelta, olrDelta)]);
+  }
 
   return blocks;
 }
@@ -500,8 +530,13 @@ function describeStableLabel(label) {
 // 정말로 더 나빠졌는지(방향이 반대인 아이템) 아니면 방향은 맞는데 세기가
 // 부족했는지를 구분한다 - 안 그러면 "방향은 맞지만 부족한" 경우까지 전부
 // "악화됐다"고 잘못 말하게 된다.
-function describeImbalanceChange(before, after, label) {
-  const worsened = Math.abs(after.deltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
+//
+// afterDeltaEnergy는 반드시 "온도를 고정한 채 조성 변화만 반영한" ΔE여야 한다
+// (예: computeItemStepResult의 immediateDeltaEnergy). 온도까지 반영된 physics.deltaEnergy를
+// 쓰면, MAX_TEMPERATURE_STEP_K(3K)짜리 배경 온도 스텝이 아이템 자체 효과보다 커서
+// 반대 방향 아이템도 "방향이 맞았다"고 잘못 판정하는 문제가 있었다.
+function describeImbalanceChange(before, afterDeltaEnergy, label) {
+  const worsened = Math.abs(afterDeltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
   const warming = label === "Energy Surplus";
   if (worsened) {
     return [
@@ -525,8 +560,16 @@ function describeImbalanceChange(before, after, label) {
  * 틀린 방향이면 |ΔE|를 키운다(describeImbalanceChange가 이 둘을 구분한다).
  * 여러 걸음에 걸쳐 누적되다가 지구형 범위(Cold/Earth-like/Warm Stable)에
  * 들어오면 그때 describeStableLabel로 넘어간다.
+ *
+ * immediateDeltaEnergy: computeItemStepResult가 온도를 옮기기 "전"에 계산해 둔,
+ * 이 아이템의 조성 변화만 반영한 ΔE(온도 고정) - describeImbalanceChange의 방향
+ * 판정에 쓴다. 없으면(예: 예전에 저장된 리포트 데이터) after.deltaEnergy로
+ * 대체하되, 그 경우 배경 온도 스텝이 섞여 판정이 부정확할 수 있다.
+ *
+ * immediateOutgoingRadiation: 같은 시점의 OLR(온도 고정) - physicsChangeBlocks의
+ * "알베도 vs 온실효과 누가 이겼는지" 서술에 쓴다(같은 온도 스텝 혼입 문제).
  */
-export function describeItemJudgment(item, before, after, label) {
+export function describeItemJudgment(item, before, after, label, immediateDeltaEnergy, immediateOutgoingRadiation) {
   const intro = [`${item.emoji} "${item.name}"을 사용했습니다.`];
 
   // 원인 -> 과정 -> 결과 순서의 블록들. 각 블록은 그 자체로는 화살표 없이 붙어
@@ -534,14 +577,14 @@ export function describeItemJudgment(item, before, after, label) {
   // 방향 설명"처럼 한 덩어리로 읽혀야 하는 줄들이 화살표로 쪼개지지 않는다.
   const blocks = [
     [SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다."],
-    ...physicsChangeBlocks(before, after, item.key),
+    ...physicsChangeBlocks(before, after, item.key, immediateOutgoingRadiation),
   ];
 
   blocks.push(deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy));
   blocks.push(["물리엔진이 최종 기후 상태를 분석합니다."]);
   blocks.push(
     label === "Energy Surplus" || label === "Energy Deficit"
-      ? describeImbalanceChange(before, after, label)
+      ? describeImbalanceChange(before, immediateDeltaEnergy ?? after.deltaEnergy, label)
       : describeStableLabel(label),
   );
 
@@ -578,13 +621,17 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
  * 인트로 줄(SLIDER_CHANGE_LINES)과 "왜" 설명(ALBEDO/GREENHOUSE_REASON)이 둘 다 붙는다 -
  * 슬라이더 여러 개가 동시에 바뀐 단계(이상기후 대응 등)는 원인을 하나로 특정할 수
  * 없으니 호출하는 쪽에서 itemKey/itemDelta를 넘기지 않아야 한다.
+ * immediateDeltaEnergy/immediateOutgoingRadiation은 describeItemJudgment와 같은
+ * 이유로 방향 판정(closingLines)과 "누가 이겼는지" 서술에만 쓴다 - 없으면 각각
+ * after.deltaEnergy/after.outgoingRadiation으로 대체하되 배경 온도 스텝이 섞여
+ * 부정확할 수 있다.
  */
-export function describeTransition(before, after, label, itemKey, itemDelta) {
+export function describeTransition(before, after, label, itemKey, itemDelta, immediateDeltaEnergy, immediateOutgoingRadiation) {
   // "온실효과가 약해졌다" 같은 파생 결과만 보여주고 정작 어느 슬라이더를 움직인
   // 아이템이었는지는 말하지 않는다는 피드백 - describeItemJudgment(게임 내 아이템
   // 판정)가 이미 쓰는 SLIDER_CHANGE_LINES를 그대로 재사용해 인과 사슬 맨 앞에 붙인다.
   const sliderChangeLine = itemKey != null && itemDelta != null ? SLIDER_CHANGE_LINES[itemKey]?.(itemDelta) : null;
-  const changeBlocks = physicsChangeBlocks(before, after, itemKey);
+  const changeBlocks = physicsChangeBlocks(before, after, itemKey, immediateOutgoingRadiation);
   const blocks = sliderChangeLine ? [[sliderChangeLine], ...changeBlocks] : changeBlocks;
 
   if (blocks.length === 0) {
@@ -602,7 +649,7 @@ export function describeTransition(before, after, label, itemKey, itemDelta) {
   // 블록 앞에도 "↓"를 넣어 마지막 줄이 화살표로 끝나고 아무것도 안 이어진다.
   const closingLines =
     label === "Energy Surplus" || label === "Energy Deficit"
-      ? describeImbalanceChange(before, after, label)
+      ? describeImbalanceChange(before, immediateDeltaEnergy ?? after.deltaEnergy, label)
       : label
         ? describeStableLabel(label)
         : [];
@@ -624,20 +671,37 @@ function dynamicCloudPreview(item, values, currentTemperature) {
     ...mapSlidersToClimateInputs(nextSliderValues(values, item)),
     currentTemperature,
   });
-  const blocks = physicsChangeBlocks(before, after, item.key);
+  // 예전엔 physicsChangeBlocks(실제 결과 설명이 쓰는, 이유 문장까지 붙는 긴 버전)를
+  // 그대로 재사용해서 - 구름만 다른 아이템(짧은 명사구 5줄)보다 미리보기 사슬이
+  // 훨씬 길어 보였다. 구름은 유일하게 데이터에 따라 방향이 갈리는 아이템(표면이
+  // 이미 구름보다 밝으면 반대로 작용)이라 알베도만 동적으로 판정하고, 나머지는
+  // 다른 아이템과 같은 명사구 스타일로 맞춘다. 온실효과 기여(cloudGreenhouseTerm)는
+  // 표면 상태와 무관하게 항상 구름 비율과 같은 방향이라(단조 증가) 동적 판정 없이
+  // item.delta 부호만으로 정해도 틀릴 일이 없다.
+  const cloudWord = item.delta > 0 ? "증가" : "감소";
+  const albedoUp = after.albedo > before.albedo + RATIO_EPSILON;
+  const albedoDown = after.albedo < before.albedo - RATIO_EPSILON;
+  const albedoWord = albedoUp ? "증가" : albedoDown ? "감소" : "거의 변화 없음";
   const deltaEUp = after.deltaEnergy > before.deltaEnergy + ENERGY_EPSILON;
   const deltaEDown = after.deltaEnergy < before.deltaEnergy - ENERGY_EPSILON;
   const deltaEWord = deltaEUp ? "증가" : deltaEDown ? "감소" : "거의 변화 없음";
-  blocks.push([`에너지 불균형(ΔE) ${deltaEWord}`]);
-  blocks.push([`예상 안정 온도 ${deltaEWord}`]);
 
   return {
     concept: [
       "📖 어떤 물리량을 바꾸나요?",
-      `• ${SLIDER_KEY_LABELS.cloud} ${item.delta > 0 ? "증가" : "감소"}`,
-      "• 실제 알베도·온실효과 변화 방향은 지금 행성의 표면 상태에 따라 달라집니다(아래 변화 과정 참고)",
+      `• 구름 ${cloudWord}`,
+      "• 실제 알베도 변화 방향은 지금 행성의 표면 상태에 따라 달라집니다(아래 변화 과정 참고)",
     ],
-    chain: withArrows(blocks),
+    chain: [
+      `구름 ${cloudWord}`,
+      "↓",
+      `알베도 ${albedoWord}`,
+      `온실효과 ${cloudWord}`,
+      "↓",
+      `에너지 불균형(ΔE) ${deltaEWord}`,
+      "↓",
+      `예상 안정 온도 ${deltaEWord}`,
+    ],
     science: [
       "💡 지구과학 개념",
       "구름은 태양빛을 반사하는 밝은 표면(알베도 약 0.5)이자, 지표 복사를 가두는 온실 역할도 동시에 합니다.",

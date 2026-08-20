@@ -125,6 +125,16 @@ export const ALBEDO_CLOUD = 0.5 // 구름 — 개발계획서 (3)1의 값
  * 슬라이더로 빙하·바다를 바꾸면 실측값과 어긋나므로, 호출부(useClimateStore)가
  * 조성이 바뀌는 순간 이 값을 떨어뜨린다.
  */
+// 빙하/바다 면적 비율만으로 지표면 반사율을 계산한다(구름 블렌딩 전 - albedoOf가
+// 마지막에 따로 덮는다). useClimateStore.nextValuesForChange가 실측 알베도에
+// "이번 조정이 이 모델 기준으로 지표면 반사율을 얼마나 움직이는지"를 델타로
+// 얹을 때도 이 함수 하나만 쓴다(중복 정의하면 한쪽만 고쳤을 때 어긋난다).
+export function surfaceAlbedoFromRatios(glacierRatio, oceanRatio) {
+  const landRatio = Math.max(0, 1 - glacierRatio - oceanRatio)
+  const totalSurface = glacierRatio + oceanRatio + landRatio // 항상 ≥ 1
+  return (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * ALBEDO_LAND) / totalSurface
+}
+
 export function albedoOf({
   glacierRatio,
   oceanRatio,
@@ -138,11 +148,7 @@ export function albedoOf({
   if (Number.isFinite(measuredSurfaceAlbedo)) {
     surfaceAlbedo = clamp(measuredSurfaceAlbedo, 0, 1)
   } else {
-    const landRatio = Math.max(0, 1 - glacierRatio - oceanRatio)
-    const totalSurface = glacierRatio + oceanRatio + landRatio // 항상 ≥ 1
-    surfaceAlbedo =
-      (glacierRatio * ALBEDO_ICE + oceanRatio * ALBEDO_OCEAN + landRatio * ALBEDO_LAND) /
-      totalSurface
+    surfaceAlbedo = surfaceAlbedoFromRatios(glacierRatio, oceanRatio)
   }
 
   // 하한 0.05는 "슬라이더로 만들 수 있는 행성"의 최소 반사율이다. 실측 지표면

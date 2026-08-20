@@ -7,6 +7,7 @@ import {
   stepTemperature,
   co2PpmToSlider,
   atmThicknessToSlider,
+  surfaceAlbedoFromRatios,
 } from "../utils/physicsEngine.js";
 
 // PlanetCreatePage 슬라이더 + GamePage 표시가 공유하는 변수 목록.
@@ -37,22 +38,34 @@ export function applyIceOceanCoupling(values, key) {
 }
 
 // 슬라이더 값 하나를 바꿀 때 항상 같이 일어나야 하는 두 부수효과(빙하/바다 상호
-// 제약 + 지표 반사율 실측값 폐기)를 한 곳에 묶는다. setValue와
-// planetAnalysis.nextSliderValues가 이 함수 하나만 쓴다 - 예전엔 measuredSurfaceAlbedo
-// 폐기가 setValue에만 있고 nextSliderValues에는 없어서, 아이템으로 빙하/바다를
-// 바꿀 때 "미리 계산한 다음 ΔE"(실측 알베도가 그대로 남아 거의 안 바뀜)와
-// "실제 스토어에 반영된 ΔE"(실측 알베도가 사라져 슬라이더 기반으로 다시 계산됨)가
-// 서로 어긋나는 버그가 있었다(예: 서울 빙하 복원기 화면 0.00 → 실제 -19.70).
+// 제약 + 지표 반사율 실측값 보정)를 한 곳에 묶는다. setValue와
+// planetAnalysis.nextSliderValues가 이 함수 하나만 쓴다.
+//
+// 예전엔 빙하/바다가 바뀌면 실측 알베도를 통째로 버리고 슬라이더 기반 면적
+// 가중 계산으로 완전히 갈아탔다 - 그런데 실측값과 슬라이더 모델은 애초에 다른
+// 기준이라, 이 "모델 전환" 자체가 빙하 ±8%p 효과보다 훨씬 크게(때로는 반대
+// 방향으로) 알베도를 흔들 수 있었다. 교육용 게임에서 "빙하를 늘렸는데 알베도가
+// 줄어드는" 결과는 핵심 개념(빙하는 밝아서 반사를 늘린다)과 정면으로 어긋나므로
+// 있어선 안 된다. 그래서 이제는 실측값을 버리지 않고, "이번 조정이 슬라이더
+// 모델 기준으로 지표면 반사율을 얼마나 움직이는지"(before/after 모델값의 차이,
+// surfaceAlbedoFromRatios)만 델타로 얹는다 - 빙하가 늘면 이 델타는 항상 양수이므로
+// 실측 기준선에서 출발했든 슬라이더 기준선에서 출발했든 알베도는 항상 함께
+// 움직인다. (예전엔 서울 빙하 복원기에서 화면 0.00 → 실제 -19.70처럼 미리보기와
+// 실제 저장값이 갈라지는 버그도 있었다 - 지금은 setValue/nextSliderValues 둘 다
+// 이 함수 하나만 거치므로 그 문제도 여전히 없다.)
 export function nextValuesForChange(values, key, value) {
   const changed = values[key] !== value;
   const next = applyIceOceanCoupling({ ...values, [key]: value }, key);
 
-  // 지표 구성(빙하/바다)을 실제로 바꾸면 그 지점의 실측 지표면 반사율은 더 이상
-  // 이 행성을 설명하지 못하므로 버린다 - 안 버리면 빙하를 100까지 올려도
-  // 알베도가 실측값에 고정돼 슬라이더가 먹지 않는 것처럼 보인다. 그때부터는
-  // albedoOf가 슬라이더 기반 면적 가중으로 되돌아간다.
   const surfaceChanged = changed && (key === "iceThickness" || key === "ocean");
-  if (surfaceChanged) delete next.measuredSurfaceAlbedo;
+  if (surfaceChanged && Number.isFinite(values.measuredSurfaceAlbedo)) {
+    const before = mapSlidersToClimateInputs(values);
+    const after = mapSlidersToClimateInputs(next);
+    const modelDelta =
+      surfaceAlbedoFromRatios(after.glacierRatio, after.oceanRatio) -
+      surfaceAlbedoFromRatios(before.glacierRatio, before.oceanRatio);
+    next.measuredSurfaceAlbedo = Math.min(1, Math.max(0, values.measuredSurfaceAlbedo + modelDelta));
+  }
 
   return next;
 }

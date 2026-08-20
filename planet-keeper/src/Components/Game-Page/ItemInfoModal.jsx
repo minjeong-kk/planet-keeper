@@ -53,7 +53,8 @@ function ItemInfoModal({ item, onClose }) {
 
 
         <div className="item-info-section">
-          <h3>📈 변화 과정</h3>
+          <h3>📈 일반적인 변화 과정</h3>
+          <p className="item-info-caveat">극단적인 기후 조성에서는 달라질 수 있습니다.</p>
 
           <div className="item-chain">
             {info.chain.map((line, i) => (

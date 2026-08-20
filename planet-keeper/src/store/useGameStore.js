@@ -312,6 +312,21 @@ function computeSettledResult() {
 // MAX_TEMPERATURE_STEP_K)만 그 ΔE 방향으로 온도를 옮긴다. 맞는 방향 아이템은
 // |ΔE|가 줄고 온도도 조금 개선되며, 틀린 방향이면 |ΔE|가 커지고 평형온도 자체가
 // 더 극단으로 이동한다 - 여러 번의 아이템 선택에 걸쳐 서서히 수렴하거나 악화된다.
+//
+// immediateDeltaEnergy(온도를 옮기기 "전", 새 조성 + 기존 온도로 계산한 ΔE)를
+// 별도로 반환한다 - MAX_TEMPERATURE_STEP_K(3K)가 커서, |ΔE|가 큰 상태에서는 이
+// 온도 스텝 자체가 아이템의 실제 조성 효과보다 OLR을 더 크게 흔들 수 있다.
+// physics.deltaEnergy(온도까지 반영된 "이후" 값)로 "이 아이템이 맞는 방향이었는지"를
+// 판정하면, 실제로는 반대 방향인 아이템(예: 이미 Energy Deficit인데 알베도를 더
+// 높이는 아이템)을 썼어도 그 턴의 배경 냉각 스텝이 우연히 더 커서 |ΔE|가 줄어든
+// 것처럼 보여 "방향이 맞았다"고 잘못 판정하는 문제가 있었다 - 판정은 반드시
+// immediateDeltaEnergy(온도 고정, 아이템 자체 효과만)로 해야 한다.
+//
+// immediateOutgoingRadiation도 같은 이유로 따로 반환한다 - planetAnalysis의
+// "알베도 vs 온실효과, 어느 쪽이 이겼는지" 서술과 "OLR 증가/감소" 설명 줄이
+// physics.outgoingRadiation(온도 스텝까지 반영된 값)을 쓰면, 온도가 내려간 폭
+// 자체가 OLR을 흔들어서 온실효과가 실제로는 진 경우에도 "온실효과가 이겨서
+// 데워지는 방향"처럼 판정과 반대로 서술되는 문제가 있었다.
 function computeItemStepResult(nextValues) {
   const { currentTemperature, setCurrentTemperature } = useClimateStore.getState();
   const climateInputs = mapSlidersToClimateInputs(nextValues);
@@ -321,7 +336,12 @@ function computeItemStepResult(nextValues) {
   setCurrentTemperature(nextTemperature);
 
   const physics = computeClimateV2({ ...climateInputs, currentTemperature: nextTemperature });
-  return { physics, ml: classifyPlanetState(physics) };
+  return {
+    physics,
+    ml: classifyPlanetState(physics),
+    immediateDeltaEnergy: immediate.deltaEnergy,
+    immediateOutgoingRadiation: immediate.outgoingRadiation,
+  };
 }
 
 const useGameStore = create(
@@ -401,8 +421,8 @@ const useGameStore = create(
 
   addItem: (item) => set((state) => ({ inventory: [...state.inventory, item] })),
 
-  pushTimeline: (stage, label, physics, ml) =>
-    set((state) => ({ timeline: [...state.timeline, { stage, label, physics, ml }] })),
+  pushTimeline: (stage, label, physics, ml, extra = {}) =>
+    set((state) => ({ timeline: [...state.timeline, { stage, label, physics, ml, ...extra }] })),
 
   // 이번 플레이에서 정답을 맞힌 문제(correctIds)는 절대 다시 내지 않는다. 아직 한
   // 번도 안 나온 문제(seenIds에 없는 것)를 우선 내고, 풀 전체가 이미 나왔으면
@@ -503,12 +523,24 @@ const useGameStore = create(
       setValue(key, nextSliderValues(values, { key, delta })[key]);
     }
 
+    // 온도를 옮기기(advanceTemperature) 전에, 지금 조성 변화만 반영한(온도 고정)
+    // ΔE를 먼저 계산해 둔다 - computeItemStepResult/describeImbalanceChange와
+    // 같은 이유다. advanceTemperature도 최대 MAX_TEMPERATURE_STEP_K(3K)까지 배경
+    // 온도를 옮기는데, |ΔE|가 큰 상태에서는 이 스텝 자체가 플레이어의 실제 대응
+    // 효과보다 OLR을 더 크게 흔들 수 있다 - 그래서 반대로 대응했는데도 그 턴의
+    // 배경 스텝이 우연히 더 커서 "위기를 막았다"고 잘못 판정될 수 있었다.
+    const { values: respondedValues } = useClimateStore.getState();
+    const immediate = computeClimateV2({
+      ...mapSlidersToClimateInputs(respondedValues),
+      currentTemperature: before.currentTemperature,
+    });
+
     advanceTemperature();
     const { values: nextValues, currentTemperature } = useClimateStore.getState();
     const physics = computeClimateV2({ ...mapSlidersToClimateInputs(nextValues), currentTemperature });
 
-    const worsened = Math.abs(physics.deltaEnergy) > Math.abs(before.deltaEnergy) + ITEM_EFFECT_EPSILON;
-    const improved = Math.abs(physics.deltaEnergy) < Math.abs(before.deltaEnergy) - ITEM_EFFECT_EPSILON;
+    const worsened = Math.abs(immediate.deltaEnergy) > Math.abs(before.deltaEnergy) + ITEM_EFFECT_EPSILON;
+    const improved = Math.abs(immediate.deltaEnergy) < Math.abs(before.deltaEnergy) - ITEM_EFFECT_EPSILON;
     const resultMessage = !playerActed
       ? message
       : improved
@@ -651,10 +683,13 @@ const useGameStore = create(
 
     set({ isComputing: true, equipment: nextEquipment });
     try {
-      const { physics, ml } = computeItemStepResult(nextValues);
+      const { physics, ml, immediateDeltaEnergy, immediateOutgoingRadiation } = computeItemStepResult(nextValues);
       const balanced = STABLE_LABELS.has(ml.label);
-      const lines = describeItemJudgment(item, physicsResult, physics, ml.label);
-      get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml);
+      const lines = describeItemJudgment(item, physicsResult, physics, ml.label, immediateDeltaEnergy, immediateOutgoingRadiation);
+      get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml, {
+        immediateDeltaEnergy,
+        immediateOutgoingRadiation,
+      });
       set({
         physicsResult: physics,
         mlResult: ml,
