@@ -1,3 +1,7 @@
+# [legacy] 지금 커밋된 observed_kim_dataset.csv의 좌표 앵커를 만든 원본 스크립트
+# (수정 전). 지금은 삭제되고 observed-kim.py가 좌표를 자체 생성한다 - 이 파일은
+# 기존 데이터 재현·대조용으로만 남겨둔다. LIMITATIONS.md 5번 참고.
+#
 # 머신러닝 학습용 데이터 - GK2A 위성산출물 (위경도 포함, KIM 매칭용 anchor)
 
 import os
@@ -27,7 +31,7 @@ PRODUCTS = [
 
 BASE_URL = "https://apihub.kma.go.kr/api/typ05/api/GK2A/LE2"
 
-DATASETS_DIR = "../Datasets"
+DATASETS_DIR = "../../Datasets/legacy"
 os.makedirs(DATASETS_DIR, exist_ok=True)
 OUTPUT_FILE = os.path.join(DATASETS_DIR, "observed_gk2a_dataset.csv")
 
@@ -85,7 +89,7 @@ DATE = TMFC + "00"    # GK2A는 분(mm) 단위까지 포함 (YYYYMMDDHHmm)
 SAMPLE_SIZE = 30
 
 
-NC_CACHE_DIR = "../nc_cache"
+NC_CACHE_DIR = "../../nc_cache"
 os.makedirs(NC_CACHE_DIR, exist_ok=True)
 
 

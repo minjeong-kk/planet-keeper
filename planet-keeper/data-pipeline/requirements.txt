@@ -1,11 +1,12 @@
-# 데이터 수집 (Scripts/)
+# 데이터 수집 (Scripts/) - 지금 쓰는 스크립트는 위성이 없어 이 두 개만 필요
 requests
 numpy
-scipy
-xarray
-netCDF4
-pyproj
 python-dotenv
 
 # 임계값 도출 (Analysis/derive_thresholds.py)
 pandas==2.3.3
+
+# Scripts/legacy/ (옛 GK2A 위성 방식 재현용, 메인 파이프라인은 필요 없음)
+xarray
+netCDF4
+pyproj

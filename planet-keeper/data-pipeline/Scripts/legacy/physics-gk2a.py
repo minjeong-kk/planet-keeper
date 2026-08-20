@@ -3,6 +3,7 @@
 # 물리엔진 기준값이 특정 계절/한 주에 편향되지 않도록, 최근 연속 7일이 아니라
 # 1월~7월까지 달마다 하루씩 뽑아서 평균낸다. physics-kim.py와 반드시 같은
 # 날짜를 써야 물리엔진 기준값이 일관되므로, 자동 계산 대신 고정 목록을 공유한다.
+# 호출 스크립트는 존재하지만 사용하지 않는 값이다.
 
 import os
 import csv
@@ -36,10 +37,10 @@ TMFC_LIST = [
     "2026072800",
 ]
 
-NC_CACHE_DIR = "../nc_cache"
+NC_CACHE_DIR = "../../nc_cache"
 os.makedirs(NC_CACHE_DIR, exist_ok=True)
 
-DATASETS_DIR = "../Datasets"
+DATASETS_DIR = "../../Datasets/legacy"
 os.makedirs(DATASETS_DIR, exist_ok=True)
 CACHE_FILE = os.path.join(DATASETS_DIR, "physics_gk2a_monthly_cache.csv")
 OUTPUT_FILE = os.path.join(DATASETS_DIR, "physics_gk2a_dataset.csv")
@@ -92,7 +93,7 @@ PRODUCT_VARIABLE = {
 
 def earth_disk_mask(ds, var_name):
     """지구 원반 안(밤이든 낮이든)인지, 원반 밖(우주 배경)인지 구분하는 마스크.
-    observed-gk2a.py의 grid_latlon()과 동일한 pyproj geos 투영을 재사용한다."""
+    GK2A 정지궤도 투영(pyproj geos)으로 위경도를 계산해 판단한다."""
     proj = ds["gk2a_imager_projection"].attrs
 
     coff = proj["column_offset"]
@@ -175,9 +176,15 @@ with open(CACHE_FILE, "a", newline="") as f:
         f.flush()
         cache[tmfc] = row
 
-# 캐시에 쌓인 전체 달(이번 실행 + 예전 실행 합쳐서)로 최종 평균을 낸다.
+# 캐시에 쌓인 달 중 지금 TMFC_LIST에 있는 것만 최종 평균에 쓴다. cache는
+# append-only라 TMFC_LIST를 갱신해도 옛 날짜가 파일에 그대로 남는데, 여기서
+# cache.items() 전체를 돌면 옛 달이 평균에 조용히 섞여 들어간다
+# (physics-kim.py에서 실제로 겪은 버그와 같은 패턴).
 daily_means = {p: [] for p in PRODUCTS}
-for tmfc, row in cache.items():
+for tmfc in TMFC_LIST:
+    row = cache.get(tmfc)
+    if row is None:
+        continue
     for product in PRODUCTS:
         value = row.get(product)
         if value not in (None, ""):
@@ -185,14 +192,16 @@ for tmfc, row in cache.items():
 
 results = {p: float(np.mean(values)) for p, values in daily_means.items() if values}
 
+n_days = sum(1 for tmfc in TMFC_LIST if tmfc in cache)
+
 with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
     writer = csv.writer(f)
 
     writer.writerow(["date_range", "n_days"] + PRODUCTS)
 
     writer.writerow(
-        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", len(cache)] +
+        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", n_days] +
         [results.get(p) for p in PRODUCTS]
     )
 
-print(f"\nCSV 저장 완료 : {OUTPUT_FILE} (캐시 {len(cache)}/{len(TMFC_LIST)}개월 기준 평균)")
+print(f"\nCSV 저장 완료 : {OUTPUT_FILE} (TMFC_LIST {n_days}/{len(TMFC_LIST)}개월 기준 평균)")

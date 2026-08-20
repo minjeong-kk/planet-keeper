@@ -29,13 +29,13 @@ VARIABLES = [
 
 # physics-gk2a.py와 공유하는 고정 날짜 목록 (1월~7월, 달마다 하루씩)
 TMFC_LIST = [
-    "2026013100",
     "2026022800",
     "2026033100",
     "2026043000",
     "2026053100",
     "2026063000",
-    "2026072800",
+    "2026073100",
+    "2026081900",
 ]
 
 DATASETS_DIR = "../Datasets"
@@ -151,9 +151,10 @@ with open(OUTPUT_FILE, "w", newline="", encoding="utf-8-sig") as f:
 
     writer.writerow(["date_range", "n_days"] + VARIABLES)
 
+    n_days = sum(1 for tmfc in TMFC_LIST if tmfc in cache)
     writer.writerow(
-        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", len(cache)] +
+        [f"{TMFC_LIST[0]}~{TMFC_LIST[-1]}", n_days] +
         [results.get(v) for v in VARIABLES]
     )
 
-print(f"\nCSV 저장 완료 : {OUTPUT_FILE} (캐시 {len(cache)}/{len(TMFC_LIST)}개월 기준 평균)")
+print(f"\nCSV 저장 완료 : {OUTPUT_FILE} (TMFC_LIST {n_days}/{len(TMFC_LIST)}개월 기준 평균)")
