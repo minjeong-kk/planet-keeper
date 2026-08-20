@@ -192,10 +192,12 @@ function GamePage() {
   const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
   const resetGame = useGameStore((state) => state.resetGame);
 
+  // 게임/행성 상태를 비우고 나가므로 방금 있던 /game은 돌아갈 수 없는 화면이 된다
+  // (돌아가도 "진행 중인 행성 데이터가 없습니다" 안내만 다시 뜬다) - replace로 건다.
   const handleBackToCreator = () => {
     resetClimate();
     resetGame();
-    navigate("/planet-create");
+    navigate("/planet-create", { replace: true });
   };
 
   // physicsResult는 useGameStore가 특정 시점(생성/아이템/최종 확인/타이머 틱)에만
@@ -353,9 +355,15 @@ function GamePage() {
 
   // 오답 3회 누적 또는 최종 문제 정답으로 REPORT 단계가 되면 리포트 페이지로 이동한다.
   // 마지막 해설 카드를 읽을 시간을 준 뒤 이동한다.
+  //
+  // replace로 이동한다 - push로 쌓으면 리포트에서 뒤로 가기를 눌렀을 때 /game으로
+  // 돌아오는데, currentStage는 여전히 REPORT라 이 effect가 다시 돌아 몇 초 뒤 또
+  // /report로 튕겨 나간다(그때마다 히스토리에 /report가 하나씩 더 쌓여서 뒤로
+  // 가기로는 영영 빠져나갈 수 없다). 게임이 끝난 /game은 돌아갈 데가 아니므로
+  // 히스토리에서 리포트로 갈아끼운다.
   useEffect(() => {
     if (currentStage !== GAME_STAGES.REPORT) return undefined;
-    const timer = setTimeout(() => navigate("/report"), RESULT_DISPLAY_MS);
+    const timer = setTimeout(() => navigate("/report", { replace: true }), RESULT_DISPLAY_MS);
     return () => clearTimeout(timer);
   }, [currentStage, navigate]);
 

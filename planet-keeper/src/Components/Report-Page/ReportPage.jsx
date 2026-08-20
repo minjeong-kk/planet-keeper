@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
 import { PLANET_STATES, planetStateOf, ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
@@ -89,6 +89,16 @@ function ReportPage() {
   // (행성 생성 화면·플레이 화면 둘 다. resetGame은 이 값을 건드리지 않으므로
   // 행성 만들기를 거쳐도 유지된다).
   const skipTutorials = useGameStore((state) => state.skipTutorials);
+
+  // 한 판도 하지 않고 주소창으로 /report에 직접 들어왔는지 - 마운트 시점에 한 번만
+  // 판단하고 그 뒤로는 다시 보지 않는다.
+  //
+  // 렌더마다 timeline.length를 보면 "다시 플레이"가 깨진다: replayGame이 async라
+  // 내부에서 resetGame()으로 timeline을 비운 뒤 await 지점에서 렌더가 한 번 끼어드는데,
+  // 그때 이 페이지가 "기록이 없네"로 판단해 시작 화면으로 튕겨 보내버린다(뒤이어
+  // 실행될 navigate("/game")이 도달하지 못한다). "직접 들어왔는가"는 원래 진입
+  // 시점의 성질이라 마운트 때 한 번 정하는 편이 의미상으로도 맞다.
+  const [enteredWithoutGame] = useState(() => timeline.length === 0);
 
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
     title: "행성 진단 결과",
@@ -186,18 +196,26 @@ function ReportPage() {
   const [selectedGroupKey, setSelectedGroupKey] = useState(null);
   const selectedGroup = selectedGroupKey != null ? quizGroups.find((g) => g.key === selectedGroupKey) : null;
 
+  // 둘 다 replace로 건다 - push로 쌓으면 "다시 플레이"를 누를 때마다 히스토리에
+  // /game과 /report가 번갈아 계속 쌓여서, 몇 판만 돌려도 뒤로 가기가 사실상
+  // 무의미해진다. 방금 본 리포트는 새 판을 시작한 시점에 돌아갈 데가 아니다.
   const handleReplay = async () => {
     skipTutorials();
     await replayGame();
-    navigate("/game");
+    navigate("/game", { replace: true });
   };
 
   const handleRestart = () => {
     skipTutorials();
     resetClimate();
     resetGame();
-    navigate("/planet-create");
+    navigate("/planet-create", { replace: true });
   };
+
+  // 빈 껍데기 리포트("기록된 변화가 없습니다"/"푼 문제가 없습니다"만 늘어선 화면)
+  // 대신 시작 화면으로 보낸다 - GamePage가 CREATOR 단계에서 안내를 띄우는 것과 같은
+  // 취지다. 위 훅들이 모두 호출된 뒤라 이 조기 반환은 훅 순서를 깨지 않는다.
+  if (enteredWithoutGame) return <Navigate to="/" replace />;
 
   return (
     <div className="report-page">

@@ -127,6 +127,51 @@
   box-shadow: none;
 }
 
+/* ── 진행 중인 게임 안내 배너 ──────────────────────────────────
+   /game 도중 주소창으로 이 페이지에 직접 들어왔을 때만 뜬다. 경고 톤은
+   PlanetLocationPicker의 picker__flag-note("⚠ 실제 불균형")와 같은 주황을 쓴다 -
+   이 페이지에서 "조심해서 읽어야 하는 문구"는 이미 그 색이다. */
+.create__resume {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+  padding: 12px 16px;
+  border: 1px solid rgba(251, 146, 60, 0.4);
+  border-radius: 12px;
+  background: rgba(251, 146, 60, 0.1);
+}
+
+.create__resume-text {
+  margin: 0;
+  color: #fdba74;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  word-break: keep-all;
+}
+
+.create__resume-btn {
+  flex-shrink: 0;
+  padding: 7px 14px;
+  border: 1px solid rgba(251, 146, 60, 0.55);
+  border-radius: 10px;
+  background: rgba(251, 146, 60, 0.16);
+  color: #fed7aa;
+  font-size: 0.88rem;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.create__resume-btn:hover {
+  border-color: #fb923c;
+  color: #ffedd5;
+}
+
 /* ── 본체: 큰 행성 + 오른쪽 특성 설정(2열) ────────────────────────
    가로폭은 그대로 유지하고(패널 약 530px, 슬라이더 트랙 480px) 세로 여백만 줄였다. */
 .create__body {

@@ -6,7 +6,7 @@ import PlanetLocationPicker from "./PlanetLocationPicker.jsx";
 import Tutorial from "../common/Tutorial.jsx";
 import { CREATE_TOUR_STEPS } from "../common/tourSteps.js";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
-import useGameStore from "../../store/useGameStore";
+import useGameStore, { GAME_STAGES } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
 import "./PlanetCreatePage.css";
 
@@ -161,6 +161,11 @@ function PlanetCreatePage() {
   // 시작 직전에 게임 상태만 초기화해서 항상 CREATOR에서 출발하게 한다 - 방금
   // 만든 슬라이더 값과 지점 선택은 useClimateStore 쪽이라 그대로 유지된다.
   const resetGame = useGameStore((state) => state.resetGame);
+  // 주소창으로 /game 도중에 이 페이지에 직접 들어온 경우를 알아내려고 본다 - 그
+  // 상태에서 슬라이더만 만지고 "완료"를 누르지 않은 채 빠져나가면, 행성(useClimateStore)
+  // 은 바뀌었는데 진행 중인 타임라인/판정(useGameStore)은 이전 것으로 남는다.
+  const currentStage = useGameStore((state) => state.currentStage);
+  const gameInProgress = currentStage !== GAME_STAGES.CREATOR && currentStage !== GAME_STAGES.REPORT;
 
   // 지금 만지고 있는(포커스/드래그 중인) 슬라이더 - 설정 패널 맨 아래 한 줄 설명이
   // 이걸 보고 SLIDER_GUIDE에서 문구를 고른다. 손을 떼도 마지막 설명은 그대로 둔다
@@ -196,10 +201,13 @@ function PlanetCreatePage() {
   const displayValue = (v) =>
     v.key === "co2" ? `${co2Ppm(values.co2)}` : `${values[v.key]}`;
 
+  // replace로 건다 - push로 쌓으면 게임 도중 뒤로 가기로 이 페이지에 돌아올 수
+  // 있고, 거기서 슬라이더를 만지면 행성과 게임 기록이 어긋난 채로 다시 /game에
+  // 들어가게 된다(gameInProgress 안내는 그래도 남는 직접 진입용 방어다).
   const handleComplete = () => {
     resetGame();
     nextProblem();
-    navigate("/game");
+    navigate("/game", { replace: true });
   };
 
   return (
@@ -219,6 +227,23 @@ function PlanetCreatePage() {
           ? 도움말
         </button>
       </header>
+
+      {/* 진행 중인 게임이 있는데 이 페이지에 들어온 경우(주소창 직접 입력 등).
+          새 행성을 만들면 그 판이 사라진다는 걸 먼저 알리고, 돌아갈 길을 준다. */}
+      {gameInProgress && (
+        <div className="create__resume" role="status">
+          <p className="create__resume-text">
+            진행 중인 게임이 있습니다. 여기서 새 행성을 만들면 지금까지의 진행 내용은 사라집니다.
+          </p>
+          <button
+            type="button"
+            className="create__resume-btn"
+            onClick={() => navigate("/game", { replace: true })}
+          >
+            게임으로 돌아가기
+          </button>
+        </div>
+      )}
 
       {/* ── 본체: 큰 행성 + 오른쪽 특성 설정(2열) ── */}
       <main className="create__body">
@@ -306,7 +331,7 @@ function PlanetCreatePage() {
 
       {/* ── 하단 액션 ── */}
       <footer className="create__actions">
-        <button type="button" className="create__back" onClick={() => navigate("/")}>
+        <button type="button" className="create__back" onClick={() => navigate("/", { replace: true })}>
           ← 처음으로
         </button>
         <button type="button" className="create__cta" onClick={handleComplete} data-tour="create-cta">
