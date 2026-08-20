@@ -9,6 +9,9 @@
   border-radius: 12px;
   position: relative;
   box-shadow: var(--shadow);
+  /* 라이트 모드 전용 - 순백(#fff)이 너무 밋밋해서 살짝 어둡게(sage 톤) 잡는다.
+     다크 모드는 아래 미디어쿼리가 --bg를 다시 정의하므로 여기 값과 무관하다. */
+  --bg: #eef4f1;
   /* 라이트/다크 모두 살짝 accent 색을 얹어 - 밋밋한 var(--bg) 단색 대신 위쪽에서
      은은하게 색이 도는 느낌을 준다(index.css 바디 배경과 같은 방식). */
   background: linear-gradient(180deg, var(--accent-bg), transparent 220px), var(--bg);
@@ -89,10 +92,19 @@
   font-size: 1.8rem;
 }
 
+/* 타임라인/문제풀이 등 섹션마다 카드로 띄워 - 이전엔 <hr> 한 줄로만 나뉘어
+   위아래 섹션이 페이지 배경과 구별이 안 됐다. --panel/--panel-border는
+   GamePage(HUD)·StartPage가 이미 쓰는 "콘솔 패널" 톤(라이트: 흰색→민트 그라디언트,
+   다크: 옅은 네이비)이라 새 색을 만들지 않고 그대로 가져와 페이지 배경과 대비를 준다. */
 .report-page__section {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  background: var(--panel);
+  border: 2px solid var(--panel-border);
+  box-shadow: 0 0 20px var(--accent-bg);
 }
 
 /* 섹션 제목을 감싸는 접기/펼치기 버튼 - 버튼 기본 스타일(테두리/배경)을 지우고
@@ -107,6 +119,19 @@
   background: none;
   cursor: pointer;
   color: inherit;
+}
+
+/* 마우스로 클릭한 직후 브라우저 기본 포커스 사각형이 남아 "행성 변화 타임라인"과
+   "문제 풀이 결과"가 접혔을 때 서로 다르게 보이는 문제 - 클릭(포커스)에서는
+   지우고, 키보드 탐색(:focus-visible)일 때만 접근성용 링을 남긴다. */
+.report-page__section-toggle:focus {
+  outline: none;
+}
+
+.report-page__section-toggle:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 4px;
+  border-radius: 6px;
 }
 
 .report-page__section-toggle h3 {
@@ -127,49 +152,52 @@
   color: var(--text-muted);
 }
 
-/* 상단 최종 결과 배너 카드 */
+/* 상단 최종 결과 배너 카드 - 세로를 조금 더 낮게(패딩/간격 축소) */
 .report-page__summary-card {
   border-radius: 12px;
-  padding: 16px 20px;
+  padding: 8px 18px;
   background: var(--accent-bg);
   border: 1px solid var(--border);
   backdrop-filter: blur(6px);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 6px;
   transition: box-shadow 0.2s ease;
 }
 
 /* item-result--ok의 "테두리로 한 번 더 알려준다" 글로우와 같은 톤 언어 -
-   결과 배너도 그 판정의 색으로 은은하게 빛나게 한다. */
+   결과 배너도 그 판정의 색으로 은은하게 빛나게 한다. 배너 바탕색(--success-bg 등)이
+   페이지 배경과 거의 구별 안 될 만큼 옅어서, 판정색을 살짝 섞어 채도를 올린다
+   (color-mix라 라이트/다크 각 --success 값을 그대로 따라간다 - 별도 하드코딩 불필요). */
 .report-page__banner--success {
   border-color: var(--success);
-  background-color: var(--success-bg);
+  /* 청록 방향은 유지하되 32%는 너무 진하다는 피드백으로 비율을 낮춰 더 옅게. */
+  background-color: color-mix(in srgb, var(--accent) 18%, var(--success-bg));
   box-shadow: 0 0 32px var(--success-bg);
 }
 
 .report-page__banner--failure {
   border-color: var(--danger);
-  background-color: var(--danger-bg);
+  background-color: color-mix(in srgb, var(--danger) 16%, var(--danger-bg));
   box-shadow: 0 0 32px var(--danger-bg);
 }
 
 /* 목숨은 남았지만 지구형 범위에 못 든 종료 - 실패(빨강)와 성공(초록) 사이의 톤. */
 .report-page__banner--partial {
   border-color: var(--warm);
-  background-color: var(--warm-bg);
+  background-color: color-mix(in srgb, var(--warm) 16%, var(--warm-bg));
   box-shadow: 0 0 32px var(--warm-bg);
 }
 
 .report-page__summary-main h2 {
   margin: 0 0 4px 0;
-  font-size: 1.4rem;
+  font-size: 1.15rem;
 }
 
 .report-page__summary-detail {
   margin: 0;
   color: var(--text);
-  font-size: 0.95rem;
+  font-size: 0.85rem;
 }
 
 .report-page__summary-metrics {
@@ -271,7 +299,7 @@
   flex-direction: column;
   gap: 10px;
   padding-left: 24px;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--accent-border);
   min-width: 0;
 }
 
@@ -289,8 +317,8 @@
 }
 
 .report-page__timeline-chart-zero {
-  stroke: var(--border);
-  stroke-width: 1;
+  stroke: var(--accent-border);
+  stroke-width: 1.5;
   stroke-dasharray: 4 3;
 }
 
@@ -331,11 +359,15 @@
 }
 
 .report-page__timeline-chart-emoji {
-  font-size: 14px;
+  font-size: 20px;
   text-anchor: middle;
 }
 
 .report-page__timeline-detail {
+  /* var(--bg)는 페이지 배경과 완전히 같은 색이라 지금까지 테두리 하나로만
+     구분됐다 - 그림자를 더해 카드가 페이지에서 확실히 떠 보이게 한다(안쪽의
+     --code-bg 칩/--accent-bg 설명 블록은 이 카드보다 한 단계 더 진한 톤이라
+     그대로 둬도 카드 경계와는 계속 구분된다). */
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -344,6 +376,7 @@
   flex-direction: column;
   gap: 10px;
   backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
 }
 
 .report-page__timeline-card-header {
@@ -575,7 +608,10 @@
 }
 
 .report-page__modal {
-  background: var(--bg);
+  /* var(--bg)는 리포트 페이지 전체 배경(이제 살짝 어둡게 조정됨)과 같은 값이라
+     안의 --code-bg 블록들과 거의 구별이 안 됐다 - GamePage 등이 쓰는 순백/딥
+     네이비 콘솔 패널 톤(--panel-solid)으로 모달만 확실히 밝게 띄운다. */
+  background: var(--panel-solid);
   color: var(--text-h);
   padding: 22px 26px;
   border-radius: 16px;
@@ -652,7 +688,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  background: var(--code-bg);
+  background: color-mix(in srgb, var(--accent) 8%, var(--code-bg));
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid var(--border);
@@ -697,7 +733,7 @@
 }
 
 .report-page__modal-explanation {
-  background: var(--code-bg);
+  background: color-mix(in srgb, var(--info) 10%, var(--code-bg));
   padding: 10px 12px;
   border-radius: 8px;
   font-size: 0.8rem;
@@ -782,7 +818,7 @@
   flex-direction: column;
   gap: 10px;
   padding-left: 24px;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--accent-border);
   min-width: 0;
 }
 
@@ -807,7 +843,7 @@
 .report-page__concept-list li {
   padding: 8px 10px;
   border-radius: 8px;
-  background: var(--accent-bg);
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel-solid));
   border-left: 3px solid var(--accent);
 }
 

@@ -1,5 +1,7 @@
 :root {
-  --text: #5e665b;
+  /* 라이트 모드 본문 글자색 - 예전 값(#5e665b/#64748b)이 흰 배경 위에서
+     너무 옅게 보인다는 피드백으로 어둡게 다시 잡았다(대비 위주, 톤은 유지). */
+  --text: #2c3a30;
   --text-h: #0f1a0e;
   --bg: #fff;
   --border: #e2e8e0;
@@ -12,8 +14,10 @@
   --shadow:
     rgba(0, 0, 0, 0.08) 0 10px 15px -3px, rgba(0, 0, 0, 0.04) 0 4px 6px -2px;
 
-  /* 보조 텍스트(라벨/캡션 등, --text보다 한 단계 옅음) */
-  --text-muted: #64748b;
+  /* 보조 텍스트(라벨/캡션 등, --text보다 한 단계 옅음) - 역시 어둡게 다시 잡음 */
+  --text-muted: #47584d;
+  /* 가장 옅은 3단계 텍스트(캡션/타임스탬프 등, --text-muted보다 한 단계 더 옅음) */
+  --text-faint: #5b6b61;
   /* 모달 뒤 배경을 어둡게 덮는 오버레이 - 라이트/다크 공통으로 같은 톤을 쓴다 */
   --overlay: rgba(15, 23, 42, 0.55);
 
@@ -37,24 +41,39 @@
   --warm-bg: #fff7ed;
   --warm-border: #ffedd5;
 
+  /* 보상/장비 확보(금색) - GamePage 장비 슬롯 수량 배지, 보상 카드 등 */
+  --gold: #92620a;
+  --gold-bg: rgba(146, 98, 10, 0.12);
+  --gold-border: rgba(146, 98, 10, 0.35);
+
   /* 인과 설명에서 "온실효과 계열"(온실효과/OLR) 줄을 구분하는 색 - "알베도 계열"
      (알베도/ASR)은 --accent를 재사용하고, 겹치지 않는 색이 하나 더 필요해 추가했다. */
   --violet: #7c3aed;
   --violet-bg: #f5f3ff;
 
-  /* 시작 페이지(StartPage)의 다크 SF 패널 톤 - 다른 페이지도 같은 느낌을 쓸 때
-     이 토큰들을 재사용한다. 라이트/다크 시스템 설정과 무관하게 항상 같은
-     값이다(스타 패드가 늘 어두운 패널인 것과 동일). StartPage.css 자체는
-     createPortal 팝업 스코프 문제로 이 값들을 로컬에도 따로 갖고 있다 -
-     여기서 지우지 않는다(다른 페이지에서 쓰려고 전역에 "추가"만 한 것).*/
-  --neon: #2dd4bf;
-  --holo: #5eead4;
-  --panel: linear-gradient(160deg, #17213a 0%, #0e1524 100%);
-  --panel-border: rgba(94, 234, 212, 0.18);
-  --panel-line: rgba(94, 234, 212, 0.13);
-  --panel-inset: rgba(6, 11, 20, 0.55);
-  --panel-ink: #e9f0fb;
-  --panel-ink-dim: #9fb2cf;
+  /* GamePage(HUD)·PlanetCreatePage·StartPage 팝업이 공유하는 "우주선 콘솔"
+     패널 톤 - 예전에는 라이트/다크 시스템 설정과 무관하게 항상 이 값(원래
+     --neon 등은 다크 값)이었는데, 그 결과 라이트 모드에서도 각 페이지가 항상
+     어두운 패널로 보이는 문제가 있었다. 지금은 라이트/다크 모두 갖는 정상
+     토큰이고, 각 페이지 CSS(.hud/.create/.start-page__overlay)는 이 값을
+     그대로 물려받거나 로컬 별칭으로만 연결한다 - 값 자체는 여기 한 곳에서만
+     정의한다(중복 정의하면 페이지마다 명도가 미묘하게 달라진다).
+     라이트 값은 흰 배경에서도 또렷하도록 다크 버전보다 채도/대비를 올렸다. */
+  --neon: #0d9488;
+  --holo: #0f766e;
+  --panel: linear-gradient(160deg, #ffffff 0%, #e3f4f1 100%);
+  --panel-solid: #ffffff;
+  --panel-border: rgba(13, 148, 136, 0.4);
+  --panel-line: rgba(13, 148, 136, 0.28);
+  --panel-line-strong: rgba(13, 148, 136, 0.55);
+  --panel-inset: rgba(13, 148, 136, 0.12);
+  --panel-ink: #16261f;
+  --panel-ink-strong: #041310;
+  --panel-ink-dim: #3f5148;
+  /* 콘솔 페이지 전체 배경 그라디언트(위→아래) 끝점 - --panel과 별개로, 카드가
+     아니라 페이지 바탕 전체에 쓴다. */
+  --void: #ffffff;
+  --deep: #e3f4f1;
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
@@ -91,6 +110,7 @@
       rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 
     --text-muted: #8a9a88;
+    --text-faint: #7c93ad;
     --overlay: rgba(0, 0, 0, 0.6);
 
     --info: #38bdf8;
@@ -108,6 +128,28 @@
     --warm: #fb923c;
     --warm-bg: rgba(251, 146, 60, 0.15);
     --warm-border: rgba(251, 146, 60, 0.4);
+
+    --gold: #fbbf24;
+    --gold-bg: rgba(251, 191, 36, 0.15);
+    --gold-border: rgba(251, 191, 36, 0.4);
+
+    --violet: #a78bfa;
+
+    /* 콘솔 패널 톤(원래 값) - GamePage/PlanetCreatePage/StartPage 팝업이
+       다크 모드에서 지금까지 쓰던 우주선 콘솔 다크 네이비를 그대로 유지한다. */
+    --neon: #2dd4bf;
+    --holo: #5eead4;
+    --panel: linear-gradient(160deg, #17213a 0%, #0e1524 100%);
+    --panel-solid: #0a1624;
+    --panel-border: rgba(94, 234, 212, 0.18);
+    --panel-line: rgba(94, 234, 212, 0.13);
+    --panel-line-strong: rgba(45, 212, 191, 0.45);
+    --panel-inset: rgba(6, 11, 20, 0.55);
+    --panel-ink: #e9f0fb;
+    --panel-ink-strong: #ffffff;
+    --panel-ink-dim: #9fb2cf;
+    --void: #03060d;
+    --deep: #060d18;
   }
 
   #social .button-icon {

@@ -325,9 +325,6 @@ function ReportPage() {
 
       <hr className="report-page__divider" />
 
-      {/* 타임라인 그래프와 선택한 지점의 설명을 한 행에 나란히 - 그래프는 넓게,
-          설명은 옆에 붙여서 클릭한 지점의 원인->과정->결과를 바로 옆에서 읽게 한다. */}
-      <div className="report-page__timeline-row">
       {/* 행성 변화 타임라인: ΔE 추이 하나로 통합한 그래프 */}
       {/* 타임라인 그래프와 선택한 지점의 설명을 하나의 섹션으로 통합 -
           접기/펼치기를 같이 하도록 CollapsibleSection 하나로 감싼다. */}
@@ -413,8 +410,6 @@ function ReportPage() {
           <p>기록된 변화가 없습니다.</p>
         )}
       </CollapsibleSection>
-
-      </div>
 
       <hr className="report-page__divider" />
 

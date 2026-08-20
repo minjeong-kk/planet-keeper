@@ -7,25 +7,42 @@
    ========================================================================= */
 
 .hud {
-  /* 게임 화면은 시스템 라이트/다크 설정과 무관하게 항상 어두운 우주 톤이다
-     (StartPage의 다크 SF 패널과 같은 방침). 아래 하위 규칙은 전부 이 토큰만 쓴다. */
-  --void: #03060d;
-  --deep: #060d18;
-  --panel: rgba(11, 24, 38, 0.74);
-  --panel-solid: #0a1624;
-  --inset: rgba(3, 8, 15, 0.55);
-  --line: rgba(45, 212, 191, 0.18);
-  --line-strong: rgba(45, 212, 191, 0.45);
-  --cyan: #2dd4bf;
-  --cyan-soft: #5eead4;
-  --ink: #eaf1fb;
-  --dim: #a8bdd6;
-  --faint: #7c93ad;
-  --ok: #34d399;
-  --warn: #fb923c;
-  --danger: #f87171;
-  --cold: #38bdf8;
-  --gold: #fbbf24;
+  /* 이 페이지만의 색은 없다 - index.css의 콘솔 팔레트(--void, --panel 계열,
+     --neon 등, 라이트/다크 둘 다 갖고 있다)를 그대로 물려받는다. 아래 별칭은 이 파일 안의
+     기존 var(--cyan)/var(--ink) 같은 호출부(수십 곳)를 하나도 안 건드리기 위한
+     것일 뿐, 값 자체는 전부 index.css 한 곳에서만 정의한다 - 여기서 값을 다시
+     적으면 페이지마다 명도가 미묘하게 갈라지는 문제가 재발한다. */
+  --cyan: var(--neon);
+  --cyan-soft: var(--holo);
+  --ink: var(--panel-ink);
+  --ink-strong: var(--panel-ink-strong);
+  --dim: var(--panel-ink-dim);
+  --faint: var(--text-faint);
+  --ok: var(--success);
+  --warn: var(--warm);
+  --cold: var(--info);
+  --inset: var(--panel-inset);
+  --line: var(--panel-border);
+  --line-strong: var(--panel-line-strong);
+  /* --danger/--violet/--gold/--void/--deep/--panel/--panel-solid은 index.css의
+     같은 이름을 그대로 쓴다(별칭 불필요). */
+
+  /* 아이템/최종/장비 모달(item-info-modal, item-result, stage-clear)과 이상기후
+     경보(climate-event) 공통 카드 톤도 전부 콘솔 팔레트 별칭이다. */
+  --modal-ink: var(--ink);
+  --modal-ink-strong: var(--ink-strong);
+  --modal-dim: var(--dim);
+  --modal-inset: var(--inset);
+
+  /* 이상기후 경보 전용 - 위기감을 위해 붉은 기운을 남긴다(콘솔 팔레트와 별개).
+     --event-sub는 var(--danger)를 그대로 쓰지 않는다 - 카드 배경 자체가 이미
+     붉은 톤이라(다크에서는 짙은 적갈색), --danger의 다크 값(#f87171)을 쓰면
+     배경과 비슷한 채도라 묻힌다. 카드 배경 위에서 읽히도록 배경 밝기에 맞춘
+     별도 값이 필요하다(라이트: 짙은 빨강, 다크: 옅은 분홍). */
+  --event-bg-a: #fff5f5;
+  --event-bg-b: #ffffff;
+  --event-sub: #b91c1c;
+  --event-hint-text: #92400e;
 
   position: relative;
   display: grid;
@@ -39,13 +56,34 @@
   color: var(--ink);
   font-size: 0.95rem;
   background:
-    radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 178, 0.15) 0%, transparent 55%),
-    radial-gradient(80% 60% at 50% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+    radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 136, 0.1) 0%, transparent 55%),
+    radial-gradient(80% 60% at 50% 100%, rgba(13, 148, 136, 0.06) 0%, transparent 60%),
     linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
 }
 
-/* 미세한 별 - 개수를 늘리지 않고 밝기도 낮게(배경이 복잡해 보이면 행성이 죽는다) */
+@media (prefers-color-scheme: dark) {
+  .hud {
+    --event-bg-a: rgba(48, 16, 20, 0.96);
+    --event-bg-b: rgba(10, 8, 16, 0.97);
+    --event-sub: #fecaca;
+    --event-hint-text: #fde68a;
+
+    background:
+      radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 178, 0.15) 0%, transparent 55%),
+      radial-gradient(80% 60% at 50% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+      linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+  }
+
+  .hud__starfield {
+    display: block;
+  }
+}
+
+/* 미세한 별 - 우주 배경 연출이라 다크 모드에서만 보인다(라이트 모드의 흰
+   배경에 별을 띄우면 화면이 아니라 얼룩으로 보인다). 개수를 늘리지 않고
+   밝기도 낮게(배경이 복잡해 보이면 행성이 죽는다) */
 .hud__starfield {
+  display: none;
   position: absolute;
   inset: 0;
   pointer-events: none;
@@ -82,6 +120,10 @@
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 14px;
+  /* 테두리만으로는 배경과 카드 구분이 잘 안 보인다는 피드백 - 옅은 그림자를
+     더해 카드마다 살짝 떠 있는 것처럼 보이게 한다(라이트/다크 공통 - 검은
+     그림자는 두 모드 모두에서 자연스럽게 보인다). */
+  box-shadow: 0 1px 2px rgba(4, 12, 9, 0.06), 0 10px 28px rgba(4, 12, 9, 0.1);
   backdrop-filter: blur(6px);
   box-sizing: border-box;
 }
@@ -791,7 +833,7 @@
   font-weight: 800;
   line-height: 1;
   letter-spacing: -0.02em;
-  color: #ffffff;
+  color: var(--ink-strong);
   font-variant-numeric: tabular-nums;
   text-shadow: 0 0 30px rgba(45, 212, 191, 0.45);
 }
@@ -955,7 +997,7 @@
   font-size: 1.15rem;
   font-weight: 700;
   line-height: 1.5;
-  color: #ffffff;
+  color: var(--ink-strong);
   word-break: keep-all;
 }
 
@@ -989,7 +1031,7 @@
   transform: translateX(3px);
   border-color: var(--cyan);
   background: rgba(45, 212, 191, 0.13);
-  color: #ffffff;
+  color: var(--ink-strong);
   box-shadow: 0 0 0 1px rgba(45, 212, 191, 0.32);
 }
 
@@ -1050,7 +1092,7 @@
 
 .mission__card--reward p {
   margin: 0;
-  color: #fde68a;
+  color: var(--gold);
   font-weight: 700;
 }
 
@@ -1385,7 +1427,7 @@
   padding: 28px 30px;
   border: 1px solid rgba(248, 113, 113, 0.55);
   border-radius: 18px;
-  background: linear-gradient(165deg, rgba(48, 16, 20, 0.96), rgba(10, 8, 16, 0.97));
+  background: linear-gradient(165deg, var(--event-bg-a) 0%, var(--event-bg-b) 100%);
   box-shadow: 0 30px 70px rgba(0, 0, 0, 0.6), 0 0 60px rgba(248, 113, 113, 0.2);
   box-sizing: border-box;
   text-align: center;
@@ -1404,7 +1446,7 @@
   font-size: 1.7rem;
   font-weight: 800;
   line-height: 1.35;
-  color: #ffffff;
+  color: var(--modal-ink-strong);
   word-break: keep-all;
   text-shadow: 0 0 26px rgba(248, 113, 113, 0.45);
 }
@@ -1412,14 +1454,14 @@
 .climate-event__sub {
   margin: 0;
   font-size: 0.92rem;
-  color: #fecaca;
+  color: var(--event-sub);
   word-break: keep-all;
 }
 
 .climate-event__sub strong {
   font-family: var(--mono);
   font-size: 1.1rem;
-  color: #ffffff;
+  color: var(--modal-ink-strong);
 }
 
 .climate-event__timer-track {
@@ -1454,7 +1496,7 @@
 
 .climate-event__slider-label {
   font-size: 0.85rem;
-  color: #fecaca;
+  color: var(--event-sub);
   white-space: nowrap;
   text-align: left;
 }
@@ -1470,7 +1512,7 @@
   font-family: var(--mono);
   font-size: 0.85rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--modal-ink-strong);
   text-align: right;
 }
 
@@ -1486,6 +1528,11 @@
   backdrop-filter: blur(4px);
 }
 
+/* item-info-modal/item-result/stage-clear는 createPortal로 document.body에
+   바로 붙는다 - .hud의 자손이 아니라서 .hud에 정의한 별칭(--ink 등)을 상속받지
+   못한다(DOM 트리 기준으로 상속되지, React 트리 기준이 아니다). 그래서 이 세
+   모달만은 .hud를 거치지 않고 index.css의 콘솔 팔레트(--panel-ink 등)를 직접
+   가리킨다 - :root는 어디서든(포탈이어도) 항상 상위이므로 안전하다. */
 .item-info-modal {
   width: 90%;
   max-width: 560px;
@@ -1497,16 +1544,16 @@
   padding: 24px 26px;
   border: 1px solid rgba(45, 212, 191, 0.35);
   border-radius: 16px;
-  background: linear-gradient(160deg, #0d1c2c 0%, #060d18 100%);
-  color: #eaf1fb;
+  background: linear-gradient(160deg, var(--panel-solid) 0%, var(--deep) 100%);
+  color: var(--panel-ink);
   text-align: left;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
 }
 
 .item-info-modal h2 {
   margin: 0;
   font-size: 1.15rem;
-  color: #ffffff;
+  color: var(--panel-ink-strong);
 }
 
 .item-info-modal button {
@@ -1522,14 +1569,14 @@
   font-size: 0.88rem;
   font-weight: 700;
   letter-spacing: 0.04em;
-  color: #5eead4;
+  color: var(--holo);
 }
 
 .item-info-section p {
   margin: 3px 0;
   font-size: 0.85rem;
   line-height: 1.6;
-  color: #a8bdd6;
+  color: var(--panel-ink-dim);
   word-break: keep-all;
 }
 
@@ -1547,11 +1594,11 @@
   font-size: 0.85rem;
   line-height: 1.35;
   text-align: center;
-  color: #cfe0f0;
+  color: var(--panel-ink);
 }
 
 .item-arrow {
-  color: #2dd4bf;
+  color: var(--neon);
   font-size: 0.82rem;
   line-height: 1;
 }
@@ -1729,7 +1776,7 @@
 .climate-event__goal {
   margin: 0;
   font-size: 0.95rem;
-  color: #ffffff;
+  color: var(--modal-ink-strong);
   word-break: keep-all;
 }
 
@@ -1741,7 +1788,7 @@
   background: rgba(248, 113, 113, 0.2);
   border: 1px solid rgba(248, 113, 113, 0.45);
   font-size: 0.78rem;
-  color: #fecaca;
+  color: var(--event-sub);
 }
 
 .climate-event__hint {
@@ -1752,7 +1799,7 @@
   background: rgba(251, 191, 36, 0.09);
   font-size: 0.88rem;
   line-height: 1.6;
-  color: #fde68a;
+  color: var(--event-hint-text);
   text-align: left;
   word-break: keep-all;
 }
@@ -1787,9 +1834,9 @@
   gap: 18px;
   flex-wrap: wrap;
   padding: 10px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(3, 8, 15, 0.45);
+  background: var(--modal-inset);
 }
 
 .climate-event__live-item {
@@ -1797,13 +1844,13 @@
   align-items: baseline;
   gap: 8px;
   font-size: 0.8rem;
-  color: #fecaca;
+  color: var(--event-sub);
 }
 
 .climate-event__live-item strong {
   font-family: var(--mono);
   font-size: 1rem;
-  color: #ffffff;
+  color: var(--modal-ink-strong);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1813,15 +1860,15 @@
 }
 
 .climate-event__live--good .climate-event__live-tag {
-  color: #34d399;
+  color: var(--ok);
 }
 
 .climate-event__live--bad .climate-event__live-tag {
-  color: #fca5a5;
+  color: var(--danger);
 }
 
 .climate-event__live--same .climate-event__live-tag {
-  color: #cbd5e1;
+  color: var(--modal-dim);
 }
 
 /* 경보가 지목한 변수에만 방향 표시 */
@@ -1830,18 +1877,18 @@
 }
 
 .climate-event__slider-row--target .climate-event__slider-label {
-  color: #ffffff;
+  color: var(--modal-ink-strong);
   font-weight: 700;
 }
 
 .climate-event__slider-row--target .climate-event__slider {
-  accent-color: #fbbf24;
+  accent-color: var(--gold);
 }
 
 .climate-event__slider-arrow {
   font-size: 1rem;
   font-weight: 800;
-  color: #fbbf24;
+  color: var(--gold);
   text-align: center;
 }
 
@@ -1871,9 +1918,9 @@
   padding: 24px 26px 20px;
   border: 1px solid rgba(45, 212, 191, 0.32);
   border-radius: 16px;
-  background: linear-gradient(160deg, #0d1c2c 0%, #060d18 100%);
-  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.62);
-  color: #eaf1fb;
+  background: linear-gradient(160deg, var(--panel-solid) 0%, var(--deep) 100%);
+  box-shadow: 0 26px 64px rgba(0, 0, 0, 0.22);
+  color: var(--panel-ink);
   text-align: left;
   box-sizing: border-box;
   animation: itemResultPop 0.24s cubic-bezier(0.2, 1.1, 0.4, 1);
@@ -1901,13 +1948,13 @@
   margin: 0;
   font-size: 1.05rem;
   font-weight: 800;
-  color: #ffffff;
+  color: var(--panel-ink-strong);
 }
 
 .item-result__sub {
   margin: 2px 0 0;
   font-size: 0.8rem;
-  color: #7c93ad;
+  color: var(--panel-ink-dim);
 }
 
 .item-result__numbers {
@@ -1924,18 +1971,18 @@
   padding: 10px 13px;
   border: 1px solid rgba(94, 234, 212, 0.16);
   border-radius: 10px;
-  background: rgba(3, 8, 15, 0.5);
+  background: var(--panel-inset);
 }
 
 .item-result__number span {
   font-size: 0.76rem;
-  color: #7c93ad;
+  color: var(--panel-ink-dim);
 }
 
 .item-result__number strong {
   font-family: var(--mono);
   font-size: 0.95rem;
-  color: #ffffff;
+  color: var(--panel-ink-strong);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1943,14 +1990,14 @@
 .item-result__number em {
   margin: 0 6px;
   font-style: normal;
-  color: #2dd4bf;
+  color: var(--neon);
 }
 
 .item-result__hint {
   margin: 0;
   font-size: 0.8rem;
   line-height: 1.55;
-  color: #7c93ad;
+  color: var(--panel-ink-dim);
   word-break: keep-all;
 }
 
@@ -1960,7 +2007,7 @@
   margin: 0;
   padding: 14px 16px;
   border-radius: 12px;
-  background: rgba(3, 8, 15, 0.5);
+  background: var(--panel-inset);
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1969,35 +2016,35 @@
 .item-result__step {
   font-size: 0.88rem;
   line-height: 1.6;
-  color: #d7e5f5;
+  color: var(--panel-ink);
   word-break: keep-all;
 }
 
 .item-result__step strong {
-  color: #f2f7ff;
+  color: var(--panel-ink-strong);
   font-weight: 600;
 }
 
 /* 알베도->ASR 계열 / 온실효과->OLR 계열 색 구분 - 리포트 페이지 타임라인
    (report-page__timeline-explain-line--albedo/greenhouse)과 같은 배색이다. */
 .item-result__step--albedo {
-  color: #2dd4bf;
+  color: var(--neon);
 }
 .item-result__step--albedo strong {
-  color: #2dd4bf;
+  color: var(--neon);
 }
 
 .item-result__step--greenhouse {
-  color: #a78bfa;
+  color: var(--violet);
 }
 .item-result__step--greenhouse strong {
-  color: #a78bfa;
+  color: var(--violet);
 }
 
 .item-result__arrow {
   font-size: 0.85rem;
   line-height: 1.1;
-  color: #2dd4bf;
+  color: var(--neon);
   text-align: center;
 }
 
@@ -2185,9 +2232,9 @@
   padding: 28px 30px 24px;
   border: 1px solid rgba(52, 211, 153, 0.45);
   border-radius: 18px;
-  background: linear-gradient(160deg, #0c2224 0%, #060d18 100%);
-  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.65), 0 0 50px rgba(52, 211, 153, 0.16);
-  color: #eaf1fb;
+  background: linear-gradient(160deg, var(--panel-solid) 0%, var(--deep) 100%);
+  box-shadow: 0 30px 70px rgba(0, 0, 0, 0.25), 0 0 50px rgba(52, 211, 153, 0.16);
+  color: var(--panel-ink);
   text-align: left;
   box-sizing: border-box;
   animation: itemResultPop 0.28s cubic-bezier(0.2, 1.1, 0.4, 1);
@@ -2201,14 +2248,14 @@
   background: rgba(52, 211, 153, 0.14);
   font-size: 0.86rem;
   font-weight: 800;
-  color: var(--ok, #34d399);
+  color: var(--success);
 }
 
 .stage-clear__lead {
   margin: 0;
   font-size: 1.02rem;
   line-height: 1.6;
-  color: #ffffff;
+  color: var(--panel-ink-strong);
   word-break: keep-all;
 }
 
@@ -2225,45 +2272,44 @@
   padding: 10px 13px;
   border: 1px solid rgba(94, 234, 212, 0.16);
   border-radius: 10px;
-  background: rgba(3, 8, 15, 0.5);
+  background: var(--panel-inset);
 }
 
 .stage-clear__numbers span {
   font-size: 0.76rem;
-  color: #7c93ad;
+  color: var(--panel-ink-dim);
 }
 
 .stage-clear__numbers strong {
   font-family: var(--mono);
   font-size: 0.95rem;
-  color: #ffffff;
+  color: var(--panel-ink-strong);
   font-variant-numeric: tabular-nums;
 }
 
 .stage-clear__next {
   padding: 14px 16px;
   border-radius: 12px;
-  ;
-  background: rgba(3, 8, 15, 0.5);
+  background: var(--panel-inset);
 }
 
 .stage-clear__next-title {
   margin: 0 0 6px;
   font-size: 0.95rem;
   font-weight: 800;
-  color: #5eead4;
+  color: var(--holo);
 }
 
 .stage-clear__next-body {
   margin: 0;
   font-size: 0.9rem;
   line-height: 1.65;
-  color: #d7e5f5;
+  color: var(--panel-ink);
   word-break: keep-all;
 }
 
 .stage-clear__next-body strong {
-  color: #ffffff;
+  color: var(--panel-ink-strong);
 }
 
 .stage-clear__note {
@@ -2272,7 +2318,7 @@
   border-top: 1px dashed rgba(148, 176, 205, 0.2);
   font-size: 0.82rem;
   line-height: 1.55;
-  color: #7c93ad;
+  color: var(--panel-ink-dim);
   word-break: keep-all;
 }
 
@@ -2293,3 +2339,4 @@
   filter: brightness(1.08);
   box-shadow: 0 0 28px rgba(45, 212, 191, 0.4);
 }
+
