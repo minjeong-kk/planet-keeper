@@ -2,13 +2,76 @@
 
 An educational climate game to reach planetary equilibrium through environmental control and science quizzes.
 
+알베도와 온실효과를 직접 조절해 행성의 **에너지 평형**(흡수 = 방출)을 맞추는 지구과학Ⅰ 학습 게임입니다.
+행성을 만들고 → 문제를 풀어 기후 제어 장비를 얻고 → 장비로 조성을 바꿔 평형에 도달한 뒤,
+그 평형을 유지한 채 지구와 비슷한 온도까지 맞추면 클리어입니다.
+
+---
+
+# 게임 실행
+
+```bash
+cd planet-keeper
+npm install
+npm run dev            # http://localhost:5173
+```
+
+| 명령 | 설명 |
+|------|------|
+| `npm run dev` | 개발 서버 |
+| `npm run build` | 프로덕션 빌드 (`dist/`) |
+| `npm run preview` | 빌드 결과 미리보기 |
+| `npm run lint` | oxlint |
+
+> 아래 **데이터 파이프라인은 실행하지 않아도 게임이 돌아갑니다.** 수집·도출 결과가
+> `src/data/climateThresholds.js`와 `src/data/climatePoints.js`로 이미 커밋되어 있습니다.
+> API 키가 필요한 건 그 데이터를 **다시 수집할 때**뿐입니다.
+
+## 화면 구성
+
+| 경로 | 화면 | 하는 일 |
+|------|------|---------|
+| `/` | 시작 | 게임 소개 · 기후 개념 도감 |
+| `/planet-create` | 행성 만들기 | 슬라이더 5종(빙하·바다·구름·대기두께·CO₂)으로 조성 설정, 또는 실측 지점 5곳 중 선택 |
+| `/game` | 플레이 | 1단계 에너지 평형 만들기 → 2단계 지구 유사 온도 맞추기. 문제 풀이·장비 사용·이상기후 대응 |
+| `/report` | 리포트 | 행성 변화 타임라인 · 문제 풀이 결과 · 핵심 개념 정리 |
+
+정의되지 않은 경로는 시작 화면으로 리다이렉트됩니다(`App.jsx`).
+
+## 소스 구조
+
+```
+planet-keeper/src/
+├─ App.jsx                    라우팅 + 경로 변경 시 스크롤 초기화
+├─ Components/
+│  ├─ Start-Page/             시작 화면, 개념 도감(ConceptBook), 마스코트
+│  ├─ Planet-Create-Page/     슬라이더 조성 설정, 지점 선택 지도
+│  ├─ Game-Page/              HUD·문제·장비·모달 (플레이 화면 전체)
+│  ├─ Report-Page/            결과 리포트
+│  ├─ common/                 용어 툴팁(Term) · 온보딩(Tutorial) · useEscapeKey
+│  └─ Planet-ui.jsx           three.js 3D 행성 렌더링
+├─ store/
+│  ├─ useClimateStore.js      행성 조성(슬라이더)과 현재 온도 — "입력"
+│  └─ useGameStore.js         단계·문제·장비·타임라인 — "게임 진행"
+├─ utils/
+│  ├─ physicsEngine.js        알베도·온실효과·ΔE·상태 판정 (순수 물리)
+│  ├─ planetAnalysis.js       판정 결과를 설명 문장으로 (물리 → 한국어)
+│  ├─ climateVisual.js        슬라이더·온도 → 3D 외형 props
+│  └─ geo.js                  위경도 → 지도 % 좌표
+└─ data/                      문제은행 · 장비 · 용어집 · 지점/임계값(파이프라인 산출물)
+```
+
+물리 결과는 store에 저장하지 않습니다 — 조성과 온도만 있으면 언제든 다시 계산되는
+순수 함수이므로, 쓰는 쪽에서 `computeClimateV2`로 파생시킵니다.
+
 ---
 
 # 데이터 수집 스크립트 설치
 
 ```bash
+cd planet-keeper/data-pipeline
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
@@ -22,7 +85,7 @@ pip install -r requirements.txt
 # 1. 실측 수집 (API 키 필요, .env 참고)
 # → data-pipeline/.env.example을 .env로 복사하고 기상청 API 허브
 #   (https://apihub.kma.go.kr)에서 발급받은 개인 키를 API_KEY에 넣으세요.
-cd data-pipeline/Scripts
+cd Scripts                     # (저장소 루트라면 cd planet-keeper/data-pipeline/Scripts)
 python3 observed-gk2a.py       # 천리안 산출물 + 좌표 앵커 → observed_gk2a_dataset.csv
 python3 observed-kim.py        # 같은 좌표의 KIM t2m/psl → observed_kim_dataset.csv
 python3 physics-kim.py         # KIM 전지구 필드 평균 → physics_kim_dataset.csv
@@ -476,3 +539,8 @@ All textures are bundled locally (not hot-linked) to avoid runtime/CORS dependen
   - 출처: https://science.nasa.gov/earth/earth-observatory/eroded-beauty-in-the-sahara-desert-150604/
   - 원본(5568×3712)을 프로젝트에서 960×640으로 리사이즈·재압축(용량 절감, 화질 손실 미미)해 로컬 번들
   - 사용처: 행성 만들기 페이지의 "특정 지점 선택" — 사하라 사막 선택 시 미리보기(`src/data/climatePoints.js`)
+
+- **파비콘** (`public/favicon.svg`)
+  - 프로젝트에서 직접 제작한 SVG (외부 저작물 없음)
+  - 게임 UI와 같은 청록 팔레트(#5eead4 ~ #0f766e)의 행성 + 고리
+  - 사용처: `index.html`의 `<link rel="icon">`
