@@ -61,12 +61,20 @@ function Tutorial({ onFinish, steps }) {
   const step = steps[index];
   const isCentered = !rect;
 
-  // 레이아웃이 잡힌 뒤에 위치를 재고, 창 크기가 바뀌면 다시 잰다.
+  // 레이아웃이 잡힌 뒤에 위치를 재고, 창 크기나 스크롤이 바뀌면 다시 잰다.
+  // measure는 getBoundingClientRect(뷰포트 기준)를 쓰므로 스크롤되면 값이 낡는다 -
+  // resize만 듣던 때는 튜토리얼 도중 페이지가 스크롤되면 강조 구멍만 제자리에
+  // 남고 실제 대상은 딴 데로 가 있었다. scroll은 버블링하지 않아서 캡처 단계로
+  // 듣는다(내부 스크롤 컨테이너가 움직이는 경우까지 잡으려면 이래야 한다).
   useLayoutEffect(() => {
     const update = () => setRect(measure(step.target));
     update();
     window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
+    window.addEventListener("scroll", update, true);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.removeEventListener("scroll", update, true);
+    };
   }, [step.target]);
 
   // 단계/대상이 바뀌면 카드 높이를 다시 잰다(측정 -> 위치 재계산은 한 번만 돈다).
@@ -79,6 +87,34 @@ function Tutorial({ onFinish, steps }) {
     else onFinish();
   };
   const goPrev = () => setIndex((i) => Math.max(0, i - 1));
+
+  // 단계가 바뀔 때마다 카드로 포커스를 옮긴다 - 그래야 이어지는 Tab이 카드 안에서
+  // 시작하고, 스크린리더도 바뀐 내용을 읽는다.
+  useEffect(() => {
+    // preventScroll - 카드는 .tour(fixed) 안의 absolute라 뷰포트 좌표를 그대로 쓴다.
+    // 포커스 이동이 브라우저 스크롤을 건드리면 방금 붙인 scroll 리스너가 곧바로
+    // 위치를 다시 재면서 화면이 흔들린다.
+    cardRef.current?.focus({ preventScroll: true });
+  }, [index]);
+
+  // 포커스 트랩. role="dialog"만 있고 트랩이 없으면 Tab이 오버레이 뒤의 게임 화면
+  // 버튼들로 빠져나가는데, 그쪽은 지금 오버레이에 덮여 보이지도 않고 누를 수도 없다.
+  const onCardKeyDown = (e) => {
+    if (e.key !== "Tab") return;
+    const focusables = cardRef.current?.querySelectorAll("button:not([disabled])");
+    if (!focusables?.length) return;
+    const first = focusables[0];
+    const last = focusables[focusables.length - 1];
+    // 카드 자체(tabIndex=-1)에 포커스가 있는 상태에서 Shift+Tab을 누르면 뒤로 빠지므로
+    // 그 경우도 마지막 버튼으로 돌려보낸다.
+    if (e.shiftKey && (document.activeElement === first || document.activeElement === cardRef.current)) {
+      e.preventDefault();
+      last.focus();
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault();
+      first.focus();
+    }
+  };
 
   // ESC로 건너뛰고, Enter/Space/→로 다음, ←로 이전 단계로 간다.
   useEffect(() => {
@@ -93,6 +129,10 @@ function Tutorial({ onFinish, steps }) {
         return;
       }
       if (e.key === "Enter" || e.key === " " || e.key === "ArrowRight") {
+        // 포커스가 카드 안의 버튼에 있으면 Enter/Space는 그 버튼 몫으로 넘긴다 -
+        // 여기서 가로채면(preventDefault가 버튼 클릭까지 막는다) "이전"이나
+        // "건너뛰기"에 포커스를 두고 Enter를 눌러도 다음 단계로 넘어가 버린다.
+        if ((e.key === "Enter" || e.key === " ") && e.target?.closest?.("button")) return;
         e.preventDefault();
         if (index + 1 < steps.length) setIndex(index + 1);
         else onFinish();
@@ -103,7 +143,7 @@ function Tutorial({ onFinish, steps }) {
   }, [index, steps.length, onFinish]);
 
   return (
-    <div className="tour" role="dialog" aria-label="게임 튜토리얼">
+    <div className="tour" role="dialog" aria-modal="true" aria-label="게임 튜토리얼">
       {/* 구멍 뚫린 오버레이 - 강조 영역만 밝게 남기고 나머지를 덮는다.
           대상을 못 찾은 단계(레이아웃상 아직 없는 패널 등)는 전체를 덮는다. */}
       {rect ? (
@@ -124,6 +164,8 @@ function Tutorial({ onFinish, steps }) {
         ref={cardRef}
         className={`tour__card${isCentered ? " tour__card--center" : ""}`}
         style={cardStyleFor(rect, cardHeight)}
+        tabIndex={-1}
+        onKeyDown={onCardKeyDown}
       >
         <div className="tour__head">
           <span className="tour__step-count">

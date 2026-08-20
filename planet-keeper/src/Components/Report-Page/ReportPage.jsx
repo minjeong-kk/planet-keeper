@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
 import useGameStore from "../../store/useGameStore";
+import useEscapeKey from "../common/useEscapeKey.js";
 import { PLANET_STATES, planetStateOf, ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
 import { describeTransition, deltaEnergyLines, formatSigned, relevantConceptKeys, labelTone } from "../../utils/planetAnalysis.js";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
@@ -195,6 +196,8 @@ function ReportPage() {
   // 최신 quizGroups를 참조한다(값 자체를 복사해두지 않음).
   const [selectedGroupKey, setSelectedGroupKey] = useState(null);
   const selectedGroup = selectedGroupKey != null ? quizGroups.find((g) => g.key === selectedGroupKey) : null;
+  // 해설 모달은 열려 있을 때만 ESC로 닫는다(닫혀 있을 땐 null을 넘겨 아무 일도 안 함).
+  useEscapeKey(selectedGroup ? () => setSelectedGroupKey(null) : null);
 
   // 둘 다 replace로 건다 - push로 쌓으면 "다시 플레이"를 누를 때마다 히스토리에
   // /game과 /report가 번갈아 계속 쌓여서, 몇 판만 돌려도 뒤로 가기가 사실상
@@ -336,7 +339,12 @@ function ReportPage() {
       {/* 고급화된 문제 해설 모달 */}
       {selectedGroup && (
         <div className="report-page__modal-overlay" onClick={() => setSelectedGroupKey(null)}>
-          <div className="report-page__modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="report-page__modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="문제 해설"
+          >
             <div className="report-page__modal-header">
               <span className={`report-page__modal-badge ${selectedGroup.correct ? "report-page__modal-badge--correct" : "report-page__modal-badge--wrong"}`}>
                 {selectedGroup.correct ? "정답" : "오답"}

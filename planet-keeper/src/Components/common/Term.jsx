@@ -3,8 +3,8 @@
 // 새 의존성이나 위치 계산 로직이 필요 없다.
 function Term({ concept, children }) {
   return (
-    <span className="concept-term" title={concept.detail}>
-      {children ?? concept.term}
+    <span className="concept-term" title={concept?.detail}>
+      {children ?? concept?.term}
     </span>
   );
 }

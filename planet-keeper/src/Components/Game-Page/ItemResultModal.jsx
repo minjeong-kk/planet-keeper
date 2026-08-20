@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { formatSigned } from "../../utils/planetAnalysis.js";
+import useEscapeKey from "../common/useEscapeKey.js";
 
 // 장비를 쓴 직후 뜨는 "사용 결과" 모달.
 //
@@ -15,6 +16,7 @@ import { formatSigned } from "../../utils/planetAnalysis.js";
 // 모달이 열려 있는 동안 GamePage는 타이머를 멈춘다(설명을 읽는 사이 이상기후가
 // 끼어들지 않게).
 function ItemResultModal({ item, before, after, lines, ok, onClose }) {
+  useEscapeKey(onClose);
   const temperatureChanged = Math.abs(after.currentTemperature - before.currentTemperature) >= 0.05;
 
   return createPortal(
