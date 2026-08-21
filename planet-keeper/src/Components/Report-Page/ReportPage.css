@@ -332,6 +332,16 @@
   cursor: pointer;
 }
 
+/* 키보드 포커스 표시 - SVG에는 기본 아웃라인이 잘 안 보여서 직접 그린다.
+   마우스 클릭(:focus)에는 안 뜨고 Tab 이동(:focus-visible)에만 뜬다. */
+.report-page__timeline-chart-point:focus {
+  outline: none;
+}
+.report-page__timeline-chart-point:focus-visible .report-page__timeline-chart-dot {
+  stroke: var(--accent);
+  stroke-width: 3;
+}
+
 .report-page__timeline-chart-dot {
   stroke: var(--bg);
   stroke-width: 2;

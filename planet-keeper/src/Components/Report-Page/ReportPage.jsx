@@ -396,12 +396,29 @@ function ReportPage() {
                 />
                 <polyline className="report-page__timeline-chart-line" points={polylinePoints} />
                 {chartPoints.map((p) => (
+                  // 마우스뿐 아니라 키보드로도 지점을 고를 수 있어야 한다 - Tab으로
+                  // 옮겨 다니고 Enter/Space로 선택한다. SVG <g>는 기본적으로 포커스를
+                  // 못 받으므로 role/tabIndex를 직접 준다.
                   <g
                     key={p.index}
                     className="report-page__timeline-chart-point"
                     transform={`translate(${xOf(p.index)}, ${yOf(p.deltaEnergy)})`}
                     onClick={() => setSelectedStep(p.index)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault(); // Space로 페이지가 스크롤되지 않게
+                      setSelectedStep(p.index);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={p.index === activeStep}
+                    aria-label={`${p.index + 1}단계 ${p.stage}${p.label ? ` ${p.label}` : ""} - ΔE ${formatSigned(
+                      p.deltaEnergy,
+                    )} W/m²`}
                   >
+                    {/* 실제 점(r=5)은 클릭·터치 대상으로 너무 작다 - 보이지 않는 큰 원을
+                        깔아 히트 영역만 넓힌다(색이 없으니 그래프 모양은 그대로다). */}
+                    <circle r={12} fill="transparent" />
                     <circle
                       r={p.index === activeStep ? 7 : 5}
                       className={`report-page__timeline-chart-dot report-page__timeline-chart-dot--${p.tone}${
