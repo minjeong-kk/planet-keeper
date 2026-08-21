@@ -47,7 +47,11 @@ function valueChipFor(line, before, after) {
   const b = spec.pick(before);
   const a = spec.pick(after);
   if (b == null || a == null) return null;
-  return `${b.toFixed(spec.digits)} → ${a.toFixed(spec.digits)}${spec.unit}`;
+  const shown = { b: Number(b.toFixed(spec.digits)), a: Number(a.toFixed(spec.digits)) };
+  // 화살표는 화면에 찍힌 두 값만 비교해서 붙인다 - 반올림 뒤에도 같은 값이면
+  // 화살표를 달지 않아야 "0.541 → 0.541 ↓" 처럼 보이지 않는다.
+  const arrow = shown.a > shown.b ? " ↑" : shown.a < shown.b ? " ↓" : "";
+  return `${shown.b.toFixed(spec.digits)} → ${shown.a.toFixed(spec.digits)}${spec.unit}${arrow}`;
 }
 
 // "대기 두께가 감소했습니다." → { label: "대기 두께", arrow: "↓" }
@@ -91,10 +95,8 @@ function toBlocks(lines) {
 function verdictBadgeOf(finalLine, ok) {
   if (ok) return { text: "평형 도달", tone: "good" };
   if (!finalLine) return null;
-  if (finalLine.includes("평형을 지나쳤습니다")) return { text: "평형 지나침", tone: "over" };
-  if (finalLine.includes("더 과다해졌습니다") || finalLine.includes("더 부족해졌습니다")) {
-    return { text: "ΔE 악화", tone: "bad" };
-  }
+  if (finalLine.includes("넘어갔습니다")) return { text: "평형 지나침", tone: "over" };
+  if (finalLine.includes("더 심해졌습니다")) return { text: "ΔE 악화", tone: "bad" };
   if (finalLine.includes("줄었지만")) return { text: "ΔE 개선", tone: "good" };
   return null;
 }
@@ -208,7 +210,9 @@ function ItemResultModal({ item, before, after, lines, ok, onClose }) {
               <h4 className="item-result__stage-title">결과</h4>
               <div className="item-result__numbers">
                 <div className="item-result__number">
-                  <span>에너지 불균형</span>
+                  <span>
+                    에너지 불균형 <small className="item-result__number-note">흡수 − 방출</small>
+                  </span>
                   <strong>
                     {formatSigned(before.deltaEnergy)}
                     <em>→</em>
@@ -216,7 +220,9 @@ function ItemResultModal({ item, before, after, lines, ok, onClose }) {
                   </strong>
                 </div>
                 <div className="item-result__number">
-                  <span>행성 온도</span>
+                  <span>
+                    현재 온도 <small className="item-result__number-note">예상 안정 온도와 다름</small>
+                  </span>
                   <strong>
                     {before.currentTemperature.toFixed(1)}
                     <em>→</em>

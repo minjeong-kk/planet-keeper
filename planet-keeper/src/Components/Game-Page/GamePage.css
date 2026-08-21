@@ -2069,6 +2069,17 @@
   background: var(--panel-inset);
 }
 
+/* 값 카드 라벨 옆 단서 - ΔE의 정의, "현재 온도"가 예상 안정 온도가 아니라는 것.
+   포탈 모달이라 전역 토큰만 쓴다(.hud 별칭은 여기까지 닿지 않는다). */
+.item-result__number-note {
+  font-size: 0.66rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--panel-ink-dim);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
 .item-result__number span {
   font-size: 0.76rem;
   color: var(--panel-ink-dim);

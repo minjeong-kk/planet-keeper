@@ -127,8 +127,8 @@ function deltaEnergyTransitionLines(before, after, itemDeltaEnergy, { beforeTemp
 
   const tempPart =
     beforeTemperature != null && afterTemperature != null
-      ? `행성 온도가 ${beforeTemperature.toFixed(1)}K → ${afterTemperature.toFixed(1)}K로 한 걸음 움직여`
-      : "행성 온도가 한 걸음 움직여";
+      ? `현재 온도가 ${beforeTemperature.toFixed(1)}K → ${afterTemperature.toFixed(1)}K로 한 걸음 움직여`
+      : "현재 온도가 한 걸음 움직여";
 
   return [
     `에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(effect)} W/m² (이 조작의 효과)`,
@@ -428,14 +428,14 @@ function netAlbedoGreenhouseEffectLine(asrDelta, olrDelta) {
 // ReportPage가 타임라인 설명에서 이 문장들을 "알베도 계열"/"온실효과 계열"로
 // 색 구분할 때도 그대로 참조한다(문구를 중복해서 따로 들고 있지 않기 위해 export).
 export const ALBEDO_REASON = {
-  iceThickness: "빙하는 태양빛을 강하게 반사하는 밝은 표면이라, 비율이 바뀌면 알베도도 함께 움직입니다.",
-  cloud: "구름은 태양빛을 반사하는 밝은 표면 역할을 합니다.",
+  iceThickness: "빙하는 밝아서 태양빛을 잘 반사합니다.",
+  cloud: "구름도 태양빛을 반사합니다.",
 };
 
 export const GREENHOUSE_REASON = {
-  cloud: "구름은 지표 복사를 가두는 온실 역할도 동시에 합니다.",
-  co2: "CO₂는 대표적인 온실기체로, 지표 복사를 흡수해 대기 중에 가둡니다.",
-  atmThickness: "대기가 두꺼워질수록 열을 가두는 능력(온실효과)이 커집니다.",
+  cloud: "구름은 지표 복사도 가둡니다.",
+  co2: "CO₂는 지표 복사를 가두는 온실기체입니다.",
+  atmThickness: "대기가 두꺼울수록 열을 더 가둡니다.",
 };
 
 // 알베도/온실효과/OLR/ASR 각각의 변화를 원인->과정 블록으로 만든다. 아이템 사용
@@ -585,8 +585,8 @@ function describeImbalanceChange(before, afterDeltaEnergy, label) {
   if (overshot) {
     return [
       warming
-        ? "🔥 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 과다하니 냉각 아이템이 필요합니다."
-        : "❄️ 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 부족하니 온난화 아이템이 필요합니다.",
+        ? "🔥 에너지가 부족에서 과다로 넘어갔습니다 - 이제는 냉각 아이템이 필요합니다."
+        : "❄️ 에너지가 과다에서 부족으로 넘어갔습니다 - 이제는 온난화 아이템이 필요합니다.",
     ];
   }
 
@@ -594,14 +594,14 @@ function describeImbalanceChange(before, afterDeltaEnergy, label) {
   if (worsened) {
     return [
       warming
-        ? "🔥 오히려 에너지가 더 과다해졌습니다 - 방향이 반대인 아이템을 골랐습니다."
-        : "❄️ 오히려 에너지가 더 부족해졌습니다 - 방향이 반대인 아이템을 골랐습니다.",
+        ? "🔥 에너지 과다가 더 심해졌습니다 - 냉각 계열 아이템이 필요합니다."
+        : "❄️ 에너지 부족이 더 심해졌습니다 - 온난화 계열 아이템이 필요합니다.",
     ];
   }
   return [
     warming
-      ? "🔥 방향은 맞아 에너지 과다가 줄었지만, 아직 남아있어 행성은 계속 더워지는 중입니다 - 냉각 아이템이 더 필요합니다."
-      : "❄️ 방향은 맞아 에너지 부족이 줄었지만, 아직 남아있어 행성은 계속 차가워지는 중입니다 - 온난화 아이템이 더 필요합니다.",
+      ? "🔥 에너지 과다가 줄었지만 아직 남아 있습니다 - 냉각 아이템이 더 필요합니다."
+      : "❄️ 에너지 부족이 줄었지만 아직 남아 있습니다 - 온난화 아이템이 더 필요합니다.",
   ];
 }
 
