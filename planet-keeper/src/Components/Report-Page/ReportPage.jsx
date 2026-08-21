@@ -12,6 +12,7 @@ import {
 } from "../../utils/planetAnalysis.js";
 import { causeFamilyOf, renderHighlightedParts } from "../../utils/explanationHighlight.jsx";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
+import Term from "../common/Term.jsx";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
 
@@ -331,7 +332,9 @@ function ReportPage() {
         
         <div className="report-page__summary-metrics">
           <div className="report-page__metric-box">
-            <span className="report-page__metric-label">최종 행성 상태</span>
+            <span className="report-page__metric-label">
+              <Term concept={CLIMATE_CONCEPTS.planetStateClasses}>최종 행성 상태</Term>
+            </span>
             <span className="report-page__metric-value">
               {final ? KOREAN_BY_STATE[finalRuleState] : "-"}
             </span>
