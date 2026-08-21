@@ -48,20 +48,18 @@
     linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  .create {
-    --track-empty: rgba(255, 255, 255, 0.14);
-    --track-usable: rgba(255, 255, 255, 0.16);
+html[data-theme="dark"] .create {
+  --track-empty: rgba(255, 255, 255, 0.14);
+  --track-usable: rgba(255, 255, 255, 0.16);
 
-    background:
-      radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 178, 0.16) 0%, transparent 60%),
-      radial-gradient(70% 50% at 50% 100%, rgba(45, 212, 191, 0.06) 0%, transparent 60%),
-      linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
-  }
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 178, 0.16) 0%, transparent 60%),
+    radial-gradient(70% 50% at 50% 100%, rgba(45, 212, 191, 0.06) 0%, transparent 60%),
+    linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+}
 
-  .create__starfield {
-    display: block;
-  }
+html[data-theme="dark"] .create__starfield {
+  display: block;
 }
 
 /* 아주 옅은 별 - 우주 배경 연출이라 다크 모드에서만 보인다. 배경이 복잡해지면

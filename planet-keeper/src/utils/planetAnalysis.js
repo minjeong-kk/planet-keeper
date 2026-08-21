@@ -9,10 +9,11 @@ import {
   BASELINE_ALBEDO,
   BASELINE_ATM_THICKNESS,
   ENERGY_BALANCE_EPSILON,
-  ENERGY_SCALE,
+  ENERGY_CHANGE_EPSILON,
   energyStateOf,
   computeClimateV2,
   mapSlidersToClimateInputs,
+  equilibriumTemperatureOf,
 } from "./physicsEngine.js";
 import { nextValuesForChange } from "../store/useClimateStore.js";
 
@@ -127,8 +128,8 @@ function deltaEnergyTransitionLines(before, after, itemDeltaEnergy, { beforeTemp
 
   const tempPart =
     beforeTemperature != null && afterTemperature != null
-      ? `행성 온도가 ${beforeTemperature.toFixed(1)}K → ${afterTemperature.toFixed(1)}K로 한 걸음 움직여`
-      : "행성 온도가 한 걸음 움직여";
+      ? `현재 온도가 ${beforeTemperature.toFixed(1)}K → ${afterTemperature.toFixed(1)}K로 한 걸음 움직여`
+      : "현재 온도가 한 걸음 움직여";
 
   return [
     `에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(effect)} W/m² (이 조작의 효과)`,
@@ -142,6 +143,28 @@ function energyProblemLines(deltaEnergy, direction) {
     ...deltaEnergyLines(deltaEnergy),
     direction === "warming" ? "장기적으로 온도가 계속 상승합니다." : "장기적으로 온도가 계속 하강합니다.",
   ];
+}
+
+/**
+ * HUD가 에너지 불균형을 "얼마나 위험한 상태인지"로 보여줄 때 쓰는 단계.
+ *
+ * 부족/과다 구분은 물리엔진의 energyStateOf를 그대로 쓴다(중복 판정을 만들지
+ * 않는다). 단계는 |ΔE|가 평형 허용범위(ENERGY_BALANCE_EPSILON)의 몇 배인지로만
+ * 나누므로, epsilon이 바뀌면 경계도 같이 움직인다.
+ *
+ *   ok     |ΔE| ≤ 1x   평형 - 경고 표시도, 애니메이션도 없음
+ *   warn   ≤ 2x        주의
+ *   alert  ≤ 4x        경고
+ *   severe > 4x        심각
+ *
+ * @returns {{ state: string, tier: "ok"|"warn"|"alert"|"severe", label: string, ratio: number }}
+ */
+export function imbalanceSeverityOf(deltaEnergy) {
+  const state = energyStateOf(deltaEnergy);
+  const ratio = Math.abs(deltaEnergy) / ENERGY_BALANCE_EPSILON;
+  const tier = state === "Stable" ? "ok" : ratio <= 2 ? "warn" : ratio <= 4 ? "alert" : "severe";
+  const label = state === "Energy Surplus" ? "에너지 과다" : state === "Energy Deficit" ? "에너지 부족" : "에너지 불균형";
+  return { state, tier, label, ratio };
 }
 
 /**
@@ -328,7 +351,13 @@ export function itemDescriptionFor(item, values, currentTemperature) {
       space_mirror: "행성 외곽의 궤도 반사경을 조절해",
     }[item.id] ?? "구름 양을 조절해";
 
-  return `${mechanism} 지금 이 행성에서는 태양광 반사율(알베도)을 ${reflect} 흡수량을 ${absorb}.`;
+  // 반사·흡수만 말하고 끝내면 안 된다 - 구름은 알베도와 온실효과 두 통로에 동시에
+  // 작용하는 유일한 레버라(퀴즈 s3-cloud-both-channels / s4-co2-cloud-combined가
+  // 가르치는 내용), 한쪽만 적으면 툴팁이 그 학습과 어긋난다. 온실효과 기여
+  // (cloudGreenhouseTerm)는 표면 상태와 무관하게 항상 구름 비율과 같은 방향이라
+  // 알베도처럼 동적으로 판정할 필요가 없다.
+  const greenhouse = item.delta > 0 ? "붙잡는 양도 늘립니다" : "붙잡는 양도 줄입니다";
+  return `${mechanism} 지금 이 행성에서는 태양광 반사율(알베도)을 ${reflect} 흡수량을 ${absorb}. 동시에 온실효과 쪽에도 작용해 우주로 나가려는 지표 복사를 ${greenhouse}.`;
 }
 
 // 이상기후 경보(useGameStore.js CLIMATE_EVENTS)의 구름 이벤트 hint도 같은 이유로
@@ -375,7 +404,10 @@ export function labelTone(label) {
 // 예전에는 0.005 하나로 둘 다 재고 있었는데, ΔE 쪽 스케일이 바뀌면 0~1 값(알베도·
 // 온실효과)의 감지 폭까지 같이 흔들리는 구조였다.
 const RATIO_EPSILON = 0.005; // 알베도·온실효과 (0~1 비율)
-const ENERGY_EPSILON = 0.005 * ENERGY_SCALE; // ΔE·OLR·ASR (W/m²)
+// ΔE·OLR·ASR (W/m²) - 물리엔진이 들고 있는 값을 그대로 쓴다(useGameStore의
+// ITEM_EFFECT_EPSILON도 같은 상수라, 설명 문구와 게임 판정이 어긋날 수 없다).
+const ENERGY_EPSILON = ENERGY_CHANGE_EPSILON;
+const TEMPERATURE_EPSILON = 0.01; // 예상 안정 온도(K) - ΔE 스케일과 무관하다
 
 function changeLine(before, after, riseText, fallText, epsilon) {
   if (after > before + epsilon) return riseText;
@@ -428,14 +460,14 @@ function netAlbedoGreenhouseEffectLine(asrDelta, olrDelta) {
 // ReportPage가 타임라인 설명에서 이 문장들을 "알베도 계열"/"온실효과 계열"로
 // 색 구분할 때도 그대로 참조한다(문구를 중복해서 따로 들고 있지 않기 위해 export).
 export const ALBEDO_REASON = {
-  iceThickness: "빙하는 태양빛을 강하게 반사하는 밝은 표면이라, 비율이 바뀌면 알베도도 함께 움직입니다.",
-  cloud: "구름은 태양빛을 반사하는 밝은 표면 역할을 합니다.",
+  iceThickness: "빙하는 밝아서 태양빛을 잘 반사합니다.",
+  cloud: "구름도 태양빛을 반사합니다.",
 };
 
 export const GREENHOUSE_REASON = {
-  cloud: "구름은 지표 복사를 가두는 온실 역할도 동시에 합니다.",
-  co2: "CO₂는 대표적인 온실기체로, 지표 복사를 흡수해 대기 중에 가둡니다.",
-  atmThickness: "대기가 두꺼워질수록 열을 가두는 능력(온실효과)이 커집니다.",
+  cloud: "구름은 지표 복사도 가둡니다.",
+  co2: "CO₂는 지표 복사를 가두는 온실기체입니다.",
+  atmThickness: "대기가 두꺼울수록 열을 더 가둡니다.",
 };
 
 // 알베도/온실효과/OLR/ASR 각각의 변화를 원인->과정 블록으로 만든다. 아이템 사용
@@ -585,8 +617,8 @@ function describeImbalanceChange(before, afterDeltaEnergy, label) {
   if (overshot) {
     return [
       warming
-        ? "🔥 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 과다하니 냉각 아이템이 필요합니다."
-        : "❄️ 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 부족하니 온난화 아이템이 필요합니다.",
+        ? "🔥 에너지가 부족에서 과다로 넘어갔습니다 - 이제는 냉각 아이템이 필요합니다."
+        : "❄️ 에너지가 과다에서 부족으로 넘어갔습니다 - 이제는 온난화 아이템이 필요합니다.",
     ];
   }
 
@@ -594,14 +626,14 @@ function describeImbalanceChange(before, afterDeltaEnergy, label) {
   if (worsened) {
     return [
       warming
-        ? "🔥 오히려 에너지가 더 과다해졌습니다 - 방향이 반대인 아이템을 골랐습니다."
-        : "❄️ 오히려 에너지가 더 부족해졌습니다 - 방향이 반대인 아이템을 골랐습니다.",
+        ? "🔥 에너지 과다가 더 심해졌습니다 - 냉각 계열 아이템이 필요합니다."
+        : "❄️ 에너지 부족이 더 심해졌습니다 - 온난화 계열 아이템이 필요합니다.",
     ];
   }
   return [
     warming
-      ? "🔥 방향은 맞아 에너지 과다가 줄었지만, 아직 남아있어 행성은 계속 더워지는 중입니다 - 냉각 아이템이 더 필요합니다."
-      : "❄️ 방향은 맞아 에너지 부족이 줄었지만, 아직 남아있어 행성은 계속 차가워지는 중입니다 - 온난화 아이템이 더 필요합니다.",
+      ? "🔥 에너지 과다가 줄었지만 아직 남아 있습니다 - 냉각 아이템이 더 필요합니다."
+      : "❄️ 에너지 부족이 줄었지만 아직 남아 있습니다 - 온난화 아이템이 더 필요합니다.",
   ];
 }
 
@@ -774,22 +806,84 @@ function dynamicCloudPreview(item, values, currentTemperature) {
   const deltaEUp = after.deltaEnergy > before.deltaEnergy + ENERGY_EPSILON;
   const deltaEDown = after.deltaEnergy < before.deltaEnergy - ENERGY_EPSILON;
   const deltaEWord = deltaEUp ? "증가" : deltaEDown ? "감소" : "거의 변화 없음";
+  // 예상 안정 온도는 ΔE 단어를 재사용하면 안 된다 - ΔE는 ASR과 OLR의 "차"인데
+  // equilibriumTemperatureOf는 T·(ASR/OLR)^¼ 즉 "비"로 정해진다. 구름은 ASR과 OLR을
+  // 동시에 움직이는 유일한 레버라 두 부호가 갈릴 수 있고(슬라이더 공간 전체의 17%,
+  // |ΔE|<50인 현실적인 구간에서도 약 4%), 그 조합에서는 "ΔE 감소 · 예상 안정 온도
+  // 상승"처럼 방향이 반대가 된다. 단일 통로 아이템(빙하·CO₂·대기두께)은 ASR이나 OLR
+  // 한쪽만 움직여서 차와 비가 항상 같은 방향이라 static case는 그대로 둬도 된다.
+  const teqBefore = equilibriumTemperatureOf(before);
+  const teqAfter = equilibriumTemperatureOf(after);
+  const teqWord =
+    teqAfter > teqBefore + TEMPERATURE_EPSILON
+      ? "증가"
+      : teqAfter < teqBefore - TEMPERATURE_EPSILON
+        ? "감소"
+        : "거의 변화 없음";
+
+  // space_mirror(반사판 설치)는 "궤도 반사경"이라는 기작인데 구현은 구름 슬라이더로
+  // 근사한 것이다(mockItems.js 참고 - SOLAR_CONSTANT가 고정 상수라 태양 유입 총량을
+  // 직접 줄일 수 없다). 근사 사실을 감추고 "구름 증가"만 내보내면 반사판이 온실효과를
+  // 강화한다는 말이 되어, 아이템 설명과 이 모달이 서로 다른 물건을 가리킨다.
+  // 근사를 드러내서 두 설명이 같은 물건을 말하게 한다.
+  const isMirror = item.id === "space_mirror";
 
   return {
     concept: [
       "📖 어떤 물리량을 바꾸나요?",
-      `• 구름 ${cloudWord}`,
+      ...(isMirror
+        ? [
+            `• 궤도 반사경 ${cloudWord} - 이 게임에서는 구름 비율로 근사합니다`,
+            `• 그래서 반사(알베도)뿐 아니라 온실효과에도 구름과 같은 크기로 함께 작용합니다`,
+          ]
+        : [`• 구름 ${cloudWord}`]),
       "• 실제 알베도 변화 방향은 지금 행성의 표면 상태에 따라 달라집니다(아래 변화 과정 참고)",
     ],
     chain: [
-      `구름 ${cloudWord}`,
+      isMirror ? `궤도 반사경 ${cloudWord}(구름 비율로 근사)` : `구름 ${cloudWord}`,
       "↓",
       `알베도 ${albedoWord}`,
       `온실효과 ${cloudWord}`,
       "↓",
       `에너지 불균형(ΔE) ${deltaEWord}`,
       "↓",
-      `예상 안정 온도 ${deltaEWord}`,
+      `예상 안정 온도 ${teqWord}`,
+    ],
+    science: [
+      "💡 지구과학 개념",
+      "구름은 태양빛을 반사하는 밝은 표면(알베도 약 0.5)이자, 지표 복사를 가두는 온실 역할도 동시에 합니다.",
+      "표면이 구름보다 밝은 행성(빙하가 아주 많은 경우 등)에서는 구름이 늘수록 오히려 알베도가 낮아져 더워지는 쪽으로 작용할 수 있습니다.",
+      ...(isMirror
+        ? [
+            "이 게임에서 행성에 들어오는 태양 에너지의 총량(S)은 고정값이라 반사판도 구름 비율을 조절하는 것으로 근사해 두었습니다 - 반사만 하는 실제 궤도 반사경과 달리, 여기서는 온실효과 쪽에도 함께 작용합니다.",
+          ]
+        : []),
+    ],
+  };
+}
+
+// 조성/온도가 아직 없을 때 쓰는 구름 계열 폴백 - 방향을 단정하지 않는다.
+// 예전에는 여기 자리에 "알베도 증가 → ASR 감소 → ΔE 감소" 라고 단정하는 static
+// case가 있었는데, 표면이 구름(0.5)보다 밝으면 그 세 줄이 통째로 반대가 된다.
+function cloudPreviewWithoutPlanet(item) {
+  const cloudWord = item.delta > 0 ? "증가" : "감소";
+  const isMirror = item.id === "space_mirror";
+  return {
+    concept: [
+      "📖 어떤 물리량을 바꾸나요?",
+      isMirror
+        ? `• 궤도 반사경 ${cloudWord} - 이 게임에서는 구름 비율로 근사합니다`
+        : `• 구름 ${cloudWord}`,
+      "• 알베도와 온실효과 양쪽에 동시에 작용합니다",
+      "• 최종 방향은 지금 행성의 표면 상태에 따라 갈립니다 - 행성 상태가 계산되면 여기에 실제 방향이 표시됩니다",
+    ],
+    chain: [
+      isMirror ? `궤도 반사경 ${cloudWord}(구름 비율로 근사)` : `구름 ${cloudWord}`,
+      "↓",
+      "알베도 변화",
+      `온실효과 ${cloudWord}`,
+      "↓",
+      "에너지 불균형(ΔE) 변화",
     ],
     science: [
       "💡 지구과학 개념",
@@ -800,8 +894,13 @@ function dynamicCloudPreview(item, values, currentTemperature) {
 }
 
 export function previewItemEffect(item, values, currentTemperature) {
-  if (item.key === "cloud" && values != null && currentTemperature != null) {
-    return dynamicCloudPreview(item, values, currentTemperature);
+  // 구름 계열(cloud_seeder/cloud_clearer/space_mirror)은 static case를 두지 않는다 -
+  // 알베도 방향이 표면 상태에 따라 뒤집히고 ΔE와 예상 안정 온도 방향도 갈릴 수 있어서,
+  // 고정 문구를 두면 반드시 어느 조성에서는 실제와 반대가 된다.
+  if (item.key === "cloud") {
+    return values != null && currentTemperature != null
+      ? dynamicCloudPreview(item, values, currentTemperature)
+      : cloudPreviewWithoutPlanet(item);
   }
   switch (item.id) {
     case "ice_restorer":
@@ -854,54 +953,6 @@ export function previewItemEffect(item, values, currentTemperature) {
         ],
       };
 
-    case "cloud_seeder":
-      return {
-        concept: [
-          "📖 어떤 물리량을 바꾸나요?",
-          "• 구름량 증가",
-          "• 알베도 증가",
-        ],
-        chain: [
-          "구름 증가",
-          "↓",
-          "알베도 증가",
-          "↓",
-          "흡수 에너지(ASR) 감소",
-          "↓",
-          "에너지 불균형(ΔE) 감소",
-          "↓",
-          "예상 안정 온도 감소",
-        ],
-        science: [
-          "💡 지구과학 개념",
-          "밝은 구름은 태양빛을 우주로 반사하여 지표가 흡수하는 에너지를 줄입니다.",
-        ],
-      };
-
-    case "cloud_clearer":
-      return {
-        concept: [
-          "📖 어떤 물리량을 바꾸나요?",
-          "• 구름량 감소",
-          "• 알베도 감소",
-        ],
-        chain: [
-          "구름 감소",
-          "↓",
-          "알베도 감소",
-          "↓",
-          "흡수 에너지(ASR) 증가",
-          "↓",
-          "에너지 불균형(ΔE) 증가",
-          "↓",
-          "예상 안정 온도 증가",
-        ],
-        science: [
-          "💡 지구과학 개념",
-          "구름이 줄어들면 태양빛이 지표에 더 많이 도달하여 에너지 흡수가 증가합니다.",
-        ],
-      };
-
     case "carbon_capture":
       return {
         concept: [
@@ -949,27 +1000,6 @@ export function previewItemEffect(item, values, currentTemperature) {
         science: [
           "💡 지구과학 개념",
           "온실기체가 많아질수록 지표의 열이 대기 중에 더 오래 머무르게 됩니다.",
-        ],
-      };
-
-    case "space_mirror":
-      return {
-        concept: [
-          "📖 어떤 물리량을 바꾸나요?",
-          "• 반사율(알베도) 증가",
-        ],
-        chain: [
-          "반사율 증가",
-          "↓",
-          "흡수 에너지(ASR) 감소",
-          "↓",
-          "에너지 불균형(ΔE) 감소",
-          "↓",
-          "예상 안정 온도 감소",
-        ],
-        science: [
-          "💡 지구과학 개념",
-          "반사율이 높을수록 태양 에너지가 우주로 되돌아가 지표가 덜 가열됩니다.",
         ],
       };
 

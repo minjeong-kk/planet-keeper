@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
+import { STAGE3_QUESTIONS, STAGE4_QUESTIONS, reviewToText } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
 import useClimateStore, { CLIMATE_VARIABLES } from "./useClimateStore.js";
 import {
@@ -14,7 +14,7 @@ import {
   PLANET_STATES,
   REFERENCE_TEMP_K,
   ENERGY_BALANCE_EPSILON,
-  ENERGY_SCALE,
+  ENERGY_CHANGE_EPSILON,
 } from "../utils/physicsEngine.js";
 import {
   describeItemJudgment,
@@ -66,7 +66,9 @@ const EARTH_LIKE_STABLE_LABEL = "Earth-like Stable";
 const STABLE_LABELS = new Set(["Cold Stable", EARTH_LIKE_STABLE_LABEL, "Warm Stable"]);
 
 // 2단계 문제를 맞혔는데도 아직 지구형 범위 밖(Warm/Cold Stable)일 때 CO2를 이
-// 폭만큼 +-한다(carbon_capture/greenhouse_emitter 아이템과 같은 스케일 ±25).
+// 폭만큼 +-한다. CO2 아이템(carbon_capture/greenhouse_emitter)의 ±6 보다 일부러
+// 크게 잡았다 - MAX_FINAL_ATTEMPTS(3)번 안에 지구형 범위로 들어와야 하므로 아이템
+// 단계보다 큰 걸음이 필요하다(3번째 시도는 아래 co2PpmForTargetTemperature 로 정확히 맞춘다).
 const FINAL_CO2_STEP = 25;
 // 이 조정을 반복해도 끝나지 않을 수 있으므로, 3번째 시도에서는 무한 루프를 막기
 // 위해 co2PpmForTargetTemperature로 정확히 지구형 평형이 되도록 강제 조정한다.
@@ -217,9 +219,11 @@ export const equipmentTotalCount = (equipment) =>
 // 이보다 작은 ΔE 변화는 "효과 없음"으로 본다 - co2/atmThickness가 이미
 // greenhouseStrength 상한(GREENHOUSE_MAX)에 걸린 경우 등, 슬라이더를 움직여도 실제로는
 // 아무 것도 안 바뀌는 경우가 있다(부동소수 오차 여유도 겸한다).
-// ΔE 단위(W/m²)라 SOLAR_CONSTANT 스케일을 따라간다 - 0.01은 S=100 기준으로 잡은 값이다.
-// ItemInfoModal("지금 사용하면" 미리보기)도 같은 기준을 써야 판정이 어긋나지 않는다.
-export const ITEM_EFFECT_EPSILON = 0.01 * ENERGY_SCALE;
+// 값 자체는 물리엔진이 들고 있다 - planetAnalysis의 설명 생성도 같은 상수를 쓰므로
+// ItemInfoModal("지금 사용하면" 미리보기)과 장비 카드 키워드가 어긋날 수 없다.
+// 이 이름은 게임 쪽 호출부(pickVisibleItems/isUsableClimateEvent/ItemInfoModal)가
+// 이미 쓰고 있어서 별칭으로 남겨 둔다.
+export const ITEM_EFFECT_EPSILON = ENERGY_CHANGE_EPSILON;
 
 // 지금 ΔE 방향에 실제로 도움이 되는(clamp에 걸려 무효화되지 않은) 아이템을 후보에
 // 최소 GUARANTEED_WORKING_CHOICES개 고정으로 넣은 뒤 나머지를 무작위로 채운다.
@@ -365,6 +369,14 @@ const useGameStore = create(
   // 행성 생성 시점의 슬라이더 조성 스냅샷 - replayGame이 "같은 행성으로 다시
   // 시작"할 때 이 값으로 되돌린다. nextProblem이 채운다.
   initialValues: null,
+  // 같은 시점의 현재 온도 스냅샷. 조성만 되돌리고 온도를 기준값(288.15K)으로
+  // 되돌리면 "같은 행성"이 아니게 된다 - 지점 프리셋은 그 지점의 실측 기온에서
+  // 출발하기 때문이다(setValuesFromPoint). 남극은 230.4K에서 ΔE +37.4(Energy
+  // Surplus)로 시작하는데 288.15K로 되돌리면 ΔE -102.2(Energy Deficit)가 되어
+  // 시나리오 방향이 통째로 뒤집히고, GamePage의 지점 특이사항 안내
+  // (LOCATION_IMBALANCE_NOTES, "남극은 ... 에너지 과다로 나옵니다")까지
+  // 사실과 달라진다.
+  initialTemperature: null,
   // 리포트 페이지의 "행성 변화 타임라인" - 행성 생성/아이템 사용/최종 확인마다
   // { stage: "초기"|"아이템"|"최종", label, physics, ml } 하나씩 쌓인다.
   timeline: [],
@@ -442,7 +454,17 @@ const useGameStore = create(
     const question = pickRandom(unseen.length > 0 ? unseen : available.length > 0 ? available : pool);
 
     set((state) => ({ seenIds: new Set(state.seenIds).add(question.id) }));
-    return { ...question, isRetry };
+    // 선택지 순서를 출제할 때마다 섞는다 - 같은 문제라도 판마다(재도전이면
+    // 그때마다) 정답이 몇 번에 오는지 달라져서, 번호만 외워 넘기는 걸 막는다.
+    // 정답 판정은 원래부터 문자열 비교(solveProblem)라 순서와 무관하다.
+    //
+    // 섞는 건 choices만이다. bogi(ㄱ/ㄴ/ㄷ, ㉠/㉡/㉢)는 선택지가 그 라벨을 직접
+    // 가리키므로 순서를 바꾸면 문제 자체가 깨진다.
+    //
+    // 섞은 결과를 여기서 currentProblem에 넣어 두는 것이 중요하다 - 렌더링 중에
+    // 섞으면 QuizModal이 다시 그려질 때마다(힌트 열기, 1초 타이머 등) 선택지가
+    // 눈앞에서 뒤바뀐다.
+    return { ...question, choices: shuffled(question.choices), isRetry };
   },
 
   // 지금 ΔE 부호를 보고 악화 방향(온난화/냉각)을 정한 뒤, 그 방향 후보 중 하나를
@@ -558,16 +580,19 @@ const useGameStore = create(
       immediateDeltaEnergy: immediate.deltaEnergy,
       immediateOutgoingRadiation: immediate.outgoingRadiation,
     });
-    set({ physicsResult: physics, climateEvent: resultMessage, pendingClimateEvent: null });
+    // mlResult는 physicsResult와 항상 같은 시점의 값이어야 한다 - 예전에는 평형에
+    // 들어왔을 때만 갱신해서, 플레이어가 과잉 대응해 ΔE 부호가 뒤집히면(슬라이더
+    // 5개를 다 쓸 수 있으므로 한 번의 대응으로 ±30 W/m² 넘게 움직인다) 배지와
+    // 행성 진단이 이전 라벨 그대로 남았다 - "에너지 과다"라고 표시하면서 해결
+    // 방향으로 냉각을 권하는데 실제로는 이미 부족으로 넘어가 있는 상태가 됐다.
+    const ml = classifyPlanetState(physics);
+    set({ physicsResult: physics, mlResult: ml, climateEvent: resultMessage, pendingClimateEvent: null });
 
     // 대응 결과로 에너지가 균형에 들어왔다면 여기서 바로 2단계로 넘긴다 - 예전에는
     // 단계 판정을 applyEquipment에서만 해서, 이상기후로 우연히 평형이 되면 장비를
-    // 한 번 더 쓸 때까지 1단계 문제만 계속 도는 구간이 있었다. mlResult도 같이
-    // 갱신해야 화면 배지가 "불평형"인데 2단계로 넘어가는 모순이 생기지 않는다.
-    const ml = classifyPlanetState(physics);
+    // 한 번 더 쓸 때까지 1단계 문제만 계속 도는 구간이 있었다.
     if (STABLE_LABELS.has(ml.label) && get().currentStage === GAME_STAGES.PROBLEM1) {
       set({
-        mlResult: ml,
         currentStage: GAME_STAGES.FINAL,
         currentProblem: get().pickNextProblem(STAGE4_QUESTIONS),
       });
@@ -607,7 +632,11 @@ const useGameStore = create(
   nextProblem: async () => {
     if (get().currentStage !== GAME_STAGES.CREATOR) return;
 
-    set({ isComputing: true, initialValues: { ...useClimateStore.getState().values } });
+    set({
+      isComputing: true,
+      initialValues: { ...useClimateStore.getState().values },
+      initialTemperature: useClimateStore.getState().currentTemperature,
+    });
     try {
       const { physics, ml } = computeSnapshotResult();
       set({ physicsResult: physics, mlResult: ml });
@@ -725,8 +754,15 @@ const useGameStore = create(
           ? { currentStage: GAME_STAGES.FINAL, currentProblem: get().pickNextProblem(STAGE4_QUESTIONS) }
           : {}),
       });
+      // 호출부(GamePage -> ItemResultModal)가 "온도를 옮기기 전" 값을 알아야 한다 -
+      // 모달의 큰 ΔE 숫자와 OLR 값 칩이 physics(온도 스텝 포함)만 보고 그리면,
+      // 같은 모달의 판정 문구/배지(immediate 기준)와 반대로 말하는 경우가 생긴다.
+      // notice.lines에는 이미 문장으로 들어가 있지만 숫자로는 꺼낼 수 없어서
+      // 여기서 그대로 돌려준다.
+      return { immediateDeltaEnergy, immediateOutgoingRadiation };
     } catch (err) {
       console.error("[useGameStore] 장비 효과 재계산 실패:", err);
+      return null;
     } finally {
       set({ isComputing: false });
     }
@@ -746,7 +782,9 @@ const useGameStore = create(
           title: currentProblem.title,
           selectedAnswer: answer,
           correctAnswer: currentProblem.answer,
-          explanation: currentProblem.explanation,
+          // 화면은 review 블록을 그대로 그린다(QuizReview). 여기 남기는 평문은
+          // 이 기능이 없던 시절 저장본과 모양을 맞추기 위한 대체용이다.
+          explanation: reviewToText(currentProblem.review),
           concepts: currentProblem.concepts,
           isRetry: currentProblem.isRetry ?? false,
           correct,
@@ -836,7 +874,14 @@ const useGameStore = create(
           const co2Ppm = co2PpmForTargetTemperature(climateInputs, physicsResult.absorbedRadiation, REFERENCE_TEMP_K);
           setValue("co2", co2PpmToSlider(co2Ppm));
         } else {
-          const direction = freshMl.label === "Warm Stable" ? -1 : 1;
+          // 방향은 라벨이 아니라 "지금 조성이 결국 도달할 평형온도"로 정한다.
+          // 라벨로 정하면(예전 `label === "Warm Stable" ? -1 : 1`) Energy Surplus가
+          // else 쪽으로 떨어져 CO₂를 올려버린다 - 이미 에너지가 남는 행성을 더
+          // 데우는 반대 방향이다. FINAL 단계에서도 펜딩 이상기후는 만료 처리되므로
+          // (tickSecond는 단계와 무관하게 resolveClimateEvent를 부른다) 여기 라벨이
+          // Warm/Cold Stable이 아닌 경우가 실제로 들어온다.
+          const direction =
+            equilibriumTemperatureOf(physicsResult) > REFERENCE_TEMP_K ? -1 : 1;
           setValue("co2", Math.min(100, Math.max(0, values.co2 + direction * FINAL_CO2_STEP)));
         }
 
@@ -883,6 +928,7 @@ const useGameStore = create(
       equipment: {},
       visibleItems: [],
       initialValues: null,
+      initialTemperature: null,
       timeline: [],
       quizLog: [],
       seenIds: new Set(),
@@ -905,11 +951,14 @@ const useGameStore = create(
   // 처음부터 다시 시작한다. "행성 다시 만들기"(resetClimate + /planet-create)와 달리
   // 슬라이더를 다시 만지지 않아도 된다.
   replayGame: async () => {
-    const { initialValues } = get();
+    const { initialValues, initialTemperature } = get();
     get().resetGame();
     useClimateStore.setState({
       values: initialValues ? { ...initialValues } : useClimateStore.getState().values,
-      currentTemperature: REFERENCE_TEMP_K,
+      // 조성과 같은 시점의 온도로 되돌린다 - 기준 온도로 고정하면 지점 프리셋
+      // 행성이 다른 행성이 된다(initialTemperature 주석 참고). 옛 저장본처럼
+      // 이 값이 없으면 예전 동작대로 기준 온도를 쓴다.
+      currentTemperature: initialTemperature ?? REFERENCE_TEMP_K,
     });
     await get().nextProblem();
   },

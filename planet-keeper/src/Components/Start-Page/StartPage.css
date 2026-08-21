@@ -54,23 +54,75 @@
 
 /* 다크 모드: 배경이 어두워지므로 페이지 위 글자를 밝은 쪽으로 뒤집는다.
    (메뉴/CTA/말풍선은 원래 어두운 패널이라 그대로 둔다) */
-@media (prefers-color-scheme: dark) {
-  .start-page {
-    --on-page: #f4f8ff;
-    --on-page-sub: #cbd8ec;
-    --on-page-accent: #7fe0cf;
+html[data-theme="dark"] .start-page {
+  --on-page: #f4f8ff;
+  --on-page-sub: #cbd8ec;
+  --on-page-accent: #7fe0cf;
 
-    --deco-grid: rgba(94, 234, 212, 0.07);
-    --deco-dust-far: rgba(214, 236, 255, 0.5);
-    --deco-dust-near: rgba(160, 226, 255, 0.55);
-    --deco-orbit-outer: rgba(94, 234, 212, 0.13);
-    --deco-orbit-mid: rgba(94, 234, 212, 0.16);
-    --deco-orbit-inner: rgba(94, 234, 212, 0.12);
+  --deco-grid: rgba(94, 234, 212, 0.07);
+  --deco-dust-far: rgba(214, 236, 255, 0.5);
+  --deco-dust-near: rgba(160, 226, 255, 0.55);
+  --deco-orbit-outer: rgba(94, 234, 212, 0.13);
+  --deco-orbit-mid: rgba(94, 234, 212, 0.16);
+  --deco-orbit-inner: rgba(94, 234, 212, 0.12);
 
-    background:
-      radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 178, 0.16) 0%, transparent 60%),
-      radial-gradient(70% 50% at 50% 100%, rgba(45, 212, 191, 0.06) 0%, transparent 60%),
-      linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+  background:
+    radial-gradient(90% 60% at 50% 0%, rgba(13, 148, 178, 0.16) 0%, transparent 60%),
+    radial-gradient(70% 50% at 50% 100%, rgba(45, 212, 191, 0.06) 0%, transparent 60%),
+    linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+}
+
+/* ══ 우측 아래 테마 스위치 ═══════════════════════════════════════
+   관제 콘솔 톤(홀로그램 엣지 + 모노 라벨)을 그대로 쓴다. 배경 장식(z-index:-1)
+   위에 얹히도록 z-index 만 주고, 팝업(포탈)보다는 아래에 있으면 된다. */
+.start-page__theme {
+  position: absolute;
+  right: 28px;
+  bottom: 24px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 15px;
+  border: 1px solid var(--glass-border);
+  border-radius: 999px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
+  color: var(--ink);
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.start-page__theme:hover {
+  transform: translateY(-2px);
+  border-color: rgba(45, 212, 191, 0.45);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28), 0 0 18px rgba(45, 212, 191, 0.16);
+}
+
+.start-page__theme-icon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--neon);
+}
+
+.start-page__theme-text {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+/* 좁은 화면에서는 라벨을 접고 아이콘만 남긴다 */
+@media (max-width: 1024px) {
+  .start-page__theme {
+    right: 16px;
+    bottom: 16px;
+    padding: 9px;
+  }
+
+  .start-page__theme-text {
+    display: none;
   }
 }
 
@@ -621,10 +673,13 @@
   min-width: 0;
 }
 
+/* 단계 제목은 굵기만으로는 본문과 잘 안 갈라졌다(둘 다 흰 계열) - 패널의 강조색
+   (--holo, 왼쪽 단계 번호와 같은 색)으로 올려서 목록을 훑을 때 제목만 먼저
+   눈에 들어오게 한다. --holo는 라이트/다크 양쪽에 있는 토큰이다. */
 .start-page__flow-title {
   font-size: 0.96rem;
   line-height: 1.5;
-  color: var(--pad-ink-strong);
+  color: var(--holo);
 }
 
 .start-page__flow-text {
@@ -791,7 +846,11 @@
   min-height: 300px;
 }
 
+/* 좌측 표제 칸은 고정이고 이 본문 칸만 스크롤한다. ConceptBook이 개념을 넘길
+   때 key로 이 칸을 새로 마운트하므로, 넘길 때마다 스크롤이 맨 위(핵심 개념)에서
+   다시 시작한다 - 스크롤 위치를 따로 되감는 코드가 필요 없다. */
 .start-page__pane--body {
+  gap: 14px;
   max-height: 52svh;
   overflow-y: auto;
   padding-right: 6px;
@@ -859,11 +918,344 @@
   word-break: break-word;
 }
 
-.start-page__pane-body {
+/* ── 본문 정보 카드(codex-*) ────────────────────────────────────
+   우측 본문의 sections 블록을 그리는 스타일.
+
+   색은 전부 index.css의 라이트/다크 양쪽에 존재하는 토큰으로만 쓴다 - --pad-*
+   별칭, --holo, 그리고 --warm/--info/--gold 3종(각각 -bg/-border 포함). 여기서
+   rgba를 직접 적으면 다크에서만 맞고 라이트에서 안 보이거나 대비가 깨진다.
+   --violet 은 다크에 --violet-bg 가 없어서 color-mix로 옅게 만든다(ReportPage가
+   쓰는 것과 같은 방식 - 각 테마의 --violet 값을 그대로 따라간다).
+
+   카드는 한 겹까지만 만든다 - 카드 안에 카드를 또 두면 얇은 테두리가 겹쳐
+   무엇이 묶음인지 오히려 안 보인다. 그래서 흐름도·공식·수치는 카드 "안의
+   내용"이고 자기 테두리를 두르지 않는다(배경만 --pad-inset). */
+.codex-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--pad-line);
+  border-radius: 12px;
+  /* 이 패드는 body의 text-align: center 를 물려받는다. 표제(좌측 칸)는 가운데가
+     맞지만 본문은 여러 줄이라, 카드 안에서만 왼쪽으로 맞춰 줄 시작점을 하나로
+     모은다 - 위에서 아래로 읽을 때 눈이 매 줄 가운데를 다시 찾지 않아도 된다. */
+  text-align: left;
+}
+
+.codex-card__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
-  font-size: 0.96rem;
-  line-height: 1.95;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--holo);
+  word-break: keep-all;
+}
+
+.codex-card__icon {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.codex-card__text {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.8;
+  color: var(--pad-ink-strong);
+  word-break: keep-all;
+}
+
+/* 흐름도·공식·수치를 보조하는 원문 문장 - 본문보다 한 단 낮춰서, 카드의 시각
+   요소를 먼저 보고 필요하면 설명을 읽는 순서가 되게 한다. */
+.codex-card__caption {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--pad-line);
+}
+
+.codex-card__caption p {
+  margin: 0;
+  font-size: 0.85rem;
+  line-height: 1.78;
+  color: var(--pad-ink-dim);
+  word-break: keep-all;
+}
+
+/* note 카드 톤 - key(핵심) / game(게임 적용) / warn(임계점) */
+.codex-card--note.is-key {
+  border-color: var(--pad-border);
+  border-left: 2px solid var(--holo);
+  background: color-mix(in srgb, var(--holo) 8%, transparent);
+}
+
+.codex-card--note.is-key .codex-card__text {
+  font-weight: 600;
+}
+
+.codex-card--note.is-game {
+  border-color: color-mix(in srgb, var(--violet) 32%, transparent);
+  border-left: 2px solid var(--violet);
+  background: color-mix(in srgb, var(--violet) 8%, transparent);
+}
+
+.codex-card--note.is-game .codex-card__head {
+  color: var(--violet);
+}
+
+.codex-card--note.is-warn {
+  border-color: var(--gold-border);
+  border-left: 2px solid var(--gold);
+  background: var(--gold-bg);
+}
+
+.codex-card--note.is-warn .codex-card__head {
+  color: var(--gold);
+}
+
+/* ── 흐름도 ─────────────────────────────────────────────────── */
+.codex-flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.codex-flow__step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 12px;
+  border: 1px solid var(--pad-line);
+  border-radius: 9px;
+  background: var(--pad-inset);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--pad-ink-strong);
+  word-break: keep-all;
+}
+
+/* 단계 사이의 ↓ 는 요소 사이 여백에 겹쳐 그린다 - 화살표용 빈 <li>를 끼우면
+   목록의 의미(단계 수)가 화살표까지 세어 버린다. */
+.codex-flow__step:not(.is-last) {
+  margin-bottom: 20px;
+}
+
+.codex-flow__step:not(.is-last)::after {
+  content: "↓";
+  position: absolute;
+  top: 100%;
+  left: 22px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 0.8rem;
+  color: var(--holo);
+  opacity: 0.7;
+}
+
+.codex-flow__icon {
+  flex-shrink: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+/* 계에서 빠져나가는 에너지(loss)와 붙잡히거나 들어오는 에너지(gain)를 색으로만
+   구분한다 - 문장을 읽지 않고도 흐름의 성격이 보이게 한다. */
+.codex-flow__step--loss {
+  color: var(--pad-ink-dim);
+}
+
+.codex-flow__step--gain {
+  border-color: var(--pad-border);
+  box-shadow: inset 2px 0 0 var(--holo);
+}
+
+.codex-flow__loop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--pad-border);
+  border-radius: 9px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--holo);
+  word-break: keep-all;
+}
+
+/* ── 공식 박스 ──────────────────────────────────────────────── */
+.codex-formula {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border-left: 2px solid var(--holo);
+  background: var(--pad-inset);
+  overflow-x: auto;
+}
+
+.codex-formula__line {
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--holo);
+}
+
+/* ── 조건 → 결과 규칙 ───────────────────────────────────────── */
+.codex-rules {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.codex-rules__row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--pad-line);
+  border-radius: 9px;
+  background: var(--pad-inset);
+  font-size: 0.88rem;
+  color: var(--pad-ink-strong);
+  word-break: keep-all;
+}
+
+.codex-rules__cond {
+  flex-shrink: 0;
+  min-width: 68px;
+  font-family: var(--mono);
+  font-size: 0.84rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 상승은 --warm, 하강은 --info - GamePage가 고온/저온에 쓰는 것과 같은 색이라
+   도감에서 배운 색이 게임 화면에서 그대로 이어진다. */
+.codex-rules__row--up {
+  border-color: var(--warm-border);
+}
+
+.codex-rules__row--up .codex-rules__cond {
+  color: var(--warm);
+}
+
+.codex-rules__row--down {
+  border-color: var(--info-border);
+}
+
+.codex-rules__row--down .codex-rules__cond {
+  color: var(--info);
+}
+
+/* ── 수치 막대(표면별 반사율) ───────────────────────────────── */
+.codex-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.codex-bars__row {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 10px;
+}
+
+.codex-bars__label {
+  font-size: 0.85rem;
   color: var(--pad-ink);
+  white-space: nowrap;
+}
+
+.codex-bars__track {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--pad-inset);
+  overflow: hidden;
+}
+
+.codex-bars__fill {
+  display: block;
+  height: 100%;
+  /* 바다 0.08 처럼 아주 작은 값도 보이도록 최소 폭을 준다 */
+  min-width: 3px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--holo) 45%, transparent),
+    var(--holo)
+  );
+}
+
+.codex-bars__value {
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--holo);
+}
+
+/* ── 수치 카드(기준값 · 실제 지점) ──────────────────────────── */
+/* 2열 고정 - 지금 쓰는 수치 묶음은 모두 4개라 2×2로 딱 맞는다. auto-fit으로
+   두면 셀의 min-content(라벨 길이)에 따라 3+1처럼 한 칸이 남는 줄이 생긴다. */
+.codex-stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.codex-stats__cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px 11px;
+  border: 1px solid var(--pad-line);
+  border-radius: 9px;
+  background: var(--pad-inset);
+}
+
+.codex-stats__label {
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  color: var(--pad-ink-dim);
+  word-break: keep-all;
+}
+
+.codex-stats__value {
+  font-family: var(--mono);
+  font-size: 0.94rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--holo);
+}
+
+.codex-stats__note {
+  font-size: 0.68rem;
+  color: var(--pad-ink-dim);
+  opacity: 0.85;
   word-break: keep-all;
 }
 

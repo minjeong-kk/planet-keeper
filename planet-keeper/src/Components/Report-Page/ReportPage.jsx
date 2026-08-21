@@ -12,6 +12,9 @@ import {
 } from "../../utils/planetAnalysis.js";
 import { causeFamilyOf, renderHighlightedParts } from "../../utils/explanationHighlight.jsx";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
+import Term from "../common/Term.jsx";
+import QuizReview from "../common/QuizReview.jsx";
+import { reviewOf } from "../../data/quizBank.js";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
 
@@ -140,7 +143,8 @@ function ReportPage() {
   const final = timeline[timeline.length - 1] ?? null;
   const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
 
-  // "핵심 개념 정리"에서 9개 전부가 아니라 이번 판에 실제로 나타난 개념만 고른다.
+  // "핵심 개념 정리"에서 용어집 전체가 아니라 이번 판에 실제로 나타난 개념만
+  // 고른다(개수를 여기 적어두면 climateConcepts.js가 늘 때마다 주석이 낡는다).
   const quizConceptKeys = useMemo(() => {
     const keys = new Set();
     quizLog.forEach((q) => {
@@ -330,7 +334,9 @@ function ReportPage() {
         
         <div className="report-page__summary-metrics">
           <div className="report-page__metric-box">
-            <span className="report-page__metric-label">최종 행성 상태</span>
+            <span className="report-page__metric-label">
+              <Term concept={CLIMATE_CONCEPTS.planetStateClasses}>최종 행성 상태</Term>
+            </span>
             <span className="report-page__metric-value">
               {final ? KOREAN_BY_STATE[finalRuleState] : "-"}
             </span>
@@ -551,11 +557,13 @@ function ReportPage() {
               </div>
             </div>
 
-            {selectedGroup.explanation && (
+            {(reviewOf(selectedGroup.key) || selectedGroup.explanation) && (
               <div className="report-page__modal-section">
                 <h4 className="report-page__modal-subtitle">💡 해설</h4>
                 <div className="report-page__modal-explanation">
-                  <p>{selectedGroup.explanation}</p>
+                  {/* 게임 화면의 해설 카드와 같은 컴포넌트를 쓴다 - 한 곳만 고쳐도
+                      두 화면의 해설이 함께 바뀐다. quizGroups의 key는 문제 id다. */}
+                  <QuizReview review={reviewOf(selectedGroup.key)} fallbackText={selectedGroup.explanation} />
                 </div>
               </div>
             )}

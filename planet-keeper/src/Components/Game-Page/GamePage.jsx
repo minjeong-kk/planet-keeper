@@ -29,19 +29,38 @@ import {
   COLD_STABLE_MAX_K,
   EARTH_LIKE_MAX_K,
 } from "../../utils/physicsEngine.js";
-import { formatSigned, itemDeltaEnergyChange, climateEventHintFor } from "../../utils/planetAnalysis.js";
+import { formatSigned, itemDeltaEnergyChange, climateEventHintFor, imbalanceSeverityOf } from "../../utils/planetAnalysis.js";
 import "./GamePage.css";
 
 // 행성 위에 잠깐 뜨는 정답/오답 플래시가 유지되는 시간(ms).
 const FEEDBACK_FLASH_MS = 1600;
-// 문제를 푼 직후 임무 패널 자리에 뜨는 해설 카드가 유지되는 시간(ms).
-// REPORT로 넘어갈 때도 이 시간만큼은 마지막 해설을 보여준 뒤 페이지를 이동한다.
-const RESULT_DISPLAY_MS = 3600;
+// 해설 카드를 닫은 뒤 리포트로 넘어가기까지의 짧은 여유(ms). 예전에는 해설 카드
+// 자체가 이 시간이 지나면 사라졌는데, 읽는 속도가 사람마다 달라서 다 읽기 전에
+// 화면이 넘어가 버렸다. 지금은 카드가 "계속"을 누를 때까지 떠 있고, 이 상수는
+// 누른 뒤 화면이 툭 끊기지 않게 하는 한 박자에만 쓴다.
+const REPORT_LEAVE_MS = 600;
 
-// 이상기후 경고 슬라이더의 조절 폭(±). 행성 만들기 때와 같은 0~100 풀
-// 레인지를 그대로 쓰면 몇 초 안에 미세하게 조정하기엔 한 번 드래그로 너무
-// 크게 움직인다 - 경고가 뜬 시점 값(startValues) 기준 좁은 구간만 허용한다.
-const CLIMATE_ALERT_SLIDER_RANGE = 15;
+// 이상기후 경고 슬라이더의 조절 폭(±). 행성 만들기 때와 같은 0~100 풀 레인지를
+// 그대로 쓰면 몇 초 안에 미세하게 조정하기엔 한 번 드래그로 너무 크게 움직인다 -
+// 경고가 뜬 시점 값(startValues) 기준 좁은 구간만 허용한다.
+//
+// 슬라이더마다 폭을 다르게 준다. 예전에는 전부 ±15 였는데, 그러면 이상기후에
+// 대응하다가 우연히 평형에 들어가 2단계로 새는 일이 잦았다(조성 81개 중 31%가
+// 응답 한 번으로 평형 도달 가능 - 그만큼 1단계에서 아이템을 쓸 일이 사라졌다).
+// 특히 CO₂ 는 g 가 log₂ 응답이라 ±15 면 OLR 을 30 W/m² 넘게 흔들어(평형 기준
+// ±14.8 의 두 배) 다른 슬라이더와 비교가 안 될 만큼 강했다.
+//
+// 아래 폭으로는 응답 한 번에 평형까지 가는 조성이 12% 로 줄어든다. 아이템 델타는
+// 건드리지 않았다 - 줄여 봐도 평형까지 필요한 평균 사용 횟수는 4.1 → 4.8 회로
+// 거의 안 늘고 최장 경로만 10 → 12 회로 늘어져 1단계가 지루해진다.
+const CLIMATE_ALERT_SLIDER_RANGE = {
+  co2: 5,
+  atmThickness: 8,
+  cloud: 8,
+  iceThickness: 10,
+  ocean: 10,
+};
+const alertSliderRange = (key) => CLIMATE_ALERT_SLIDER_RANGE[key] ?? 8;
 
 // 코드는 그대로 두고 실행만 끈다 - 다시 끌 땐 이 플래그만 false로.
 const CLIMATE_TICK_ENABLED = true;
@@ -77,7 +96,7 @@ const STAGE_META = {
 // 지점 선택(PlanetLocationPicker)으로 시작했을 때, 그 지점의 첫 판정이 직관과
 // 반대로 보일 수 있는 경우를 설명한다 - 이 엔진은 지점마다 실측 온도/알베도는
 // 반영하지만 위도별 실제 일사량 차이나 대기·해류의 열 수송은 반영하지 않고 모든
-// 지점에 같은 태양상수를 쓴다(PlanetLocationPicker의 picker__flag-note와 같은
+// 지점에 같은 유입 단파복사 S를 쓴다(PlanetLocationPicker의 picker__flag-note와 같은
 // 이유). 그래서 실제로는 추운 남극이 "에너지 과다"로, 실제로는 더운 사하라/
 // 태평양/아마존이 "에너지 부족"으로 나온다 - 계산이 틀린 게 아니라 이 세 지점
 // 모두 실제로는 대기·해류가 계속 열을 옮겨줘야 그 온도가 유지된다는 뜻이다.
@@ -90,7 +109,7 @@ const LOCATION_IMBALANCE_EXPECTED = {
 };
 const LOCATION_IMBALANCE_NOTES = {
   antarctica:
-    "남극은 실측 온도가 230K로 매우 낮은데도 \"에너지 과다\"로 나옵니다 - 이 엔진은 모든 지점에 같은 태양상수를 적용해서, 실제로는 대기·해류가 계속 열을 밖으로 옮겨야 유지되는 이 낮은 온도를 그 유출 없이 계산하면 오히려 에너지가 남는 것처럼 보입니다.",
+    "남극은 실측 온도가 230K로 매우 낮은데도 \"에너지 과다\"로 나옵니다 - 이 엔진은 모든 지점에 같은 유입 단파복사를 적용해서, 실제로는 대기·해류가 계속 열을 밖으로 옮겨야 유지되는 이 낮은 온도를 그 유출 없이 계산하면 오히려 에너지가 남는 것처럼 보입니다.",
   sahara:
     "사하라는 실측 온도가 300K로 높은데도 \"에너지 부족\"으로 나옵니다 - 위도에 따라 실제로 크게 다른 일사량 차이를 이 엔진은 반영하지 않아서, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 이 온도를 그 유입 없이 계산하면 오히려 에너지가 부족한 것처럼 보입니다.",
   pacific:
@@ -286,12 +305,12 @@ function GamePage() {
   useEffect(() => {
     if (!CLIMATE_TICK_ENABLED) return undefined;
     if (currentStage === GAME_STAGES.REPORT || currentStage === GAME_STAGES.CREATOR) return undefined;
-    // 온보딩·장비 사용 결과를 읽는 동안에는 게임을 멈춘다 - 설명을 읽는 사이
-    // 경과 시간이 쌓이거나 이상기후가 터지면 읽을 수가 없다.
-    if (tutorialOpen || useEffectCard || stageClearOpen) return undefined;
+    // 온보딩·장비 사용 결과·정답 해설을 읽는 동안에는 게임을 멈춘다 - 설명을
+    // 읽는 사이 경과 시간이 쌓이거나 이상기후가 터지면 읽을 수가 없다.
+    if (tutorialOpen || useEffectCard || stageClearOpen || result) return undefined;
     const timer = setInterval(tickSecond, 1000);
     return () => clearInterval(timer);
-  }, [currentStage, tickSecond, tutorialOpen, useEffectCard, stageClearOpen]);
+  }, [currentStage, tickSecond, tutorialOpen, useEffectCard, stageClearOpen, result]);
 
   // 온보딩이 예약된 판에서 실제로 플레이 가능한 화면이 준비되면(문제/장비 단계 + 물리
   // 결과가 채워짐) 한 번만 자동으로 연다.
@@ -328,7 +347,9 @@ function GamePage() {
     setFeedback(correct ? "correct" : "wrong");
     setResult({
       correct,
-      explanation: answered.explanation,
+      // 해설 본문은 QuizResult가 id로 review를 찾아 그린다 - 블록 배열을 여기서
+      // 복사해 넘기면 같은 데이터가 두 군데 살아 있게 된다.
+      id: answered.id,
       concepts: answered.concepts,
       reward: correct ? rewardText : null,
     });
@@ -348,26 +369,32 @@ function GamePage() {
   const handleUseEquipment = async (item) => {
     const before = useGameStore.getState().physicsResult;
     setResult(null);
-    await applyEquipment(item);
+    // applyEquipment는 "온도를 옮기기 전"(조성 변화만 반영한) ΔE/OLR을 돌려준다 -
+    // 판정 문구가 그 값으로 만들어지므로, 모달의 숫자도 같은 값을 써야 문장과
+    // 반대로 말하지 않는다(ItemResultModal 주석 참고).
+    const step = await applyEquipment(item);
     const state = useGameStore.getState();
     const after = state.physicsResult;
     if (before && after && after !== before) {
-      setUseEffect({ item, before, after, lines: state.notice?.lines ?? [], ok: !!state.notice?.ok });
+      setUseEffect({
+        item,
+        before,
+        after,
+        lines: state.notice?.lines ?? [],
+        ok: !!state.notice?.ok,
+        immediateDeltaEnergy: step?.immediateDeltaEnergy,
+        immediateOutgoingRadiation: step?.immediateOutgoingRadiation,
+      });
     }
   };
 
-  // 피드백 플래시 / 해설 카드는 각자 정해진 시간 뒤 자동으로 사라진다.
+  // 행성 위에 뜨는 정답/오답 플래시만 시간이 지나면 사라진다 - 해설 카드는
+  // 플레이어가 "계속"을 누를 때까지 남는다(아래 QuizResult의 onClose).
   useEffect(() => {
     if (!feedback) return undefined;
     const timer = setTimeout(() => setFeedback(null), FEEDBACK_FLASH_MS);
     return () => clearTimeout(timer);
   }, [feedback]);
-
-  useEffect(() => {
-    if (!result) return undefined;
-    const timer = setTimeout(() => setResult(null), RESULT_DISPLAY_MS);
-    return () => clearTimeout(timer);
-  }, [result]);
 
   // 아이템 사용/최종 확인 판정(notice)과 이상기후 결과(climateEvent)는 하단
   // "최근 활동" 로그에 시간 순으로 쌓아 둔다 - 화면 어딘가에 항상 펼쳐져 있지
@@ -389,7 +416,9 @@ function GamePage() {
   }, [climateEvent]);
 
   // 오답 3회 누적 또는 최종 문제 정답으로 REPORT 단계가 되면 리포트 페이지로 이동한다.
-  // 마지막 해설 카드를 읽을 시간을 준 뒤 이동한다.
+  // 마지막 해설 카드가 떠 있으면 플레이어가 "계속"을 누를 때까지 기다린다 - 게임이
+  // 끝나는 그 문제의 해설이 가장 중요한데, 예전에는 정해진 시간이 지나면 읽는 중에
+  // 리포트로 넘어가 버렸다.
   //
   // replace로 이동한다 - push로 쌓으면 리포트에서 뒤로 가기를 눌렀을 때 /game으로
   // 돌아오는데, currentStage는 여전히 REPORT라 이 effect가 다시 돌아 몇 초 뒤 또
@@ -398,9 +427,10 @@ function GamePage() {
   // 히스토리에서 리포트로 갈아끼운다.
   useEffect(() => {
     if (currentStage !== GAME_STAGES.REPORT) return undefined;
-    const timer = setTimeout(() => navigate("/report", { replace: true }), RESULT_DISPLAY_MS);
+    if (result) return undefined;
+    const timer = setTimeout(() => navigate("/report", { replace: true }), REPORT_LEAVE_MS);
     return () => clearTimeout(timer);
-  }, [currentStage, navigate]);
+  }, [currentStage, result, navigate]);
 
   // 보유 장비 총 수량 - 하단 안내 문구에서 "지금 쓸 게 있는지"를 알려주는 데 쓴다.
   const heldEquipmentCount = useMemo(() => equipmentTotalCount(equipment), [equipment]);
@@ -419,6 +449,15 @@ function GamePage() {
     ? Math.min(100, Math.max(0, 50 + (physicsResult.deltaEnergy / (ENERGY_BALANCE_EPSILON * 4)) * 50))
     : 50;
   const isBalanced = physicsResult ? Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON : false;
+  // ΔE가 평형 허용범위의 몇 배인지로 나눈 위험 단계(ok/warn/alert/severe). 부족·과다
+  // 구분은 물리엔진의 energyStateOf를 그대로 쓴다 - 여기서 다시 판정하지 않는다.
+  const severity = physicsResult ? imbalanceSeverityOf(physicsResult.deltaEnergy) : null;
+  const imbalanceTier = severity?.tier ?? "ok";
+  // 예상 안정 온도와 현재 온도의 차이 - 지금 온도가 앞으로 어디로 갈지를 한 줄로.
+  const equilibriumGap =
+    equilibriumTemperature != null && physicsResult
+      ? equilibriumTemperature - physicsResult.currentTemperature
+      : null;
   // 브리핑 단계(expiresAt === null)에는 카운트다운이 아직 흐르지 않는다.
   const isBriefing = !!pendingClimateEvent && pendingClimateEvent.expiresAt == null;
   const remainingSeconds =
@@ -435,12 +474,16 @@ function GamePage() {
     [pendingClimateEvent, climateInputs, currentTemperature],
   );
   const startDeltaEnergy = physicsResult?.deltaEnergy ?? 0;
+  // "변화 없음"으로 볼 폭은 게임 판정과 같은 기준(ENERGY_BALANCE_EPSILON의 1/10)을
+  // 쓴다 - 예전에는 생 0.5 W/m²였는데, ΔE는 SOLAR_CONSTANT 스케일을 따라가므로
+  // 재수집으로 S가 바뀌면 이 표시만 다른 감도로 조용히 어긋난다.
+  const LIVE_TREND_EPSILON = ENERGY_BALANCE_EPSILON / 10;
   const liveTrend =
     livePhysics == null
       ? null
-      : Math.abs(livePhysics.deltaEnergy) < Math.abs(startDeltaEnergy) - 0.5
+      : Math.abs(livePhysics.deltaEnergy) < Math.abs(startDeltaEnergy) - LIVE_TREND_EPSILON
         ? "good"
-        : Math.abs(livePhysics.deltaEnergy) > Math.abs(startDeltaEnergy) + 0.5
+        : Math.abs(livePhysics.deltaEnergy) > Math.abs(startDeltaEnergy) + LIVE_TREND_EPSILON
           ? "bad"
           : "same";
 
@@ -571,8 +614,12 @@ function GamePage() {
               <PlanetUI {...visual} />
             </div>
             {badge && (
-              <span className={`hud__planet-badge hud__planet-badge--${badge.tone}`}>
-                <span aria-hidden="true">{badge.icon}</span>
+              <span
+                className={`hud__planet-badge hud__planet-badge--${badge.tone} hud__planet-badge--tier-${imbalanceTier}`}
+              >
+                <span className="hud__planet-badge-icon" aria-hidden="true">
+                  {badge.icon}
+                </span>
                 {badge.text}
               </span>
             )}
@@ -621,12 +668,18 @@ function GamePage() {
           ) : (
             /* 1단계: 목표가 "에너지 평형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
                온도 안정 구간은 아직 보여주지 않는다. */
-            <div className="hud__balance">
+            <div className={`hud__balance hud__balance--${imbalanceTier}`}>
+              {/* 상태 이름(에너지 과다/부족)은 행성 옆 배지가 맡는다 - 여기서 또
+                  말하면 같은 화면에 배지가 두 개가 된다. 여기는 값과 정도만. */}
               <span className="hud__balance-label">에너지 불균형</span>
               <p className={`hud__balance-value${isBalanced ? " hud__balance-value--ok" : ""}`}>
                 {physicsResult ? formatSigned(physicsResult.deltaEnergy) : "--"}
                 <span className="hud__balance-unit">W/m²</span>
               </p>
+              {/* 심한 불균형에서만 한 줄. 주의 단계에서는 색만으로 알린다. */}
+              {(imbalanceTier === "alert" || imbalanceTier === "severe") && (
+                <p className="hud__balance-note">평형 상태에서 크게 벗어났습니다.</p>
+              )}
               <div className="hud__balance-track">
                 <span className="hud__balance-zero" />
                 {physicsResult && (
@@ -652,10 +705,18 @@ function GamePage() {
               <span className="hud__substat-value">
                 {equilibriumTemperature != null ? `${equilibriumTemperature.toFixed(1)} K` : "--"}
               </span>
+              {/* 지금 온도가 그 방향으로 얼마나 남았는지 - 두 값을 빼기만 한다. */}
+              {equilibriumGap != null && (
+                <span className="hud__substat-gap">현재보다 {formatSigned(equilibriumGap)} K</span>
+              )}
             </div>
             <div className="hud__substat">
               <span className="hud__substat-label">에너지 불균형</span>
-              <span className={`hud__substat-value${isBalanced ? " hud__substat-value--ok" : ""}`}>
+              <span
+                className={`hud__substat-value hud__substat-value--tier-${imbalanceTier}${
+                  isBalanced ? " hud__substat-value--ok" : ""
+                }`}
+              >
                 {physicsResult ? `${formatSigned(physicsResult.deltaEnergy)} W/m²` : "--"}
               </span>
             </div>
@@ -679,7 +740,11 @@ function GamePage() {
 
           {/* 임무 패널 - 문제를 푼 직후에는 같은 자리가 해설 카드로 바뀐다. */}
           {result ? (
-            <QuizResult result={result} onClose={() => setResult(null)} />
+            <QuizResult
+              result={result}
+              onClose={() => setResult(null)}
+              continueLabel={currentStage === GAME_STAGES.REPORT ? "결과 보기" : "계속"}
+            />
           ) : (
             <>
               {isQuizStage && currentProblem && (
@@ -851,8 +916,9 @@ function GamePage() {
                 <div className="climate-event__sliders">
                   {CLIMATE_VARIABLES.map(({ key, label }) => {
                     const startValue = pendingClimateEvent.startValues[key];
-                    const min = Math.max(0, startValue - CLIMATE_ALERT_SLIDER_RANGE);
-                    const max = Math.min(100, startValue + CLIMATE_ALERT_SLIDER_RANGE);
+                    const range = alertSliderRange(key);
+                    const min = Math.max(0, startValue - range);
+                    const max = Math.min(100, startValue + range);
                     // 경보가 지목한 변수에만 방향 표시를 붙인다(정확한 목표값은 알려주지 않는다).
                     const isTarget = key === pendingClimateEvent.key;
                     return (
@@ -905,6 +971,8 @@ function GamePage() {
           after={useEffectCard.after}
           lines={useEffectCard.lines}
           ok={useEffectCard.ok}
+          immediateDeltaEnergy={useEffectCard.immediateDeltaEnergy}
+          immediateOutgoingRadiation={useEffectCard.immediateOutgoingRadiation}
           onClose={() => setUseEffect(null)}
         />
       )}

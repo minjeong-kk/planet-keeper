@@ -8,15 +8,20 @@ import { CREATE_TOUR_STEPS } from "../common/tourSteps.js";
 import useClimateStore, { CLIMATE_VARIABLES } from "../../store/useClimateStore";
 import useGameStore, { isGameInProgress } from "../../store/useGameStore";
 import { slidersToVisual, co2Ppm } from "../../utils/climateVisual.js";
+import { mapSlidersToClimateInputs } from "../../utils/physicsEngine.js";
 import "./PlanetCreatePage.css";
 
 // label은 CLIMATE_VARIABLES(store)가 원본 - GamePage/ReportPage와 항상 같은 문구를 쓴다.
 // 여기 순서(바다 먼저)만 표시 순서로 별도 유지.
+// 대기 두께는 슬라이더 %를 그대로 보여주면 안 된다 - mapSlidersToClimateInputs가
+// 0~100을 0.4~2.0으로 옮기므로 "지구 = 100%"가 아니라 "지구 = 37%"다. 그런데
+// 도감·문제·용어집은 전부 "대기 두께 1 = 지구 기준"으로 가르쳐서, %만 보여주면
+// 학생이 지구를 재현하려고 100%까지 밀어 올린다. 그래서 물리 단위(×배)로 적는다.
 const VARIABLE_ICONS = [
   { key: "ocean", Icon: Waves, unit: "%" },
   { key: "iceThickness", Icon: Snowflake, unit: "%" },
   { key: "cloud", Icon: Cloud, unit: "%" },
-  { key: "atmThickness", Icon: Wind, unit: "%" },
+  { key: "atmThickness", Icon: Wind, unit: "×" },
   { key: "co2", Icon: Factory, unit: "ppm" },
 ];
 const LABEL_BY_KEY = Object.fromEntries(CLIMATE_VARIABLES.map((v) => [v.key, v.label]));
@@ -54,7 +59,7 @@ const SLIDER_GUIDE = {
   iceThickness: "🧊 빙하와 바다는 합쳐서 100%를 넘을 수 없어요.",
   ocean: "🌊 바다와 빙하는 합쳐서 100%를 넘을 수 없어요.",
   cloud: "☁️ 구름은 햇빛을 반사해 식히고, 열도 가둬 데웁니다.",
-  atmThickness: "💨 대기가 두꺼울수록 열을 더 오래 가둡니다.",
+  atmThickness: "💨 대기가 두꺼울수록 열을 더 오래 가둡니다. 1.0배가 지구입니다.",
   co2: "🏭 CO₂가 늘수록 온실효과가 강해집니다.",
 };
 
@@ -64,7 +69,7 @@ const SLIDER_GUIDE_FULL = {
   iceThickness: "빙하와 바다는 합쳐서 100%를 넘을 수 없어요. 빙하를 늘리면 바다의 최대치가 줄어듭니다.",
   ocean: "바다와 빙하는 합쳐서 100%를 넘을 수 없어요. 바다를 늘리면 빙하의 최대치가 줄어듭니다.",
   cloud: "구름은 태양빛을 반사해 식히면서도 열을 가둬 데웁니다. 알베도와 온실효과 모두에 영향을 줘요.",
-  atmThickness: "대기가 두꺼울수록 열을 더 오래 가둬 온실효과가 강해집니다.",
+  atmThickness: "대기가 두꺼울수록 열을 더 오래 가둬 온실효과가 강해집니다. 1.0배가 현재 지구의 대기 두께이고, 슬라이더는 0.4배에서 2.0배까지 움직입니다.",
   co2: "CO₂가 늘수록 온실효과가 강해지지만, 늘어날수록 증가폭은 점점 줄어들어요.",
 };
 
@@ -203,9 +208,15 @@ function PlanetCreatePage() {
   // 어디서든 다시 계산되는 순수 함수이므로, 쓰는 쪽(GamePage/ReportPage)에서
   // useMemo로 파생시킨다.
 
-  // 대시보드 수치 표시(단위 포함). CO₂ 는 실제 ppm 으로 환산해 보여준다.
-  const displayValue = (v) =>
-    v.key === "co2" ? `${co2Ppm(values.co2)}` : `${values[v.key]}`;
+  // 대시보드 수치 표시(단위 포함). CO₂ 는 실제 ppm, 대기 두께는 지구 배율(×)로
+  // 환산해 보여준다 - 둘 다 슬라이더 0~100과 스케일이 달라서, 그대로 적으면
+  // 화면 숫자와 학습 자료의 숫자가 다른 뜻이 된다(VARIABLE_ICONS 주석 참고).
+  // 환산은 물리엔진의 mapSlidersToClimateInputs 하나만 쓴다.
+  const displayValue = (v) => {
+    if (v.key === "co2") return `${co2Ppm(values.co2)}`;
+    if (v.key === "atmThickness") return mapSlidersToClimateInputs(values).atmThickness.toFixed(2);
+    return `${values[v.key]}`;
+  };
 
   // replace로 건다 - push로 쌓으면 게임 도중 뒤로 가기로 이 페이지에 돌아올 수
   // 있고, 거기서 슬라이더를 만지면 행성과 게임 기록이 어긋난 채로 다시 /game에

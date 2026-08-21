@@ -185,10 +185,15 @@ const GREENHOUSE_MAX = 0.85
 // 온실효과의 각 항. co2PpmForTargetTemperature(역함수)도 같은 식을 써야 하므로
 // 계수를 양쪽에 적지 않고 여기 한 번만 둔다 - 예전에는 복제돼 있어서, 상수를
 // 한쪽만 고쳤을 때 2단계 강제 안정화가 조용히 빗나갔다.
+//
+// 두 계수는 학습 화면(문제 힌트/도감)도 식으로 인용한다 - referenceValues.js가
+// 여기서 가져다 문구에 끼우므로, 계수를 고치면 설명도 함께 따라간다.
+export const CO2_LOG_COEFFICIENT = 0.25 // g 의 CO₂ 항: 농도 2배마다 이만큼
+export const CLOUD_GREENHOUSE_COEFFICIENT = 0.1 // g 의 구름 항: 구름 비율 × 이 값
 const co2GreenhouseTerm = (co2Ppm) =>
-  0.25 * Math.log2(Math.max(co2Ppm, 1) / CO2_BASELINE_PPM)
+  CO2_LOG_COEFFICIENT * Math.log2(Math.max(co2Ppm, 1) / CO2_BASELINE_PPM)
 const atmGreenhouseTerm = (atmThickness) => 0.35 * (atmThickness - 1) // 1 = 지구 기준
-const cloudGreenhouseTerm = (cloudRatio) => 0.1 * cloudRatio
+const cloudGreenhouseTerm = (cloudRatio) => CLOUD_GREENHOUSE_COEFFICIENT * cloudRatio
 
 /**
  * 온실효과 강도(0~GREENHOUSE_MAX). 값이 클수록 지표 복사를 더 많이 되잡아 온난화된다.
@@ -313,6 +318,12 @@ export function mapSlidersToClimateInputs(sliders = {}) {
 // BASELINE_STATE(288.15K에서 deltaEnergy≈0이 되도록 보정한 조성)의 알베도를 그대로 쓴다.
 export const BASELINE_ALBEDO = albedoOf(BASELINE_STATE)
 export const BASELINE_ATM_THICKNESS = BASELINE_STATE.atmThickness // 1 (지구 기준)
+// 기준 조성의 온실효과 강도(지구 기준 g). 학습 화면이 이 숫자를 인용한다.
+export const BASELINE_GREENHOUSE = greenhouseStrengthOf(BASELINE_STATE)
+// 기준 조성 자체 - referenceValues.js가 "빙하 10% · 바다 70% · 구름 30%" 같은
+// 문구와 "여기서 구름만 60%로 올리면 알베도가 얼마"를 여기서 계산한다.
+// 숫자를 문구에 손으로 적으면 조성을 고쳤을 때 그 문구만 조용히 낡는다.
+export const BASELINE_COMPOSITION = { ...BASELINE_STATE }
 
 // equilibriumTemperatureOf는 이 파일 아래(온도 동역학 섹션)에 정의돼 있다 -
 // 병합 전 이쪽 브랜치가 만든 버전은 clamp/가드가 없어서, 그걸 포함하는
@@ -337,7 +348,7 @@ export function co2PpmForTargetTemperature({ atmThickness, cloudRatio }, absorbe
     GREENHOUSE_BASE -
     atmGreenhouseTerm(atmThickness) -
     cloudGreenhouseTerm(cloudRatio)
-  const co2Ppm = CO2_BASELINE_PPM * Math.pow(2, co2Term / 0.25)
+  const co2Ppm = CO2_BASELINE_PPM * Math.pow(2, co2Term / CO2_LOG_COEFFICIENT)
   return clamp(co2Ppm, CO2_BASELINE_PPM * 0.3, CO2_BASELINE_PPM * 3.0)
 }
 
@@ -365,6 +376,18 @@ export function atmThicknessToSlider(atmThickness) {
 // 5.0은 S=100 스케일에서 "평형온도로부터 약 4.6 K 이내"에 해당하는 값이었고,
 // ENERGY_SCALE을 곱해 지금 스케일에서도 같은 온도 폭을 유지한다.
 export const ENERGY_BALANCE_EPSILON = 5.0 * ENERGY_SCALE
+
+// ΔE·OLR·ASR의 변화가 이보다 작으면 "효과 없음"으로 본다. 슬라이더를 움직여도
+// clamp(0/100, GREENHOUSE_MAX)에 걸려 실제로는 아무 것도 안 바뀌는 경우를 걸러내고,
+// 부동소수 오차 여유도 겸한다.
+//
+// 예전에는 이 값이 두 군데로 갈려 있었다(useGameStore 0.01×scale / planetAnalysis
+// 0.005×scale). 그 사이 구간에서는 장비 카드의 효과 키워드는 "· 냉각"인데 정보
+// 모달은 "거의 변하지 않을"이라고 말할 수 있어서, 같은 판정을 두 화면이 다르게
+// 표시했다. 아이템 후보 선정·미리보기·설명 생성이 전부 이 하나만 쓴다.
+//
+// ΔE 단위(W/m²)라 SOLAR_CONSTANT 스케일을 따라간다(0.01은 계획서 기준 S=100에서 잡은 값).
+export const ENERGY_CHANGE_EPSILON = 0.01 * ENERGY_SCALE
 
 export function energyStateOf(deltaEnergy) {
   if (deltaEnergy > ENERGY_BALANCE_EPSILON) return "Energy Surplus"

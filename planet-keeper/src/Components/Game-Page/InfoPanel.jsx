@@ -23,7 +23,11 @@ function InfoPanel({ physicsResult, co2Ppm }) {
           value: `${physicsResult.deltaEnergy >= 0 ? "+" : ""}${physicsResult.deltaEnergy.toFixed(1)} W/m²`,
           ok: Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON,
         },
-        { icon: "☁", label: "대기 조성", value: `CO₂ ${Math.round(co2Ppm)} ppm` },
+        {
+          icon: "☁",
+          label: <Term concept={CLIMATE_CONCEPTS.earthBaseline}>대기 조성</Term>,
+          value: `CO₂ ${Math.round(co2Ppm)} ppm`,
+        },
         {
           icon: "◐",
           label: <Term concept={CLIMATE_CONCEPTS.albedo}>알베도</Term>,

@@ -61,22 +61,20 @@
     linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  .hud {
-    --event-bg-a: rgba(48, 16, 20, 0.96);
-    --event-bg-b: rgba(10, 8, 16, 0.97);
-    --event-sub: #fecaca;
-    --event-hint-text: #fde68a;
+html[data-theme="dark"] .hud {
+  --event-bg-a: rgba(48, 16, 20, 0.96);
+  --event-bg-b: rgba(10, 8, 16, 0.97);
+  --event-sub: #fecaca;
+  --event-hint-text: #fde68a;
 
-    background:
-      radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 178, 0.15) 0%, transparent 55%),
-      radial-gradient(80% 60% at 50% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
-      linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
-  }
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 178, 0.15) 0%, transparent 55%),
+    radial-gradient(80% 60% at 50% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+    linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+}
 
-  .hud__starfield {
-    display: block;
-  }
+html[data-theme="dark"] .hud__starfield {
+  display: block;
 }
 
 /* 미세한 별 - 우주 배경 연출이라 다크 모드에서만 보인다(라이트 모드의 흰
@@ -788,6 +786,90 @@
   color: var(--cold);
 }
 
+/* ── 행성 옆 상태 배지의 위기 효과 ──────────────────────────────────
+   단계는 imbalanceSeverityOf(|ΔE| / 평형 허용범위)가 정한다. 평형(ok)에서는
+   아무 것도 움직이지 않는다 - 지구형/고온/저온 안정 배지가 그대로다.
+
+   색은 배지가 이미 가진 tone 색(currentColor)을 따라간다 - 에너지 부족은 차가운
+   계열, 과다는 따뜻한 계열이 유지되고 화면이 붉어지지 않는다.
+   속도로 심각도를 나타낸다: 주의 3.2초 · 경고 2.2초 · 심각 1.6초 */
+/* 배지 밖으로 한 겹 퍼져 나가는 고리 - 레이더 핑처럼 한 박자씩 알린다.
+   ::after 라서 배지 크기나 글자 위치를 건드리지 않는다. */
+.hud__planet-badge--tier-warn::after,
+.hud__planet-badge--tier-alert::after,
+.hud__planet-badge--tier-severe::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 1px solid currentColor;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud__planet-badge--tier-warn {
+  animation: hud-badge-breathe 3.2s ease-in-out infinite;
+}
+
+.hud__planet-badge--tier-warn::after {
+  animation: hud-badge-ping 3.2s ease-out infinite;
+}
+
+.hud__planet-badge--tier-alert {
+  animation: hud-badge-breathe 2.2s ease-in-out infinite;
+}
+
+.hud__planet-badge--tier-alert::after {
+  animation: hud-badge-ping 2.2s ease-out infinite;
+}
+
+.hud__planet-badge--tier-severe {
+  animation: hud-badge-breathe-strong 1.6s ease-in-out infinite;
+}
+
+.hud__planet-badge--tier-severe::after {
+  animation: hud-badge-ping-strong 1.6s ease-out infinite;
+}
+
+/* 심각 단계에서만 아이콘이 아주 조금 커진다(inline-block + transform이라 글자가
+   밀리지 않는다). */
+.hud__planet-badge-icon {
+  display: inline-block;
+}
+
+.hud__planet-badge--tier-severe .hud__planet-badge-icon {
+  animation: hud-badge-icon 1.6s ease-in-out infinite;
+}
+
+@keyframes hud-badge-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+  50% { box-shadow: 0 0 14px 1px color-mix(in srgb, currentColor 32%, transparent); }
+}
+
+@keyframes hud-badge-breathe-strong {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+  50% {
+    box-shadow:
+      0 0 22px 3px color-mix(in srgb, currentColor 50%, transparent),
+      inset 0 0 12px color-mix(in srgb, currentColor 20%, transparent);
+  }
+}
+
+@keyframes hud-badge-ping {
+  0% { transform: scale(1); opacity: 0.5; }
+  70%, 100% { transform: scale(1.28); opacity: 0; }
+}
+
+@keyframes hud-badge-ping-strong {
+  0% { transform: scale(1); opacity: 0.75; }
+  70%, 100% { transform: scale(1.45); opacity: 0; }
+}
+
+@keyframes hud-badge-icon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
 /* 정답/오답은 행성 위에 한 번만 떠올랐다 사라진다 */
 .hud__flash {
   position: absolute;
@@ -827,6 +909,8 @@
 }
 
 .hud__readout-value {
+  position: relative;
+  display: inline-block;
   margin: 0;
   font-family: var(--mono);
   font-size: 4rem;
@@ -838,11 +922,17 @@
   text-shadow: 0 0 30px rgba(45, 212, 191, 0.45);
 }
 
+/* 단위는 숫자 오른쪽에 매달아 둔다 - 흐름에서 빠지므로 숫자의 가운데가
+   단위 글자 폭에 밀리지 않는다(아래 에너지 불균형도 같은 방식). */
 .hud__readout-unit {
+  position: absolute;
+  left: 100%;
+  bottom: 0.12em;
   margin-left: 8px;
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--cyan);
+  white-space: nowrap;
 }
 
 /* 온도 게이지 */
@@ -950,6 +1040,29 @@
   white-space: nowrap;
 }
 
+/* 보조 지표의 ΔE도 같은 단계 색을 쓴다 - 2단계(온도 게이지) 화면에서는 위쪽 큰
+   ΔE 표시가 없으므로 여기가 유일한 신호다. */
+.hud__substat-value--tier-warn {
+  color: var(--gold);
+}
+
+.hud__substat-value--tier-alert {
+  color: var(--warn);
+}
+
+.hud__substat-value--tier-severe {
+  color: var(--danger);
+}
+
+/* 예상 안정 온도 옆에 붙는 "현재보다 ±X K" - 보조 정보라 한 단 작게 */
+.hud__substat-gap {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .hud__substat-value--ok {
   color: var(--ok);
 }
@@ -999,6 +1112,40 @@
   line-height: 1.5;
   color: var(--ink-strong);
   word-break: keep-all;
+}
+
+/* <보기> 상자 - problem.bogi가 있는 문제만. 항목 텍스트가 "ㄱ." "㉠"으로
+   시작하므로 별도 번호를 붙이지 않고, 줄이 넘칠 때 라벨 아래로 들여쓰기가
+   맞도록 padding-left + text-indent(음수)로 걸어둔다. */
+.mission__bogi {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--inset);
+  padding: 11px 13px;
+}
+
+.mission__bogi-title {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--faint);
+}
+
+.mission__bogi-item {
+  margin: 0;
+  padding-left: 1.35em;
+  text-indent: -1.35em;
+  font-size: 0.87rem;
+  line-height: 1.6;
+  color: var(--ink);
+  word-break: keep-all;
+}
+
+.mission__bogi-item + .mission__bogi-item {
+  margin-top: 5px;
 }
 
 .mission__choices {
@@ -1170,11 +1317,50 @@
   box-shadow: none;
 }
 
-.mission__explanation {
+/* 오답일 때 해설 자리에 대신 뜨는 안내 + 자세한 힌트. 재도전으로 다시 나오므로
+   정답은 알려주지 않고, 필요한 수치만 풀어 준다. */
+.mission__retry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* 안쪽 해설은 QuizReview가 그린다(QuizReview.css). 그래서 이 자리에는 카드 테두리를
+   두지 않는다 - 블록마다 이미 자기 테두리가 있어서, 카드 안에 카드가 겹쳐 보이고
+   정답 해설(래퍼 없이 블록만 쌓는다)과 층이 달라진다. 제목 + 블록 스택이라는
+   구조를 정답 쪽과 똑같이 맞추고, 색만 --cyan으로 갈라 둔다. */
+.mission__retry-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mission__retry-hint-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+
+/* retryReview가 없는 옛 기록은 QuizReview가 fallbackText 문단 하나로 그린다 -
+   그때도 읽히게 테두리 없는 본문 스타일을 남겨 둔다. */
+.mission__retry-hint p {
   margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.65;
+  font-size: 0.9rem;
+  line-height: 1.72;
   color: var(--ink);
+  word-break: keep-all;
+}
+
+.mission__retry-note {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--inset);
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--dim);
   word-break: keep-all;
 }
 
@@ -1699,7 +1885,14 @@
 /* 움직임을 줄이도록 설정한 사용자에게는 은은한 반복 애니메이션을 끈다. */
 @media (prefers-reduced-motion: reduce) {
   .hud__planet-glow,
-  .hud__alert-vignette {
+  .hud__alert-vignette,
+  .hud__planet-badge--tier-warn,
+  .hud__planet-badge--tier-alert,
+  .hud__planet-badge--tier-severe,
+  .hud__planet-badge--tier-warn::after,
+  .hud__planet-badge--tier-alert::after,
+  .hud__planet-badge--tier-severe::after,
+  .hud__planet-badge--tier-severe .hud__planet-badge-icon {
     animation: none;
   }
   .hud__gauge-marker,
@@ -1954,6 +2147,39 @@
   box-shadow: 0 26px 64px rgba(0, 0, 0, 0.62), 0 0 40px rgba(52, 211, 153, 0.14);
 }
 
+/* 헤더 배지 - ΔE가 좋아졌는지 나빠졌는지를 3~5초 안에 알 수 있게. 문구는
+   판정 문장에서 읽어온 것이라 본문과 반대로 말할 수 없다. */
+.item-result__badge {
+  margin-left: auto;
+  align-self: flex-start;
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line-strong);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.item-result__badge--good {
+  border-color: rgba(94, 234, 212, 0.45);
+  background: color-mix(in srgb, var(--holo) 12%, transparent);
+  color: var(--holo);
+}
+
+.item-result__badge--bad {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.item-result__badge--over {
+  border-color: var(--warm-border);
+  background: var(--warm-bg);
+  color: var(--warm);
+}
+
 .item-result__head {
   display: flex;
   align-items: center;
@@ -1996,6 +2222,17 @@
   background: var(--panel-inset);
 }
 
+/* 값 카드 라벨 옆 단서 - ΔE의 정의, "현재 온도"가 예상 안정 온도가 아니라는 것.
+   포탈 모달이라 전역 토큰만 쓴다(.hud 별칭은 여기까지 닿지 않는다). */
+.item-result__number-note {
+  font-size: 0.66rem;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--panel-ink-dim);
+  opacity: 0.85;
+  white-space: nowrap;
+}
+
 .item-result__number span {
   font-size: 0.76rem;
   color: var(--panel-ink-dim);
@@ -2021,6 +2258,177 @@
   line-height: 1.55;
   color: var(--panel-ink-dim);
   word-break: keep-all;
+}
+
+/* ── 사용 결과 4단계(변화 → 왜? → 결과 → 현재 상태/다음 목표) ──────────
+   문구는 전부 describeItemJudgment가 만든 것을 그대로 쓰고, 여기서는 읽는 순서가
+   보이게 크기와 색만 갈라 놓는다.
+
+   색은 index.css의 전역 토큰(--panel-* / --holo / --neon / --violet)만 쓴다 - 이
+   모달은 createPortal(document.body)로 그려져 .hud 밖에 있어서, .hud에만 선언된
+   별칭(--line/--inset/--ink-strong/--dim/--cyan)은 여기서 해석되지 않는다. 그러면
+   border-color가 currentColor로, background가 투명으로 떨어져 카드가 상자로
+   안 보인다(아래 item-info-modal 주석과 같은 이유). */
+.item-result__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 15px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: var(--panel-inset);
+}
+
+.item-result__stage-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--holo);
+}
+
+.item-result__stage-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+/* ① 변화 - 움직인 슬라이더를 명사형 + 화살표로 크게 */
+.item-result__slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.item-result__slider-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--panel-ink-strong);
+}
+
+.item-result__slider-arrow {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--holo);
+  line-height: 1;
+}
+
+/* ② 왜? - 과정 한 줄 + 그 순간의 실제 수치를 오른쪽에 붙인다 */
+.item-result__why {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 7px 10px;
+  border-left: 2px solid var(--panel-line-strong);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+.item-result__why--albedo {
+  border-left-color: var(--neon);
+}
+
+.item-result__why--greenhouse {
+  border-left-color: var(--violet);
+}
+
+.item-result__why-text {
+  min-width: 0;
+}
+
+.item-result__why-value {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--holo);
+}
+
+/* 부연 설명("왜 그런지")은 한 단 물러난다 */
+.item-result__reason {
+  margin: 0;
+  padding-left: 12px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--panel-ink-dim);
+  word-break: keep-all;
+}
+
+/* ③ 결과 - 큰 숫자 아래 붙는 판정 문장 */
+.item-result__result-note {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--panel-ink-dim);
+  word-break: keep-all;
+}
+
+/* ④ 현재 상태 / 다음 목표 - 두 칸으로 갈라서 "지금"과 "다음"을 구분 */
+.item-result__verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-result__verdict-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.item-result__verdict-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: 12px;
+  background: var(--panel-inset);
+}
+
+.item-result__verdict-card--next {
+  border-color: rgba(94, 234, 212, 0.28);
+  background: color-mix(in srgb, var(--holo) 8%, transparent);
+}
+
+.item-result__verdict-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--panel-ink-dim);
+}
+
+.item-result__verdict-card--next .item-result__verdict-label {
+  color: var(--holo);
+}
+
+.item-result__verdict-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+/* 다음 목표가 없는 경우(성공 문구 한 조각뿐일 때)는 한 칸을 다 쓴다 */
+.item-result__verdict-row:has(.item-result__verdict-card:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .item-result__verdict-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* 인과 사슬 - 블록 사이의 "↓"만 화살표로 그린다 */
@@ -2140,6 +2548,8 @@
 }
 
 .hud__balance-value {
+  position: relative;
+  display: inline-block;
   margin: 0;
   font-family: var(--mono);
   font-size: 1.9rem;
@@ -2153,11 +2563,47 @@
   color: var(--ok);
 }
 
+/* ── 에너지 불균형 위험 단계 ────────────────────────────────────────
+   단계는 imbalanceSeverityOf(|ΔE| / 평형 허용범위)가 정한다. 평형(ok)에서는
+   아무 것도 덧붙이지 않고, 벗어난 만큼만 노랑 → 주황 → 빨강으로 올린다.
+   색을 입히는 범위는 이 지표 영역뿐이다 - 화면 전체를 붉게 만들지 않는다. */
+.hud__balance--warn .hud__balance-value,
+.hud__balance--warn .hud__balance-label {
+  color: var(--gold);
+}
+
+.hud__balance--alert .hud__balance-value,
+.hud__balance--alert .hud__balance-label {
+  color: var(--warn);
+}
+
+.hud__balance--severe .hud__balance-value,
+.hud__balance--severe .hud__balance-label {
+  color: var(--danger);
+}
+
+.hud__balance-note {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
+.hud__balance--severe .hud__balance-note {
+  color: var(--danger);
+  opacity: 0.85;
+}
+
 .hud__balance-unit {
+  position: absolute;
+  left: 100%;
+  bottom: 0.1em;
   margin-left: 6px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--faint);
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--dim);
+  white-space: nowrap;
 }
 
 .hud__balance-track {

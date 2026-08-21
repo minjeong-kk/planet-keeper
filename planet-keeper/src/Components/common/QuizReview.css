@@ -1,0 +1,307 @@
+/* 정답 해설(QuizReview) 스타일 - 게임 화면과 리포트 모달이 같이 쓴다.
+
+   색은 index.css의 라이트/다크 양쪽에 존재하는 전역 토큰만 쓴다(--panel-* / --holo /
+   --violet / --gold). 이 파일이 두 페이지(.hud, .report-page)에 함께 얹히므로
+   페이지별 별칭(--ink, --line 같은 것)을 쓰면 한쪽에서 값이 없어 무너진다. */
+.qreview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-align: left;
+}
+
+/* ── 핵심 결론 ─────────────────────────────────────────────────
+   해설 전체를 읽지 않아도 무엇을 배웠는지 알 수 있게 맨 위에 한 문장만. */
+.qreview__verdict {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--panel-border);
+  border-left: 2px solid var(--holo);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--holo) 9%, transparent);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.65;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+.qreview__verdict-mark {
+  flex-shrink: 0;
+  color: var(--holo);
+  font-weight: 700;
+}
+
+/* ── 오답 해설의 첫 줄 ─────────────────────────────────────────
+   verdict와 같은 자리·같은 크기다(오답 해설도 정답 해설만큼 읽히게 하는 것이
+   목적이므로). 색만 --gold로 갈라서, 이것이 결론이 아니라 근거임을 훑기만 해도
+   알 수 있게 한다. */
+.qreview__fact {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--panel-border);
+  border-left: 2px solid var(--gold);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gold) 9%, transparent);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.65;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+.qreview__fact-mark {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
+/* ── 블록 공통 ─────────────────────────────────────────────── */
+.qreview__block {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.qreview__heading {
+  margin: 0;
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: var(--holo);
+  word-break: keep-all;
+}
+
+.qreview__text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.72;
+  color: var(--panel-ink);
+  word-break: keep-all;
+}
+
+/* 참고·게임 적용은 본문에서 한 단 물러나게 한다 - 읽는 순서에서 나중이다 */
+.qreview__block--note,
+.qreview__block--game,
+.qreview__block--misread {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-line);
+}
+
+/* ── 사실과 어긋나는 서술(오답 해설의 마지막) ───────────────── */
+.qreview__block--misread {
+  border-color: color-mix(in srgb, var(--gold) 30%, transparent);
+  background: color-mix(in srgb, var(--gold) 7%, transparent);
+}
+
+.qreview__block--misread .qreview__heading {
+  color: var(--gold);
+}
+
+.qreview__misread {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qreview__misread-item {
+  position: relative;
+  padding-left: 18px;
+  font-size: 0.9rem;
+  line-height: 1.62;
+  color: var(--panel-ink);
+  word-break: keep-all;
+}
+
+/* 불릿 대신 취소 표시 - "이건 사실과 다르다"는 뜻이 형태로 보인다. */
+.qreview__misread-item::before {
+  content: "✕";
+  position: absolute;
+  left: 0;
+  color: var(--gold);
+  font-weight: 700;
+}
+
+.qreview__block--game {
+  border-color: color-mix(in srgb, var(--violet) 32%, transparent);
+  background: color-mix(in srgb, var(--violet) 8%, transparent);
+}
+
+.qreview__block--game .qreview__heading {
+  color: var(--violet);
+}
+
+.qreview__block--note {
+  background: var(--panel-inset);
+}
+
+.qreview__block--note .qreview__heading {
+  color: var(--panel-ink-dim);
+}
+
+.qreview__block--note .qreview__text {
+  color: var(--panel-ink-dim);
+  font-size: 0.87rem;
+}
+
+/* ── 원인 → 결과 흐름 ───────────────────────────────────────
+   단계 사이의 ↓ 는 여백에 겹쳐 그린다 - 화살표용 빈 <li>를 끼우면 목록의
+   의미(단계 수)가 화살표까지 세어 버린다. */
+.qreview__flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.qreview__step {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: var(--panel-inset);
+  font-size: 0.89rem;
+  line-height: 1.5;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+.qreview__step:not(.is-last) {
+  margin-bottom: 18px;
+}
+
+.qreview__step:not(.is-last)::after {
+  content: "↓";
+  position: absolute;
+  top: 100%;
+  left: 20px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  font-size: 0.78rem;
+  color: var(--holo);
+  opacity: 0.7;
+}
+
+.qreview__step-icon {
+  flex-shrink: 0;
+  font-size: 0.92rem;
+  line-height: 1;
+}
+
+/* 계에서 빠져나가는 에너지(loss)와 들어오거나 붙잡히는 에너지(gain)를 색으로 구분 */
+.qreview__step--gain {
+  border-color: var(--panel-border);
+  box-shadow: inset 2px 0 0 var(--holo);
+}
+
+.qreview__step--loss {
+  color: var(--panel-ink-dim);
+}
+
+/* ── 비교(두 개념 / 두 상황 / 수치) ────────────────────────── */
+.qreview__compare {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+}
+
+.qreview__compare-row {
+  display: grid;
+  grid-template-columns: minmax(88px, auto) minmax(0, 1fr);
+  gap: 10px;
+  align-items: baseline;
+  padding: 8px 11px;
+  border: 1px solid var(--panel-line);
+  border-radius: 9px;
+  background: var(--panel-inset);
+}
+
+.qreview__compare-label {
+  margin: 0;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--holo);
+  word-break: keep-all;
+}
+
+.qreview__compare-text {
+  margin: 0;
+  font-size: 0.89rem;
+  line-height: 1.65;
+  color: var(--panel-ink);
+  word-break: keep-all;
+}
+
+/* ── 공식 + 변수 설명 ──────────────────────────────────────── */
+.qreview__formula {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border-left: 2px solid var(--holo);
+  background: var(--panel-inset);
+  overflow-x: auto;
+}
+
+.qreview__formula code {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  line-height: 1.7;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--holo);
+}
+
+.qreview__vars {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin: 0;
+}
+
+.qreview__var-row {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 9px;
+  align-items: baseline;
+}
+
+.qreview__var-sym {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--holo);
+}
+
+.qreview__var-text {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.65;
+  color: var(--panel-ink-dim);
+  word-break: keep-all;
+}
+
+/* 좁은 화면에서는 라벨을 위로 올려 본문 폭을 확보한다 */
+@media (max-width: 1024px) {
+  .qreview__compare-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 3px;
+  }
+}

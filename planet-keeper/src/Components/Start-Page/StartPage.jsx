@@ -1,13 +1,16 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Moon, Sun } from "lucide-react";
 import MascotGuide from "./MascotGuide";
 import InfoSection from "./InfoSection";
 import useGameStore from "../../store/useGameStore";
 import useClimateStore from "../../store/useClimateStore";
+import useTheme from "../common/useTheme.js";
 import "./StartPage.css";
 
 function StartPage() {
   const navigate = useNavigate();
+  // 테마는 기본적으로 OS 설정을 따르고, 아래 버튼으로 한 번 고르면 그 선택이 남는다.
+  const { theme, toggle } = useTheme();
   // 게임 단계(Step) 전환: resetGame() 이 currentStage 를 GAME_STAGES.CREATOR 로
   // 되돌리면서 이전 플레이의 문제/아이템/목숨/판정 결과까지 함께 초기화한다
   // (리포트에서 시작 화면으로 돌아온 경우에도 깨끗한 상태로 진입).
@@ -71,8 +74,23 @@ function StartPage() {
         </button>
       </div>
 
-      {/* 우측: 기상이 + 말풍선 */}
+      {/* 좌측: 기상이 + 말풍선 */}
       <MascotGuide />
+
+      {/* 우측 아래 테마 스위치 - 지금 테마의 반대 아이콘을 보여준다(누르면 그렇게
+          바뀐다는 뜻). 관제 콘솔 톤을 그대로 쓰고 배경 장식 위에 얹는다. */}
+      <button
+        type="button"
+        className="start-page__theme"
+        onClick={toggle}
+        aria-label={theme === "dark" ? "라이트 모드로 바꾸기" : "다크 모드로 바꾸기"}
+        title={theme === "dark" ? "라이트 모드" : "다크 모드"}
+      >
+        <span className="start-page__theme-icon" aria-hidden="true">
+          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+        </span>
+        <span className="start-page__theme-text">{theme === "dark" ? "LIGHT" : "DARK"}</span>
+      </button>
     </div>
   );
 }
