@@ -29,7 +29,7 @@ import {
   COLD_STABLE_MAX_K,
   EARTH_LIKE_MAX_K,
 } from "../../utils/physicsEngine.js";
-import { formatSigned, itemDeltaEnergyChange, climateEventHintFor } from "../../utils/planetAnalysis.js";
+import { formatSigned, itemDeltaEnergyChange, climateEventHintFor, imbalanceSeverityOf } from "../../utils/planetAnalysis.js";
 import "./GamePage.css";
 
 // 행성 위에 잠깐 뜨는 정답/오답 플래시가 유지되는 시간(ms).
@@ -421,6 +421,15 @@ function GamePage() {
     ? Math.min(100, Math.max(0, 50 + (physicsResult.deltaEnergy / (ENERGY_BALANCE_EPSILON * 4)) * 50))
     : 50;
   const isBalanced = physicsResult ? Math.abs(physicsResult.deltaEnergy) <= ENERGY_BALANCE_EPSILON : false;
+  // ΔE가 평형 허용범위의 몇 배인지로 나눈 위험 단계(ok/warn/alert/severe). 부족·과다
+  // 구분은 물리엔진의 energyStateOf를 그대로 쓴다 - 여기서 다시 판정하지 않는다.
+  const severity = physicsResult ? imbalanceSeverityOf(physicsResult.deltaEnergy) : null;
+  const imbalanceTier = severity?.tier ?? "ok";
+  // 예상 안정 온도와 현재 온도의 차이 - 지금 온도가 앞으로 어디로 갈지를 한 줄로.
+  const equilibriumGap =
+    equilibriumTemperature != null && physicsResult
+      ? equilibriumTemperature - physicsResult.currentTemperature
+      : null;
   // 브리핑 단계(expiresAt === null)에는 카운트다운이 아직 흐르지 않는다.
   const isBriefing = !!pendingClimateEvent && pendingClimateEvent.expiresAt == null;
   const remainingSeconds =
@@ -623,12 +632,25 @@ function GamePage() {
           ) : (
             /* 1단계: 목표가 "에너지 평형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
                온도 안정 구간은 아직 보여주지 않는다. */
-            <div className="hud__balance">
-              <span className="hud__balance-label">에너지 불균형</span>
+            <div className={`hud__balance hud__balance--${imbalanceTier}`}>
+              <span className="hud__balance-label">
+                {severity && severity.tier !== "ok" ? (
+                  <>
+                    <span aria-hidden="true">⚠️ </span>
+                    {severity.label}
+                  </>
+                ) : (
+                  "에너지 불균형"
+                )}
+              </span>
               <p className={`hud__balance-value${isBalanced ? " hud__balance-value--ok" : ""}`}>
                 {physicsResult ? formatSigned(physicsResult.deltaEnergy) : "--"}
                 <span className="hud__balance-unit">W/m²</span>
               </p>
+              {/* 심한 불균형에서만 한 줄. 주의 단계에서는 색만으로 알린다. */}
+              {(imbalanceTier === "alert" || imbalanceTier === "severe") && (
+                <p className="hud__balance-note">평형 상태에서 크게 벗어났습니다.</p>
+              )}
               <div className="hud__balance-track">
                 <span className="hud__balance-zero" />
                 {physicsResult && (
@@ -654,10 +676,18 @@ function GamePage() {
               <span className="hud__substat-value">
                 {equilibriumTemperature != null ? `${equilibriumTemperature.toFixed(1)} K` : "--"}
               </span>
+              {/* 지금 온도가 그 방향으로 얼마나 남았는지 - 두 값을 빼기만 한다. */}
+              {equilibriumGap != null && (
+                <span className="hud__substat-gap">현재보다 {formatSigned(equilibriumGap)} K</span>
+              )}
             </div>
             <div className="hud__substat">
               <span className="hud__substat-label">에너지 불균형</span>
-              <span className={`hud__substat-value${isBalanced ? " hud__substat-value--ok" : ""}`}>
+              <span
+                className={`hud__substat-value hud__substat-value--tier-${imbalanceTier}${
+                  isBalanced ? " hud__substat-value--ok" : ""
+                }`}
+              >
                 {physicsResult ? `${formatSigned(physicsResult.deltaEnergy)} W/m²` : "--"}
               </span>
             </div>

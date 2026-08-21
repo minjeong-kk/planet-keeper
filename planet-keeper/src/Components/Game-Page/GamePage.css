@@ -950,6 +950,29 @@
   white-space: nowrap;
 }
 
+/* 보조 지표의 ΔE도 같은 단계 색을 쓴다 - 2단계(온도 게이지) 화면에서는 위쪽 큰
+   ΔE 표시가 없으므로 여기가 유일한 신호다. */
+.hud__substat-value--tier-warn {
+  color: var(--gold);
+}
+
+.hud__substat-value--tier-alert {
+  color: var(--warn);
+}
+
+.hud__substat-value--tier-severe {
+  color: var(--danger);
+}
+
+/* 예상 안정 온도 옆에 붙는 "현재보다 ±X K" - 보조 정보라 한 단 작게 */
+.hud__substat-gap {
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
 .hud__substat-value--ok {
   color: var(--ok);
 }
@@ -1739,7 +1762,9 @@
 /* 움직임을 줄이도록 설정한 사용자에게는 은은한 반복 애니메이션을 끈다. */
 @media (prefers-reduced-motion: reduce) {
   .hud__planet-glow,
-  .hud__alert-vignette {
+  .hud__alert-vignette,
+  .hud__balance--alert .hud__balance-value,
+  .hud__balance--severe .hud__balance-value {
     animation: none;
   }
   .hud__gauge-marker,
@@ -2406,6 +2431,59 @@
 
 .hud__balance-value--ok {
   color: var(--ok);
+}
+
+/* ── 에너지 불균형 위험 단계 ────────────────────────────────────────
+   단계는 imbalanceSeverityOf(|ΔE| / 평형 허용범위)가 정한다. 평형(ok)에서는
+   아무 것도 덧붙이지 않고, 벗어난 만큼만 노랑 → 주황 → 빨강으로 올린다.
+   색을 입히는 범위는 이 지표 영역뿐이다 - 화면 전체를 붉게 만들지 않는다. */
+.hud__balance--warn .hud__balance-value,
+.hud__balance--warn .hud__balance-label {
+  color: var(--gold);
+}
+
+.hud__balance--alert .hud__balance-value,
+.hud__balance--alert .hud__balance-label {
+  color: var(--warn);
+}
+
+.hud__balance--severe .hud__balance-value,
+.hud__balance--severe .hud__balance-label {
+  color: var(--danger);
+}
+
+/* 값 뒤에 아주 옅은 후광만 둔다(배경 카드를 새로 만들지 않는다) */
+.hud__balance--alert .hud__balance-value {
+  text-shadow: 0 0 18px color-mix(in srgb, var(--warn) 45%, transparent);
+}
+
+.hud__balance--severe .hud__balance-value {
+  text-shadow: 0 0 22px color-mix(in srgb, var(--danger) 50%, transparent);
+}
+
+/* 경고/심각에서만 느린 pulse - 2.8초, 밝기만 아주 조금 흔든다(깜빡임 아님).
+   평형·주의 단계에는 애니메이션이 없다. */
+.hud__balance--alert .hud__balance-value,
+.hud__balance--severe .hud__balance-value {
+  animation: hud-imbalance-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes hud-imbalance-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+.hud__balance-note {
+  margin: 2px 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
+.hud__balance--severe .hud__balance-note {
+  color: var(--danger);
+  opacity: 0.85;
 }
 
 .hud__balance-unit {

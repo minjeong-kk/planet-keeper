@@ -145,6 +145,28 @@ function energyProblemLines(deltaEnergy, direction) {
 }
 
 /**
+ * HUD가 에너지 불균형을 "얼마나 위험한 상태인지"로 보여줄 때 쓰는 단계.
+ *
+ * 부족/과다 구분은 물리엔진의 energyStateOf를 그대로 쓴다(중복 판정을 만들지
+ * 않는다). 단계는 |ΔE|가 평형 허용범위(ENERGY_BALANCE_EPSILON)의 몇 배인지로만
+ * 나누므로, epsilon이 바뀌면 경계도 같이 움직인다.
+ *
+ *   ok     |ΔE| ≤ 1x   평형 - 경고 표시도, 애니메이션도 없음
+ *   warn   ≤ 2x        주의
+ *   alert  ≤ 4x        경고
+ *   severe > 4x        심각
+ *
+ * @returns {{ state: string, tier: "ok"|"warn"|"alert"|"severe", label: string, ratio: number }}
+ */
+export function imbalanceSeverityOf(deltaEnergy) {
+  const state = energyStateOf(deltaEnergy);
+  const ratio = Math.abs(deltaEnergy) / ENERGY_BALANCE_EPSILON;
+  const tier = state === "Stable" ? "ok" : ratio <= 2 ? "warn" : ratio <= 4 ? "alert" : "severe";
+  const label = state === "Energy Surplus" ? "에너지 과다" : state === "Energy Deficit" ? "에너지 부족" : "에너지 불균형";
+  return { state, tier, label, ratio };
+}
+
+/**
  * Planet Summary 패널 데이터를 만든다.
  * mlResult는 useGameStore.nextProblem()이 행성 생성 직후부터 채워두므로 1단계
  * 진입 시점에도 null이 아닐 수 있다 - 조성이 우연히 이미 평형 근처면 여기서도
