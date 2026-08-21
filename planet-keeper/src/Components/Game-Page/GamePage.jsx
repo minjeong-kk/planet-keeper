@@ -582,8 +582,12 @@ function GamePage() {
               <PlanetUI {...visual} />
             </div>
             {badge && (
-              <span className={`hud__planet-badge hud__planet-badge--${badge.tone}`}>
-                <span aria-hidden="true">{badge.icon}</span>
+              <span
+                className={`hud__planet-badge hud__planet-badge--${badge.tone} hud__planet-badge--tier-${imbalanceTier}`}
+              >
+                <span className="hud__planet-badge-icon" aria-hidden="true">
+                  {badge.icon}
+                </span>
                 {badge.text}
               </span>
             )}
@@ -633,18 +637,9 @@ function GamePage() {
             /* 1단계: 목표가 "에너지 평형"이다 - ΔE를 가장 큰 지표로 두고, 지구 유사
                온도 안정 구간은 아직 보여주지 않는다. */
             <div className={`hud__balance hud__balance--${imbalanceTier}`}>
-              <span className="hud__balance-label">
-                {severity && severity.tier !== "ok" ? (
-                  <>
-                    <span className="hud__balance-warn-icon" aria-hidden="true">
-                      ⚠️
-                    </span>
-                    {severity.label}
-                  </>
-                ) : (
-                  "에너지 불균형"
-                )}
-              </span>
+              {/* 상태 이름(에너지 과다/부족)은 행성 옆 배지가 맡는다 - 여기서 또
+                  말하면 같은 화면에 배지가 두 개가 된다. 여기는 값과 정도만. */}
+              <span className="hud__balance-label">에너지 불균형</span>
               <p className={`hud__balance-value${isBalanced ? " hud__balance-value--ok" : ""}`}>
                 {physicsResult ? formatSigned(physicsResult.deltaEnergy) : "--"}
                 <span className="hud__balance-unit">W/m²</span>

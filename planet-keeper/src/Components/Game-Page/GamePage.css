@@ -788,6 +788,90 @@
   color: var(--cold);
 }
 
+/* ── 행성 옆 상태 배지의 위기 효과 ──────────────────────────────────
+   단계는 imbalanceSeverityOf(|ΔE| / 평형 허용범위)가 정한다. 평형(ok)에서는
+   아무 것도 움직이지 않는다 - 지구형/고온/저온 안정 배지가 그대로다.
+
+   색은 배지가 이미 가진 tone 색(currentColor)을 따라간다 - 에너지 부족은 차가운
+   계열, 과다는 따뜻한 계열이 유지되고 화면이 붉어지지 않는다.
+   속도로 심각도를 나타낸다: 주의 3.2초 · 경고 2.2초 · 심각 1.6초 */
+/* 배지 밖으로 한 겹 퍼져 나가는 고리 - 레이더 핑처럼 한 박자씩 알린다.
+   ::after 라서 배지 크기나 글자 위치를 건드리지 않는다. */
+.hud__planet-badge--tier-warn::after,
+.hud__planet-badge--tier-alert::after,
+.hud__planet-badge--tier-severe::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border: 1px solid currentColor;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud__planet-badge--tier-warn {
+  animation: hud-badge-breathe 3.2s ease-in-out infinite;
+}
+
+.hud__planet-badge--tier-warn::after {
+  animation: hud-badge-ping 3.2s ease-out infinite;
+}
+
+.hud__planet-badge--tier-alert {
+  animation: hud-badge-breathe 2.2s ease-in-out infinite;
+}
+
+.hud__planet-badge--tier-alert::after {
+  animation: hud-badge-ping 2.2s ease-out infinite;
+}
+
+.hud__planet-badge--tier-severe {
+  animation: hud-badge-breathe-strong 1.6s ease-in-out infinite;
+}
+
+.hud__planet-badge--tier-severe::after {
+  animation: hud-badge-ping-strong 1.6s ease-out infinite;
+}
+
+/* 심각 단계에서만 아이콘이 아주 조금 커진다(inline-block + transform이라 글자가
+   밀리지 않는다). */
+.hud__planet-badge-icon {
+  display: inline-block;
+}
+
+.hud__planet-badge--tier-severe .hud__planet-badge-icon {
+  animation: hud-badge-icon 1.6s ease-in-out infinite;
+}
+
+@keyframes hud-badge-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+  50% { box-shadow: 0 0 14px 1px color-mix(in srgb, currentColor 32%, transparent); }
+}
+
+@keyframes hud-badge-breathe-strong {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent); }
+  50% {
+    box-shadow:
+      0 0 22px 3px color-mix(in srgb, currentColor 50%, transparent),
+      inset 0 0 12px color-mix(in srgb, currentColor 20%, transparent);
+  }
+}
+
+@keyframes hud-badge-ping {
+  0% { transform: scale(1); opacity: 0.5; }
+  70%, 100% { transform: scale(1.28); opacity: 0; }
+}
+
+@keyframes hud-badge-ping-strong {
+  0% { transform: scale(1); opacity: 0.75; }
+  70%, 100% { transform: scale(1.45); opacity: 0; }
+}
+
+@keyframes hud-badge-icon {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.18); }
+}
+
 /* 정답/오답은 행성 위에 한 번만 떠올랐다 사라진다 */
 .hud__flash {
   position: absolute;
@@ -1795,12 +1879,13 @@
 @media (prefers-reduced-motion: reduce) {
   .hud__planet-glow,
   .hud__alert-vignette,
-  .hud__balance--warn .hud__balance-label,
-  .hud__balance--alert .hud__balance-label,
-  .hud__balance--severe .hud__balance-label,
-  .hud__balance--alert .hud__balance-value,
-  .hud__balance--severe .hud__balance-value,
-  .hud__balance--severe .hud__balance-warn-icon {
+  .hud__planet-badge--tier-warn,
+  .hud__planet-badge--tier-alert,
+  .hud__planet-badge--tier-severe,
+  .hud__planet-badge--tier-warn::after,
+  .hud__planet-badge--tier-alert::after,
+  .hud__planet-badge--tier-severe::after,
+  .hud__planet-badge--tier-severe .hud__planet-badge-icon {
     animation: none;
   }
   .hud__gauge-marker,
@@ -2486,119 +2571,6 @@
 .hud__balance--severe .hud__balance-value,
 .hud__balance--severe .hud__balance-label {
   color: var(--danger);
-}
-
-/* 값 뒤에 아주 옅은 후광만 둔다(배경 카드를 새로 만들지 않는다) */
-.hud__balance--alert .hud__balance-value {
-  text-shadow: 0 0 18px color-mix(in srgb, var(--warn) 45%, transparent);
-}
-
-.hud__balance--severe .hud__balance-value {
-  text-shadow: 0 0 22px color-mix(in srgb, var(--danger) 50%, transparent);
-}
-
-/* ── 단계가 쌓이는 느낌 ────────────────────────────────────────────────
-   경고 라벨을 작은 알약으로 만들고 테두리·후광을 같이 흔든다. 예전에는 14px짜리
-   작은 글자의 투명도만 1 → 0.68 로 흔들어서 눈에 걸리지 않았다. 평형(ok) 상태의
-   라벨은 그대로여서 정상 화면은 달라지지 않는다.
-
-   테두리·후광 색은 currentColor 로 잡는다 - 위에서 단계별로 color 를 이미
-   gold → warn → danger 로 올려 두었으므로 자동으로 따라온다.
-
-   속도로 심각도를 나타낸다:  주의 3.2초 · 경고 2.2초 · 심각 1.6초
-   깜빡임이 아니라 숨쉬는 정도로만 흔든다 - 밝기를 0 으로 떨어뜨리지 않는다. */
-.hud__balance--warn .hud__balance-label,
-.hud__balance--alert .hud__balance-label,
-.hud__balance--severe .hud__balance-label {
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 13px;
-  border: 1px solid currentColor;
-  border-radius: 999px;
-  font-size: 0.84rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.hud__balance--warn .hud__balance-label {
-  background: color-mix(in srgb, var(--gold) 13%, transparent);
-  animation: hud-imbalance-chip 3.2s ease-in-out infinite;
-}
-
-.hud__balance--alert .hud__balance-label {
-  background: color-mix(in srgb, var(--warn) 15%, transparent);
-  animation: hud-imbalance-chip 2.2s ease-in-out infinite;
-}
-
-.hud__balance--severe .hud__balance-label {
-  background: color-mix(in srgb, var(--danger) 17%, transparent);
-  animation: hud-imbalance-chip-strong 1.6s ease-in-out infinite;
-}
-
-/* 값(큰 숫자)은 경고 이상에서만, 라벨보다 조금 느리게 - 둘이 같은 박자로 뛰면
-   화면이 시끄럽다. 블록 요소라 box-shadow 대신 글자 후광만 흔든다. */
-.hud__balance--alert .hud__balance-value {
-  animation: hud-imbalance-text 2.8s ease-in-out infinite;
-}
-
-.hud__balance--severe .hud__balance-value {
-  animation: hud-imbalance-text-strong 2s ease-in-out infinite;
-}
-
-/* 심각 단계에서만 아이콘이 아주 조금 커진다. inline-block + transform이라
-   글자가 밀리지 않는다. */
-.hud__balance-warn-icon {
-  display: inline-block;
-  margin-right: 5px;
-}
-
-.hud__balance--severe .hud__balance-warn-icon {
-  animation: hud-imbalance-icon 1.6s ease-in-out infinite;
-}
-
-@keyframes hud-imbalance-chip {
-  0%, 100% {
-    opacity: 0.86;
-    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
-  }
-  50% {
-    opacity: 1;
-    box-shadow: 0 0 13px 1px color-mix(in srgb, currentColor 34%, transparent);
-  }
-}
-
-@keyframes hud-imbalance-chip-strong {
-  0%, 100% {
-    opacity: 0.82;
-    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
-  }
-  50% {
-    opacity: 1;
-    box-shadow:
-      0 0 20px 3px color-mix(in srgb, currentColor 48%, transparent),
-      inset 0 0 12px color-mix(in srgb, currentColor 18%, transparent);
-  }
-}
-
-@keyframes hud-imbalance-text {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.72; }
-}
-
-@keyframes hud-imbalance-text-strong {
-  0%, 100% {
-    opacity: 1;
-    text-shadow: 0 0 22px color-mix(in srgb, var(--danger) 45%, transparent);
-  }
-  50% {
-    opacity: 0.66;
-    text-shadow: 0 0 34px color-mix(in srgb, var(--danger) 80%, transparent);
-  }
-}
-
-@keyframes hud-imbalance-icon {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.16); }
 }
 
 .hud__balance-note {
