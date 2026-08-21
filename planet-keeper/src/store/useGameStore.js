@@ -442,7 +442,17 @@ const useGameStore = create(
     const question = pickRandom(unseen.length > 0 ? unseen : available.length > 0 ? available : pool);
 
     set((state) => ({ seenIds: new Set(state.seenIds).add(question.id) }));
-    return { ...question, isRetry };
+    // 선택지 순서를 출제할 때마다 섞는다 - 같은 문제라도 판마다(재도전이면
+    // 그때마다) 정답이 몇 번에 오는지 달라져서, 번호만 외워 넘기는 걸 막는다.
+    // 정답 판정은 원래부터 문자열 비교(solveProblem)라 순서와 무관하다.
+    //
+    // 섞는 건 choices만이다. bogi(ㄱ/ㄴ/ㄷ, ㉠/㉡/㉢)는 선택지가 그 라벨을 직접
+    // 가리키므로 순서를 바꾸면 문제 자체가 깨진다.
+    //
+    // 섞은 결과를 여기서 currentProblem에 넣어 두는 것이 중요하다 - 렌더링 중에
+    // 섞으면 QuizModal이 다시 그려질 때마다(힌트 열기, 1초 타이머 등) 선택지가
+    // 눈앞에서 뒤바뀐다.
+    return { ...question, choices: shuffled(question.choices), isRetry };
   },
 
   // 지금 ΔE 부호를 보고 악화 방향(온난화/냉각)을 정한 뒤, 그 방향 후보 중 하나를
