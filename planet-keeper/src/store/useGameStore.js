@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { STAGE3_QUESTIONS, STAGE4_QUESTIONS } from "../data/quizBank.js";
+import { STAGE3_QUESTIONS, STAGE4_QUESTIONS, reviewToText } from "../data/quizBank.js";
 import { MOCK_ITEMS } from "../data/mockItems.js";
 import useClimateStore, { CLIMATE_VARIABLES } from "./useClimateStore.js";
 import {
@@ -756,7 +756,9 @@ const useGameStore = create(
           title: currentProblem.title,
           selectedAnswer: answer,
           correctAnswer: currentProblem.answer,
-          explanation: currentProblem.explanation,
+          // 화면은 review 블록을 그대로 그린다(QuizReview). 여기 남기는 평문은
+          // 이 기능이 없던 시절 저장본과 모양을 맞추기 위한 대체용이다.
+          explanation: reviewToText(currentProblem.review),
           concepts: currentProblem.concepts,
           isRetry: currentProblem.isRetry ?? false,
           correct,

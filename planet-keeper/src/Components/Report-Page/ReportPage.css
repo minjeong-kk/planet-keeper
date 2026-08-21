@@ -742,18 +742,11 @@
   color: var(--text);
 }
 
+/* 안에 QuizReview 블록 카드가 들어온다 - 여기서 또 배경·테두리를 두르면 카드
+   안의 카드가 되어 무엇이 묶음인지 오히려 안 보인다. 자리만 잡는다. */
 .report-page__modal-explanation {
-  background: color-mix(in srgb, var(--info) 10%, var(--code-bg));
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 0.8rem;
   line-height: 1.55;
   color: var(--text);
-  border-left: 3px solid var(--info);
-}
-
-.report-page__modal-explanation p {
-  margin: 0;
 }
 
 .report-page__modal-close-btn {

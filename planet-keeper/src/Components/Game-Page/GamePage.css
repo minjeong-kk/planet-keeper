@@ -1204,14 +1204,6 @@
   box-shadow: none;
 }
 
-.mission__explanation {
-  margin: 0;
-  font-size: 0.95rem;
-  line-height: 1.65;
-  color: var(--ink);
-  word-break: keep-all;
-}
-
 .mission__concepts {
   display: flex;
   flex-wrap: wrap;

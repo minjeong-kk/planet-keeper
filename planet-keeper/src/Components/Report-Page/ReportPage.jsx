@@ -13,6 +13,8 @@ import {
 import { causeFamilyOf, renderHighlightedParts } from "../../utils/explanationHighlight.jsx";
 import { CLIMATE_CONCEPTS } from "../../data/climateConcepts.js";
 import Term from "../common/Term.jsx";
+import QuizReview from "../common/QuizReview.jsx";
+import { reviewOf } from "../../data/quizBank.js";
 import { MOCK_ITEMS } from "../../data/mockItems.js";
 import "./ReportPage.css";
 
@@ -555,11 +557,13 @@ function ReportPage() {
               </div>
             </div>
 
-            {selectedGroup.explanation && (
+            {(reviewOf(selectedGroup.key) || selectedGroup.explanation) && (
               <div className="report-page__modal-section">
                 <h4 className="report-page__modal-subtitle">💡 해설</h4>
                 <div className="report-page__modal-explanation">
-                  <p>{selectedGroup.explanation}</p>
+                  {/* 게임 화면의 해설 카드와 같은 컴포넌트를 쓴다 - 한 곳만 고쳐도
+                      두 화면의 해설이 함께 바뀐다. quizGroups의 key는 문제 id다. */}
+                  <QuizReview review={reviewOf(selectedGroup.key)} fallbackText={selectedGroup.explanation} />
                 </div>
               </div>
             )}

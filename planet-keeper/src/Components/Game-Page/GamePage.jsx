@@ -328,7 +328,9 @@ function GamePage() {
     setFeedback(correct ? "correct" : "wrong");
     setResult({
       correct,
-      explanation: answered.explanation,
+      // 해설 본문은 QuizResult가 id로 review를 찾아 그린다 - 블록 배열을 여기서
+      // 복사해 넘기면 같은 데이터가 두 군데 살아 있게 된다.
+      id: answered.id,
       concepts: answered.concepts,
       reward: correct ? rewardText : null,
     });

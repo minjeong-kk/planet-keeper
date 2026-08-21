@@ -1,4 +1,6 @@
 import { useState } from "react";
+import QuizReview from "../common/QuizReview.jsx";
+import { reviewOf } from "../../data/quizBank.js";
 
 // 오른쪽 패널의 임무(문제) 카드. PROBLEM1/FINAL 단계가 공유한다.
 // number는 GamePage가 "지금까지 몇 번째로 푸는 문제인지"(quizLog.length + 1)를
@@ -104,7 +106,9 @@ export function QuizResult({ result, onClose }) {
         </button>
       </div>
 
-      {result.explanation && <p className="mission__explanation">{result.explanation}</p>}
+      {/* 해설은 긴 문단 하나가 아니라 블록으로 그린다 - 핵심 결론 한 문장이 맨 위에
+          오고, 그 아래는 문제 성격에 맞는 구조(흐름도/비교/공식)가 붙는다. */}
+      <QuizReview review={reviewOf(result.id)} fallbackText={result.explanation} />
 
       {result.concepts?.length > 0 && (
         <p className="mission__concepts">
