@@ -2497,63 +2497,108 @@
   text-shadow: 0 0 22px color-mix(in srgb, var(--danger) 50%, transparent);
 }
 
-/* ── 단계가 쌓이는 느낌: pulse 속도로 심각도를 나타낸다 ─────────────────
-   정상(ok)  애니메이션 없음
-   주의      3.2초 - 아주 천천히 한 번씩
-   경고      2.2초 - 조금 빠르게, 값까지 같이
-   심각      1.6초 - 폭을 키우고 후광까지 흔든다(⚠️ 아이콘도 살짝 커짐)
-   깜빡임이 아니라 숨쉬는 정도로만 흔든다 - 밝기를 0으로 떨어뜨리지 않는다. */
+/* ── 단계가 쌓이는 느낌 ────────────────────────────────────────────────
+   경고 라벨을 작은 알약으로 만들고 테두리·후광을 같이 흔든다. 예전에는 14px짜리
+   작은 글자의 투명도만 1 → 0.68 로 흔들어서 눈에 걸리지 않았다. 평형(ok) 상태의
+   라벨은 그대로여서 정상 화면은 달라지지 않는다.
+
+   테두리·후광 색은 currentColor 로 잡는다 - 위에서 단계별로 color 를 이미
+   gold → warn → danger 로 올려 두었으므로 자동으로 따라온다.
+
+   속도로 심각도를 나타낸다:  주의 3.2초 · 경고 2.2초 · 심각 1.6초
+   깜빡임이 아니라 숨쉬는 정도로만 흔든다 - 밝기를 0 으로 떨어뜨리지 않는다. */
+.hud__balance--warn .hud__balance-label,
+.hud__balance--alert .hud__balance-label,
+.hud__balance--severe .hud__balance-label {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 13px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
 .hud__balance--warn .hud__balance-label {
-  animation: hud-imbalance-pulse 3.2s ease-in-out infinite;
+  background: color-mix(in srgb, var(--gold) 13%, transparent);
+  animation: hud-imbalance-chip 3.2s ease-in-out infinite;
 }
 
 .hud__balance--alert .hud__balance-label {
-  animation: hud-imbalance-pulse 2.2s ease-in-out infinite;
+  background: color-mix(in srgb, var(--warn) 15%, transparent);
+  animation: hud-imbalance-chip 2.2s ease-in-out infinite;
 }
 
 .hud__balance--severe .hud__balance-label {
-  animation: hud-imbalance-pulse-strong 1.6s ease-in-out infinite;
+  background: color-mix(in srgb, var(--danger) 17%, transparent);
+  animation: hud-imbalance-chip-strong 1.6s ease-in-out infinite;
 }
 
-/* 값은 경고 이상에서만, 라벨보다 조금 느리게 - 둘이 같은 박자로 뛰면 시끄럽다 */
+/* 값(큰 숫자)은 경고 이상에서만, 라벨보다 조금 느리게 - 둘이 같은 박자로 뛰면
+   화면이 시끄럽다. 블록 요소라 box-shadow 대신 글자 후광만 흔든다. */
 .hud__balance--alert .hud__balance-value {
-  animation: hud-imbalance-pulse 2.8s ease-in-out infinite;
+  animation: hud-imbalance-text 2.8s ease-in-out infinite;
 }
 
 .hud__balance--severe .hud__balance-value {
-  animation: hud-imbalance-pulse-strong 2s ease-in-out infinite;
+  animation: hud-imbalance-text-strong 2s ease-in-out infinite;
 }
 
 /* 심각 단계에서만 아이콘이 아주 조금 커진다. inline-block + transform이라
    글자가 밀리지 않는다. */
 .hud__balance-warn-icon {
   display: inline-block;
-  margin-right: 4px;
+  margin-right: 5px;
 }
 
 .hud__balance--severe .hud__balance-warn-icon {
   animation: hud-imbalance-icon 1.6s ease-in-out infinite;
 }
 
-@keyframes hud-imbalance-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.74; }
+@keyframes hud-imbalance-chip {
+  0%, 100% {
+    opacity: 0.86;
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 13px 1px color-mix(in srgb, currentColor 34%, transparent);
+  }
 }
 
-@keyframes hud-imbalance-pulse-strong {
+@keyframes hud-imbalance-chip-strong {
+  0%, 100% {
+    opacity: 0.82;
+    box-shadow: 0 0 0 0 color-mix(in srgb, currentColor 0%, transparent);
+  }
+  50% {
+    opacity: 1;
+    box-shadow:
+      0 0 20px 3px color-mix(in srgb, currentColor 48%, transparent),
+      inset 0 0 12px color-mix(in srgb, currentColor 18%, transparent);
+  }
+}
+
+@keyframes hud-imbalance-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.72; }
+}
+
+@keyframes hud-imbalance-text-strong {
   0%, 100% {
     opacity: 1;
     text-shadow: 0 0 22px color-mix(in srgb, var(--danger) 45%, transparent);
   }
   50% {
-    opacity: 0.68;
-    text-shadow: 0 0 32px color-mix(in srgb, var(--danger) 75%, transparent);
+    opacity: 0.66;
+    text-shadow: 0 0 34px color-mix(in srgb, var(--danger) 80%, transparent);
   }
 }
 
 @keyframes hud-imbalance-icon {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.14); }
+  50% { transform: scale(1.16); }
 }
 
 .hud__balance-note {
