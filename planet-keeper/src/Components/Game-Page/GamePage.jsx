@@ -40,10 +40,27 @@ const FEEDBACK_FLASH_MS = 1600;
 // 누른 뒤 화면이 툭 끊기지 않게 하는 한 박자에만 쓴다.
 const REPORT_LEAVE_MS = 600;
 
-// 이상기후 경고 슬라이더의 조절 폭(±). 행성 만들기 때와 같은 0~100 풀
-// 레인지를 그대로 쓰면 몇 초 안에 미세하게 조정하기엔 한 번 드래그로 너무
-// 크게 움직인다 - 경고가 뜬 시점 값(startValues) 기준 좁은 구간만 허용한다.
-const CLIMATE_ALERT_SLIDER_RANGE = 15;
+// 이상기후 경고 슬라이더의 조절 폭(±). 행성 만들기 때와 같은 0~100 풀 레인지를
+// 그대로 쓰면 몇 초 안에 미세하게 조정하기엔 한 번 드래그로 너무 크게 움직인다 -
+// 경고가 뜬 시점 값(startValues) 기준 좁은 구간만 허용한다.
+//
+// 슬라이더마다 폭을 다르게 준다. 예전에는 전부 ±15 였는데, 그러면 이상기후에
+// 대응하다가 우연히 평형에 들어가 2단계로 새는 일이 잦았다(조성 81개 중 31%가
+// 응답 한 번으로 평형 도달 가능 - 그만큼 1단계에서 아이템을 쓸 일이 사라졌다).
+// 특히 CO₂ 는 g 가 log₂ 응답이라 ±15 면 OLR 을 30 W/m² 넘게 흔들어(평형 기준
+// ±14.8 의 두 배) 다른 슬라이더와 비교가 안 될 만큼 강했다.
+//
+// 아래 폭으로는 응답 한 번에 평형까지 가는 조성이 12% 로 줄어든다. 아이템 델타는
+// 건드리지 않았다 - 줄여 봐도 평형까지 필요한 평균 사용 횟수는 4.1 → 4.8 회로
+// 거의 안 늘고 최장 경로만 10 → 12 회로 늘어져 1단계가 지루해진다.
+const CLIMATE_ALERT_SLIDER_RANGE = {
+  co2: 5,
+  atmThickness: 8,
+  cloud: 8,
+  iceThickness: 10,
+  ocean: 10,
+};
+const alertSliderRange = (key) => CLIMATE_ALERT_SLIDER_RANGE[key] ?? 8;
 
 // 코드는 그대로 두고 실행만 끈다 - 다시 끌 땐 이 플래그만 false로.
 const CLIMATE_TICK_ENABLED = true;
@@ -884,8 +901,9 @@ function GamePage() {
                 <div className="climate-event__sliders">
                   {CLIMATE_VARIABLES.map(({ key, label }) => {
                     const startValue = pendingClimateEvent.startValues[key];
-                    const min = Math.max(0, startValue - CLIMATE_ALERT_SLIDER_RANGE);
-                    const max = Math.min(100, startValue + CLIMATE_ALERT_SLIDER_RANGE);
+                    const range = alertSliderRange(key);
+                    const min = Math.max(0, startValue - range);
+                    const max = Math.min(100, startValue + range);
                     // 경보가 지목한 변수에만 방향 표시를 붙인다(정확한 목표값은 알려주지 않는다).
                     const isTarget = key === pendingClimateEvent.key;
                     return (
