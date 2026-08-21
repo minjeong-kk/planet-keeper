@@ -72,7 +72,9 @@ export const CONCEPT_PAGES = [
         tone: "game",
         icon: "🎮",
         heading: "게임에서는",
-        paragraphs: ["게임은 |ΔE| 가 충분히 작을 때를 '평형'으로 판정합니다."],
+        paragraphs: [
+          "|ΔE| 가 0에 가까울수록 에너지 평형에 가까운 상태입니다. 게임에서는 일정 범위 안에 들어오면 '평형'으로 판정합니다.",
+        ],
       },
     ],
   },

@@ -621,10 +621,13 @@
   min-width: 0;
 }
 
+/* 단계 제목은 굵기만으로는 본문과 잘 안 갈라졌다(둘 다 흰 계열) - 패널의 강조색
+   (--holo, 왼쪽 단계 번호와 같은 색)으로 올려서 목록을 훑을 때 제목만 먼저
+   눈에 들어오게 한다. --holo는 라이트/다크 양쪽에 있는 토큰이다. */
 .start-page__flow-title {
   font-size: 0.96rem;
   line-height: 1.5;
-  color: var(--pad-ink-strong);
+  color: var(--holo);
 }
 
 .start-page__flow-text {
