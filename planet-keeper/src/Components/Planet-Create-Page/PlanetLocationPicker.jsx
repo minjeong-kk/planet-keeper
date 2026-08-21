@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CLIMATE_POINTS } from "../../data/climatePoints.js";
 import { latLngToPercent } from "../../utils/geo.js";
 import useClimateStore from "../../store/useClimateStore";
@@ -31,25 +31,29 @@ function PlanetLocationPicker({ onStart }) {
   const selectedLocation = useClimateStore((state) => state.selectedLocation);
   const isViewingLocationImage = useClimateStore((state) => state.isViewingLocationImage);
   const setValuesFromPoint = useClimateStore((state) => state.setValuesFromPoint);
+  const values = useClimateStore((state) => state.values);
+  const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const [hoveredId, setHoveredId] = useState(null);
-  // null: 안내 없음. { imbalanced }: 방금 선택한 지점이 (실제 온도 기준으로) 불평형인지.
-  const [balanceNote, setBalanceNote] = useState(null);
+
+  // "이 지점은 실제로 불평형인가" - 스토어에서 파생시킨다(컴포넌트 state 아님).
+  // 예전엔 handleSelect에서 useState에 담아뒀는데, selectedLocation은 persist로
+  // 복원되는 반면 이 값만 새로고침에 날아가서 "지점 정보는 그대로인데 배지만
+  // 사라지는" 상태가 됐다(사하라 ΔE -80.8처럼 실제로 불평형인데도).
+  //
+  // isViewingLocationImage가 true일 때만 본다 - 그게 "스토어 값 == 그 지점 값"
+  // (슬라이더를 만지면 스토어가 내린다)이라는 뜻이라, 직접 조정한 조성을 두고
+  // "이 지점은 불평형"이라고 말하지 않게 된다.
+  const imbalanced = useMemo(() => {
+    if (!isViewingLocationImage || typeof selectedLocation?.t2m !== "number") return false;
+    const { deltaEnergy } = computeClimateV2({
+      ...mapSlidersToClimateInputs(values),
+      currentTemperature,
+    });
+    return Math.abs(deltaEnergy) > ENERGY_BALANCE_EPSILON;
+  }, [isViewingLocationImage, selectedLocation, values, currentTemperature]);
 
   const handleSelect = (point) => {
     setValuesFromPoint(point);
-
-    // t2m이 있는 지점만 "실제로 이 지점이 평형인가"를 계산해 보여준다 - 값을
-    // 반영한 직후의 스토어 상태를 그대로 읽는다(setValuesFromPoint가 동기 처리).
-    if (typeof point.t2m === "number") {
-      const state = useClimateStore.getState();
-      const physics = computeClimateV2({
-        ...mapSlidersToClimateInputs(state.values),
-        currentTemperature: state.currentTemperature,
-      });
-      setBalanceNote({ imbalanced: Math.abs(physics.deltaEnergy) > ENERGY_BALANCE_EPSILON });
-    } else {
-      setBalanceNote(null);
-    }
   };
 
   return (
@@ -105,9 +109,9 @@ function PlanetLocationPicker({ onStart }) {
                     지도 칸 높이(=picker__map-frame 크기)까지 지점마다 달라진다.
                     항상 렌더링하고 visibility만 토글해 자리를 고정한다. */}
                 <span
-                  className={`picker__flag-note${balanceNote?.imbalanced ? "" : " picker__flag-note--hidden"}`}
+                  className={`picker__flag-note${imbalanced ? "" : " picker__flag-note--hidden"}`}
                   title="이 지점은 실제로 에너지 불균형 상태입니다. 실제 지구에서는 대기와 해류가 이 열을 다른 지역으로 옮겨 지구 전체는 균형을 이룹니다. 이 게임은 한 지점만 계산하므로 그 이동 효과는 반영되지 않습니다."
-                  aria-hidden={!balanceNote?.imbalanced}
+                  aria-hidden={!imbalanced}
                 >
                   ⚠ 실제 불균형
                 </span>

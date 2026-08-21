@@ -1,6 +1,6 @@
 import { Component, Suspense, memo, useEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
-import { Canvas, invalidate, useFrame, useThree } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, useTexture } from '@react-three/drei'
 import './Planet-ui.css'
 
@@ -170,13 +170,17 @@ const glowFragment = /* glsl */ `
 
 /* ═══════════════ 컴포넌트 ═══════════════ */
 
+// 이 Canvas 루트에 정확히 바인딩된 invalidate (모듈 전역 invalidate는 같은 페이지에
+// 함께 떠 있는 다른 Canvas(LocationPhoto3D)까지 매 프레임 깨운다) - PlanetBody/
+// BasicPlanet/Clouds/AtmosphereRing이 전부 같은 이유로 필요해 한 곳으로 모은다.
+const useCanvasInvalidate = () => useThree((s) => s.invalidate)
+
 /* 본체: 하이트맵 기반 셰이더 하나로 지형/바다/빙하를 표현.
    memo → seaLevel/ice/oceanRatio 가 안 바뀌면(구름·CO₂ 조작 등) 리렌더 skip. */
 const PlanetBody = memo(function PlanetBody({ seaLevel, ice, oceanRatio }) {
   const [day, height] = useTexture([DAY_URL, HEIGHT_URL])
   const matRef = useRef()
-  // 이 Canvas 루트에 정확히 바인딩된 invalidate (모듈 전역 invalidate 의 루트 불일치 방지)
-  const invalidateThis = useThree((s) => s.invalidate)
+  const invalidateThis = useCanvasInvalidate()
 
   // '단 1개의 고정된' uniforms 객체 (초기값). 이후엔 material 의 실제 uniforms 를 직접 수정.
   const uniforms = useMemo(
@@ -223,9 +227,10 @@ const PlanetBody = memo(function PlanetBody({ seaLevel, ice, oceanRatio }) {
 
 /* 텍스처 로딩/실패 시 안전 폴백 (basic material) */
 function BasicPlanet({ color = '#2a3a5a' }) {
+  const invalidateThis = useCanvasInvalidate()
   useEffect(() => {
-    invalidate()
-  }, [color])
+    invalidateThis()
+  }, [color, invalidateThis])
   return (
     <mesh>
       <sphereGeometry args={[R, 48, 48]} />
@@ -234,17 +239,31 @@ function BasicPlanet({ color = '#2a3a5a' }) {
   )
 }
 
-/* 구름: 부드럽게 떠서 자전하는 반투명 셸 1개.
+/* 구름: 부드럽게 떠서 자전하는 반투명 셸 1개. 본체(PlanetBody)는 회전하지 않으므로
+   화면에서 움직이는 건 이 구름층 하나뿐이다.
    memo → ratio 안 바뀌면(바다·빙하·CO₂ 조작) 리렌더 skip. */
+// 구름 자전 각속도(rad/s). 0.04 → 한 바퀴 약 2.6분. 예전 0.015(약 7분)는 저대비
+// 구름 텍스처에서 사실상 인지되지 않았는데, invalidate를 매 프레임 부르는 비용은
+// 속도와 무관하게 똑같이 내고 있었다 - 같은 값을 내는 김에 보이게 만든다.
+const CLOUD_SPIN_RAD_PER_SEC = 0.04
 const Clouds = memo(function Clouds({ ratio }) {
   const map = useTexture(CLOUD_URL)
   const ref = useRef()
+  const invalidateThis = useCanvasInvalidate()
   useFrame((_, dt) => {
-    if (ref.current) {
-      ref.current.rotation.y += dt * 0.015 // 본체와 독립된 느린 자전
-      invalidate()
-    }
+    if (!ref.current) return
+    ref.current.rotation.y += dt * CLOUD_SPIN_RAD_PER_SEC
   })
+  // frameloop="demand"에서는 useFrame 자체가 invalidate()로 예약된 렌더 위에서만
+  // 돌아간다 - useFrame 안에서 격프레임만 invalidate를 걸렀더니(이전 코드) 건너뛴
+  // 바로 그 틱에 남은 예약 프레임이 0이 되어 루프 자체가 멈춰버렸다(자전이 영원히
+  // 멈춤, 매 프레임 invalidate하던 예전 코드보다 더 나쁜 결과). 대신 루프 밖에서
+  // 타이머로 ~30fps만 invalidate를 예약한다 - 그 주기로만 렌더가 일어나고, 그때마다
+  // useFrame이 dt만큼 회전을 갱신하니 60fps 대비 렌더 부하는 여전히 절반이다.
+  useEffect(() => {
+    const id = setInterval(invalidateThis, 1000 / 30)
+    return () => clearInterval(id)
+  }, [invalidateThis])
   return (
     <mesh ref={ref} scale={1.015}>
       <sphereGeometry args={[R, 64, 64]} />
@@ -263,6 +282,7 @@ const Clouds = memo(function Clouds({ ratio }) {
 /* 외곽 대기 프레넬 링 (CO₂ 상승: 파랑 → 보라 → 붉은빛, 은은한 글로우).
    memo → scale/co2Level 안 바뀌면 리렌더 skip. 색상은 기존 uColor.value 를 mutate(할당 0). */
 const AtmosphereRing = memo(function AtmosphereRing({ scale, co2Level }) {
+  const invalidateThis = useCanvasInvalidate()
   const uniforms = useMemo(
     () => ({ uColor: { value: ATM_BLUE.clone() }, uStrength: { value: 0.85 } }),
     [], // eslint-disable-line react-hooks/exhaustive-deps
@@ -274,8 +294,8 @@ const AtmosphereRing = memo(function AtmosphereRing({ scale, co2Level }) {
     if (c < 0.5) col.copy(ATM_BLUE).lerp(ATM_VIOLET, c / 0.5)
     else col.copy(ATM_VIOLET).lerp(ATM_RED, (c - 0.5) / 0.5)
     uniforms.uStrength.value = 0.72 + co2Level * 0.3 // 은은하게(0.72~1.02)
-    invalidate()
-  }, [co2Level, scale, uniforms])
+    invalidateThis()
+  }, [co2Level, scale, uniforms, invalidateThis])
 
   return (
     <mesh scale={scale}>
@@ -332,7 +352,10 @@ function PlanetUI({
     <div className="planet-viewport">
       <Canvas
         camera={{ position: [0, 0, 5], fov: 45 }}
-        frameloop="demand" // 유휴 시 프레임 0 (GPU 0%). 변경 시 invalidate()로 즉시 렌더
+        // demand: 우리가 invalidate()를 부를 때만 그린다. 슬라이더를 안 만지면 조작
+        // 때문에 그릴 일은 없지만, 구름이 있으면(cloudRatio > 0) Clouds가 자전을 위해
+        // 격프레임으로 계속 깨우므로 그때는 ≈30fps로 돈다.
+        frameloop="demand"
         dpr={[1, 1.5]}
         gl={{ alpha: true, antialias: true, powerPreference: 'high-performance' }}
       >

@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import useGameStore, { itemDeltaEnergyChange, ITEM_EFFECT_EPSILON } from "../../store/useGameStore.js";
 import useClimateStore from "../../store/useClimateStore.js";
+import useEscapeKey from "../common/useEscapeKey.js";
 import { previewItemEffect, formatSigned } from "../../utils/planetAnalysis.js";
 
 // 아이템 카드의 (ⓘ) 버튼/카드 클릭 시 뜨는 원인->과정->결과 설명 모달.
@@ -11,6 +12,7 @@ import { previewItemEffect, formatSigned } from "../../utils/planetAnalysis.js";
 // 0.5)보다 밝은 행성에서는 실제 방향이 반대가 될 수 있어서다. 아래 "지금 사용하면"
 // 문단은 어느 아이템이든 itemDeltaEnergyChange로 실측 예측치를 보여준다.
 function ItemInfoModal({ item, onClose }) {
+  useEscapeKey(onClose);
   const values = useClimateStore((state) => state.values);
   const currentTemperature = useClimateStore((state) => state.currentTemperature);
   const physicsResult = useGameStore((state) => state.physicsResult);
@@ -34,7 +36,12 @@ function ItemInfoModal({ item, onClose }) {
   // 닫을 수 없었다. body로 포탈해서 화면 기준으로 뜨게 한다.
   return createPortal(
     <div className="item-info-modal-overlay" onClick={onClose}>
-      <div className="item-info-modal" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="item-info-modal"
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-label={`${item.name} 상세 설명`}
+      >
 
         <h2>
           {item.emoji} {item.name}

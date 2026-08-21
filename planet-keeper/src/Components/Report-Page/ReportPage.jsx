@@ -1,7 +1,8 @@
 import { useState, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import useClimateStore from "../../store/useClimateStore";
-import useGameStore from "../../store/useGameStore";
+import useGameStore, { isGameInProgress } from "../../store/useGameStore";
+import useEscapeKey from "../common/useEscapeKey.js";
 import { PLANET_STATES, planetStateOf, ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
 import {
   describeTransition,
@@ -105,6 +106,7 @@ function CollapsibleSection({ title, defaultOpen = true, children }) {
 function ReportPage() {
   const navigate = useNavigate();
   const resetClimate = useClimateStore((state) => state.resetClimate);
+  const currentStage = useGameStore((state) => state.currentStage);
   const gameOverReason = useGameStore((state) => state.gameOverReason);
   const elapsedSeconds = useGameStore((state) => state.elapsedSeconds);
   const timeline = useGameStore((state) => state.timeline);
@@ -115,6 +117,18 @@ function ReportPage() {
   // (행성 생성 화면·플레이 화면 둘 다. resetGame은 이 값을 건드리지 않으므로
   // 행성 만들기를 거쳐도 유지된다).
   const skipTutorials = useGameStore((state) => state.skipTutorials);
+
+  // 한 판도 안 했거나(timeline 비어있음) 게임이 아직 진행 중인데(PlanetCreatePage의
+  // gameInProgress와 같은 기준) 주소창으로 /report에 직접 들어왔는지 - 마운트
+  // 시점에 한 번만 판단하고 그 뒤로는 다시 보지 않는다.
+  //
+  // 렌더마다 다시 보면 "다시 플레이"가 깨진다: replayGame이 async라 내부에서
+  // resetGame()으로 timeline을 비우고 currentStage를 CREATOR로 되돌린 뒤 await
+  // 지점에서 렌더가 한 번 끼어드는데, 그때 이 페이지가 "기록이 없네/진행 중이
+  // 아니네"로 판단해 시작 화면으로 튕겨 보내버린다(뒤이어 실행될 navigate("/game")이
+  // 도달하지 못한다). "직접 들어왔는가"는 원래 진입 시점의 성질이라 마운트 때 한
+  // 번 정하는 편이 의미상으로도 맞다.
+  const [enteredWithoutGame] = useState(() => timeline.length === 0 || isGameInProgress(currentStage));
 
   const resultBanner = RESULT_BANNER_BY_REASON[gameOverReason] ?? {
     title: "행성 진단 결과",
@@ -205,6 +219,7 @@ function ReportPage() {
           item?.delta,
           entry.immediateDeltaEnergy,
           entry.immediateOutgoingRadiation,
+          entry.sliderChanged,
         )
       : deltaEnergyLines(entry.physics.deltaEnergy);
   }, [activeStep, activePoint, displayTimeline]);
@@ -266,8 +281,10 @@ function ReportPage() {
   // 최신 quizGroups를 참조한다(값 자체를 복사해두지 않음).
   const [selectedGroupKey, setSelectedGroupKey] = useState(null);
   const selectedGroup = selectedGroupKey != null ? quizGroups.find((g) => g.key === selectedGroupKey) : null;
+  // 해설 모달은 열려 있을 때만 ESC로 닫는다(닫혀 있을 땐 null을 넘겨 아무 일도 안 함).
+  useEscapeKey(selectedGroup ? () => setSelectedGroupKey(null) : null);
 
-    // 문제 목록에서 마우스를 올린 항목 - 그 문제가 다루는 개념 카드를 옆에서
+  // 문제 목록에서 마우스를 올린 항목 - 그 문제가 다루는 개념 카드를 옆에서
   // 강조하기 위한 용도(클릭 선택과는 별개라 selectedGroupKey를 건드리지 않는다).
   const [hoveredQuizKey, setHoveredQuizKey] = useState(null);
   const hoveredConceptKeys = useMemo(() => {
@@ -276,18 +293,26 @@ function ReportPage() {
     return new Set(group.concepts.map(conceptKeyOf).filter(Boolean));
   }, [hoveredQuizKey, quizGroups]);
 
+  // 둘 다 replace로 건다 - push로 쌓으면 "다시 플레이"를 누를 때마다 히스토리에
+  // /game과 /report가 번갈아 계속 쌓여서, 몇 판만 돌려도 뒤로 가기가 사실상
+  // 무의미해진다. 방금 본 리포트는 새 판을 시작한 시점에 돌아갈 데가 아니다.
   const handleReplay = async () => {
     skipTutorials();
     await replayGame();
-    navigate("/game");
+    navigate("/game", { replace: true });
   };
 
   const handleRestart = () => {
     skipTutorials();
     resetClimate();
     resetGame();
-    navigate("/planet-create");
+    navigate("/planet-create", { replace: true });
   };
+
+  // 빈 껍데기 리포트("기록된 변화가 없습니다"/"푼 문제가 없습니다"만 늘어선 화면)
+  // 대신 시작 화면으로 보낸다 - GamePage가 CREATOR 단계에서 안내를 띄우는 것과 같은
+  // 취지다. 위 훅들이 모두 호출된 뒤라 이 조기 반환은 훅 순서를 깨지 않는다.
+  if (enteredWithoutGame) return <Navigate to="/" replace />;
 
   return (
     <div className="report-page">
@@ -371,12 +396,29 @@ function ReportPage() {
                 />
                 <polyline className="report-page__timeline-chart-line" points={polylinePoints} />
                 {chartPoints.map((p) => (
+                  // 마우스뿐 아니라 키보드로도 지점을 고를 수 있어야 한다 - Tab으로
+                  // 옮겨 다니고 Enter/Space로 선택한다. SVG <g>는 기본적으로 포커스를
+                  // 못 받으므로 role/tabIndex를 직접 준다.
                   <g
                     key={p.index}
                     className="report-page__timeline-chart-point"
                     transform={`translate(${xOf(p.index)}, ${yOf(p.deltaEnergy)})`}
                     onClick={() => setSelectedStep(p.index)}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter" && e.key !== " ") return;
+                      e.preventDefault(); // Space로 페이지가 스크롤되지 않게
+                      setSelectedStep(p.index);
+                    }}
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={p.index === activeStep}
+                    aria-label={`${p.index + 1}단계 ${p.stage}${p.label ? ` ${p.label}` : ""} - ΔE ${formatSigned(
+                      p.deltaEnergy,
+                    )} W/m²`}
                   >
+                    {/* 실제 점(r=5)은 클릭·터치 대상으로 너무 작다 - 보이지 않는 큰 원을
+                        깔아 히트 영역만 넓힌다(색이 없으니 그래프 모양은 그대로다). */}
+                    <circle r={12} fill="transparent" />
                     <circle
                       r={p.index === activeStep ? 7 : 5}
                       className={`report-page__timeline-chart-dot report-page__timeline-chart-dot--${p.tone}${
@@ -481,7 +523,12 @@ function ReportPage() {
           화면 전체 오버레이라 콘텐츠 트리 안에 있으면 안 된다. */}
       {selectedGroup && (
         <div className="report-page__modal-overlay" onClick={() => setSelectedGroupKey(null)}>
-          <div className="report-page__modal" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="report-page__modal"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="문제 해설"
+          >
             <div className="report-page__modal-header">
               <span className={`report-page__modal-badge ${selectedGroup.correct ? "report-page__modal-badge--correct" : "report-page__modal-badge--wrong"}`}>
                 {selectedGroup.correct ? "정답" : "오답"}

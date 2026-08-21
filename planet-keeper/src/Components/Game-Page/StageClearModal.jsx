@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import { formatSigned } from "../../utils/planetAnalysis.js";
 import { ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
+import useEscapeKey from "../common/useEscapeKey.js";
 
 // 1단계(에너지 평형 만들기)를 통과한 순간 한 번 뜨는 단계 전환 모달.
 //
@@ -10,6 +11,10 @@ import { ENERGY_BALANCE_EPSILON } from "../../utils/physicsEngine.js";
 //
 // 이 모달이 떠 있는 동안 GamePage는 타이머를 멈춘다(읽는 사이 이상기후 방지).
 function StageClearModal({ physicsResult, onStart }) {
+  // 오버레이 클릭으로는 닫히지 않는 모달이지만(단계 전환은 확인하고 넘어가야 한다)
+  // ESC는 하단 확인 버튼과 같은 동작으로 열어 둔다 - Tutorial의 ESC(건너뛰기)와 같다.
+  useEscapeKey(onStart);
+
   return createPortal(
     <div className="stage-clear-overlay">
       <div className="stage-clear" role="dialog" aria-label="에너지 평형 달성">

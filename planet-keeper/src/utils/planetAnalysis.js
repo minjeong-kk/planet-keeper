@@ -101,12 +101,40 @@ export function deltaEnergyLines(deltaEnergy) {
 }
 
 // describeItemJudgment/describeTransition처럼 before/after를 둘 다 아는 곳에서만
-// 쓴다 - ΔE 숫자 줄만 "이전 -> 이후"로 바꿔서 이 조작 하나가 ΔE를 얼마나 움직였는지
+// 쓴다 - ΔE 숫자 줄을 "이전 -> 이후"로 바꿔서 이 조작 하나가 ΔE를 얼마나 움직였는지
 // 바로 보이게 한다. 방향 설명 문장은 항상 지금(after) 상태 기준이어야 하므로
 // deltaEnergyLines(after)가 만든 것을 그대로 쓴다.
-function deltaEnergyTransitionLines(before, after) {
+//
+// itemDeltaEnergy(온도 고정, 조성 변화만 반영한 ΔE)를 알면 숫자를 두 줄로 나눈다 -
+// "이 조작이 실제로 한 일"과 "그 뒤 행성이 스스로 한 걸음 식거나 데워진 몫"은
+// 서로 다른 사건이기 때문이다. 판정(describeImbalanceChange)은 앞쪽만 보고 하는데
+// 숫자 줄만 온도까지 반영된 값을 보여주면, 같은 모달 안에서
+//   "ΔE: -114.3 → -111.6" (줄어든 것처럼 보임)
+//   "오히려 에너지가 더 부족해졌습니다 - 방향이 반대인 아이템을 골랐습니다."
+// 처럼 숫자와 문장이 서로 반대로 말하게 된다. 나눠서 보여주면 "아이템은 악화시켰고
+// (-121.4) 행성이 식으면서 일부 상쇄했다(-111.6)"로 읽혀 둘이 같은 이야기를 한다.
+// (온도 이동은 이 게임이 가르치려는 되먹임 그 자체라 감추는 것보다 드러내는 편이 낫다.)
+function deltaEnergyTransitionLines(before, after, itemDeltaEnergy, { beforeTemperature, afterTemperature } = {}) {
   const [, directionLine] = deltaEnergyLines(after);
-  return [`에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(after)} W/m²`, directionLine];
+
+  // itemDeltaEnergy를 모르면(예전 저장본의 리포트 등) 예전처럼 한 줄로 둔다.
+  // 온도 이동이 사실상 없을 때도 굳이 쪼개지 않는다 - 읽을 게 늘기만 한다.
+  const effect = itemDeltaEnergy ?? after;
+  const stepMoved = Math.abs(after - effect) > ENERGY_EPSILON;
+  if (!stepMoved) {
+    return [`에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(effect)} W/m²`, directionLine];
+  }
+
+  const tempPart =
+    beforeTemperature != null && afterTemperature != null
+      ? `행성 온도가 ${beforeTemperature.toFixed(1)}K → ${afterTemperature.toFixed(1)}K로 한 걸음 움직여`
+      : "행성 온도가 한 걸음 움직여";
+
+  return [
+    `에너지 불균형(ΔE): ${formatSigned(before)} → ${formatSigned(effect)} W/m² (이 조작의 효과)`,
+    `${tempPart} ΔE는 ${formatSigned(after)} W/m²가 되었습니다.`,
+    directionLine,
+  ];
 }
 
 function energyProblemLines(deltaEnergy, direction) {
@@ -315,9 +343,16 @@ export function climateEventHintFor(event, values, currentTemperature) {
     ...mapSlidersToClimateInputs(nextSliderValues(values, { key: "cloud", delta: event.delta })),
     currentTemperature,
   });
-  const absorbUp = after.absorbedRadiation > before.absorbedRadiation + ENERGY_EPSILON;
+  // itemDescriptionFor와 같이 3분기로 둔다 - 2분기였을 때는 구름이 이미 0이나
+  // 100에 붙어 클램프로 아무 변화가 없는데도 "줄어듭니다"라고 단정해서, 대응
+  // 중에 플레이어가 슬라이더를 끝까지 밀면 힌트가 사실과 반대가 됐다.
+  const diff = after.absorbedRadiation - before.absorbedRadiation;
   const verb = event.delta > 0 ? "짙어지면" : "옅어지면";
-  return `구름도 햇빛을 반사하는 밝은 표면입니다. 지금 이 행성에서는 구름이 ${verb} 지표가 받는 태양에너지가 ${absorbUp ? "늘어납니다" : "줄어듭니다"}.`;
+  const effect =
+    Math.abs(diff) <= ENERGY_EPSILON
+      ? "지표가 받는 태양에너지는 거의 그대로입니다"
+      : `지표가 받는 태양에너지가 ${diff > 0 ? "늘어납니다" : "줄어듭니다"}`;
+  return `구름도 햇빛을 반사하는 밝은 표면입니다. 지금 이 행성에서는 구름이 ${verb} ${effect}.`;
 }
 
 // planetStateOf/energyStateOf 라벨을 색 톤으로 매핑한다 - GamePage(상태 판정 배지)와
@@ -536,8 +571,26 @@ function describeStableLabel(label) {
 // 쓰면, MAX_TEMPERATURE_STEP_K(3K)짜리 배경 온도 스텝이 아이템 자체 효과보다 커서
 // 반대 방향 아이템도 "방향이 맞았다"고 잘못 판정하는 문제가 있었다.
 function describeImbalanceChange(before, afterDeltaEnergy, label) {
-  const worsened = Math.abs(afterDeltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
   const warming = label === "Energy Surplus";
+
+  // 부호가 뒤집혔다면(overshot) 방향이 틀린 게 아니라 "너무 세게" 민 것이다 -
+  // 에너지가 부족하던 행성에 온난화 아이템을 써서 평형을 지나 과다로 넘어간 경우가
+  // 그렇다(예: 대기 두께 100·CO2 0에서 온실가스 방출기는 ΔE를 -18.5에서 +36.4로
+  // 옮긴다). 이걸 "방향이 반대인 아이템"이라고 말하면 정확히 반대로 가르치게 된다 -
+  // 다음에 골라야 할 것도 같은 계열의 약한 아이템이 아니라 반대 계열이다. |ΔE|가
+  // 커졌는지 작아졌는지와 무관하게 부호만으로 판단해야 한다 - 예전엔 이 판정이
+  // "|ΔE|가 커진" 경우에만 걸려 있어서, 작은 과다/부족을 지나쳐 반대쪽으로 넘어갔지만
+  // 크기 자체는 작아진 경우(예: -18.5 → +5)를 "부족이 줄었다"로 잘못 설명했다.
+  const overshot = afterDeltaEnergy * before.deltaEnergy < 0;
+  if (overshot) {
+    return [
+      warming
+        ? "🔥 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 과다하니 냉각 아이템이 필요합니다."
+        : "❄️ 방향은 맞았지만 효과가 너무 커서 평형을 지나쳤습니다 - 이제는 에너지가 부족하니 온난화 아이템이 필요합니다.",
+    ];
+  }
+
+  const worsened = Math.abs(afterDeltaEnergy) > Math.abs(before.deltaEnergy) + ENERGY_EPSILON;
   if (worsened) {
     return [
       warming
@@ -569,18 +622,32 @@ function describeImbalanceChange(before, afterDeltaEnergy, label) {
  * immediateOutgoingRadiation: 같은 시점의 OLR(온도 고정) - physicsChangeBlocks의
  * "알베도 vs 온실효과 누가 이겼는지" 서술에 쓴다(같은 온도 스텝 혼입 문제).
  */
-export function describeItemJudgment(item, before, after, label, immediateDeltaEnergy, immediateOutgoingRadiation) {
+// sliderChanged=false는 슬라이더가 이미 한계값(0/100 또는 GREENHOUSE_MAX 등)이라
+// 아이템을 써도 실제로는 그 슬라이더가 움직이지 않은 경우다 - 그런데도 item.delta
+// 부호만 보고 "빙하가 증가했습니다" 같은 줄을 그대로 내보내면, 바로 다음
+// physicsChangeBlocks가 정확하게 말하는 "감지될 만한 변화가 없었다"와 자기모순되는
+// 문장이 나란히 뜬다. 실제로 안 움직였을 때는 그 사실을 그대로 말한다.
+export function describeItemJudgment(item, before, after, label, immediateDeltaEnergy, immediateOutgoingRadiation, sliderChanged = true) {
   const intro = [`${item.emoji} "${item.name}"을 사용했습니다.`];
+
+  const introLine = sliderChanged
+    ? (SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다.")
+    : "이미 한계값에 도달해 있어 이번에는 조성이 변하지 않았습니다.";
 
   // 원인 -> 과정 -> 결과 순서의 블록들. 각 블록은 그 자체로는 화살표 없이 붙어
   // 나오고, 블록과 블록 사이에만 withArrows가 "↓"를 넣는다 - 그래야 "ΔE 값 +
   // 방향 설명"처럼 한 덩어리로 읽혀야 하는 줄들이 화살표로 쪼개지지 않는다.
   const blocks = [
-    [SLIDER_CHANGE_LINES[item.key]?.(item.delta) ?? "행성 조성이 변화했습니다."],
+    [introLine],
     ...physicsChangeBlocks(before, after, item.key, immediateOutgoingRadiation),
   ];
 
-  blocks.push(deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy));
+  blocks.push(
+    deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy, immediateDeltaEnergy, {
+      beforeTemperature: before.currentTemperature,
+      afterTemperature: after.currentTemperature,
+    }),
+  );
   blocks.push(["물리엔진이 최종 기후 상태를 분석합니다."]);
   blocks.push(
     label === "Energy Surplus" || label === "Energy Deficit"
@@ -626,11 +693,28 @@ export function describeFinalizeJudgment(before, after, label, { co2Increased } 
  * after.deltaEnergy/after.outgoingRadiation으로 대체하되 배경 온도 스텝이 섞여
  * 부정확할 수 있다.
  */
-export function describeTransition(before, after, label, itemKey, itemDelta, immediateDeltaEnergy, immediateOutgoingRadiation) {
+export function describeTransition(
+  before,
+  after,
+  label,
+  itemKey,
+  itemDelta,
+  immediateDeltaEnergy,
+  immediateOutgoingRadiation,
+  sliderChanged = true,
+) {
   // "온실효과가 약해졌다" 같은 파생 결과만 보여주고 정작 어느 슬라이더를 움직인
   // 아이템이었는지는 말하지 않는다는 피드백 - describeItemJudgment(게임 내 아이템
   // 판정)가 이미 쓰는 SLIDER_CHANGE_LINES를 그대로 재사용해 인과 사슬 맨 앞에 붙인다.
-  const sliderChangeLine = itemKey != null && itemDelta != null ? SLIDER_CHANGE_LINES[itemKey]?.(itemDelta) : null;
+  // sliderChanged=false(이미 한계값이라 실제로는 안 움직인 경우)는 describeItemJudgment와
+  // 같은 이유로 그 사실을 그대로 말한다 - 기본값 true는 옛 리포트 데이터처럼 이
+  // 정보가 없는 경우 예전 동작(항상 변화 줄 표시)을 그대로 유지한다.
+  const sliderChangeLine =
+    itemKey != null && itemDelta != null
+      ? sliderChanged
+        ? SLIDER_CHANGE_LINES[itemKey]?.(itemDelta)
+        : "이미 한계값에 도달해 있어 이번에는 조성이 변하지 않았습니다."
+      : null;
   const changeBlocks = physicsChangeBlocks(before, after, itemKey, immediateOutgoingRadiation);
   const blocks = sliderChangeLine ? [[sliderChangeLine], ...changeBlocks] : changeBlocks;
 
@@ -640,7 +724,12 @@ export function describeTransition(before, after, label, itemKey, itemDelta, imm
     return deltaEnergyLines(after.deltaEnergy);
   }
 
-  blocks.push(deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy));
+  blocks.push(
+    deltaEnergyTransitionLines(before.deltaEnergy, after.deltaEnergy, immediateDeltaEnergy, {
+      beforeTemperature: before.currentTemperature,
+      afterTemperature: after.currentTemperature,
+    }),
+  );
 
   // 아직 불평형(Energy Surplus/Deficit)이면 describeItemJudgment와 같은 기준으로
   // "그래서 이 선택이 왜 문제인지"(방향이 반대라 더 나빠졌는지, 방향은 맞는데

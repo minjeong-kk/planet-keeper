@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Target, BookOpen, ChevronRight, X } from "lucide-react";
 import ConceptBook from "./ConceptBook";
+import useEscapeKey from "../common/useEscapeKey.js";
 import { CONCEPT_PAGES } from "./conceptPages";
 
 // 첫 화면에는 버튼 2개만 두고, 내용은 전부 팝업에서 보여준다.
@@ -13,7 +14,7 @@ import { CONCEPT_PAGES } from "./conceptPages";
 // 오는 stage(마스코트) 밑으로 깔린다. body 로 빼면 그런 영향을 받지 않는다.
 
 const GOAL_INTRO =
-  "열수지·알베도·온실효과 공식을 직접 조작해보며 '행성이 평형에 도달한다는 것'과 " +
+  "에너지 평형·알베도·온실효과 공식을 직접 조작해보며 '행성이 평형에 도달한다는 것'과 " +
   "'평형이어도 온도가 지구형 범위 밖일 수 있다는 것'을 구분해서 이해하는 것이 목표입니다.";
 
 const GOAL_STEPS = [
@@ -41,14 +42,7 @@ function InfoSection() {
 
   const close = () => setPanel(null);
 
-  useEffect(() => {
-    if (!panel) return;
-    const onKeyDown = (e) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [panel]);
+  useEscapeKey(panel ? close : null);
 
   return (
     <div className="start-page__menu">

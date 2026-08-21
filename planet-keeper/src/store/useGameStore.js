@@ -54,6 +54,11 @@ export const GAME_STAGES = {
   REPORT: "report",
 };
 
+// PlanetCreatePage가 "진행 중인 게임이 있는데 주소창 등으로 여기 직접 들어왔다"를
+// 판단할 때 쓰는 것과 같은 기준 - CREATOR(아직 시작 안 함)도 REPORT(이미 끝남)도
+// 아니면 진행 중이다.
+export const isGameInProgress = (stage) => stage !== GAME_STAGES.CREATOR && stage !== GAME_STAGES.REPORT;
+
 export const MAX_WRONG_COUNT = 3;
 const EARTH_LIKE_STABLE_LABEL = "Earth-like Stable";
 // energyStateOf 기준 "에너지가 평형(|ΔE|≤epsilon)인" 세 상태 - 아이템
@@ -549,7 +554,10 @@ const useGameStore = create(
           ? `⚠️ 반대 방향으로 대응했지만 오히려 악화됐습니다.`
           : `🤝 대응했지만 위기를 상쇄하는 데 그쳤습니다.`;
 
-    get().pushTimeline("이상기후", resultMessage, physics, null);
+    get().pushTimeline("이상기후", resultMessage, physics, null, {
+      immediateDeltaEnergy: immediate.deltaEnergy,
+      immediateOutgoingRadiation: immediate.outgoingRadiation,
+    });
     set({ physicsResult: physics, climateEvent: resultMessage, pendingClimateEvent: null });
 
     // 대응 결과로 에너지가 균형에 들어왔다면 여기서 바로 2단계로 넘긴다 - 예전에는
@@ -673,24 +681,43 @@ const useGameStore = create(
     // 보유 장비는 소모하지 않고 그대로 남는다(리포트에 기록).
     if (currentStage !== GAME_STAGES.PROBLEM1) return;
 
-    const nextEquipment = { ...equipment };
-    if (nextEquipment[item.id] > 1) nextEquipment[item.id] -= 1;
-    else delete nextEquipment[item.id];
-
-    get().addItem(`${item.emoji} ${item.name}`); // 사용 기록(리포트/하단 사용 슬롯)
+    // 슬라이더가 이미 한계값(0/100 또는 온실효과 상한)이면 아이템을 써도 이 값
+    // 자체는 안 움직인다 - describeItemJudgment/pushTimeline에 알려줘서 "빙하가
+    // 증가했습니다" 같은, 실제로는 안 일어난 변화를 단정하는 문장을 막는다.
     const nextValues = nextSliderValues(values, item);
-    setValue(item.key, nextValues[item.key]);
+    const sliderChanged = nextValues[item.key] !== values[item.key];
 
-    set({ isComputing: true, equipment: nextEquipment });
+    // 장비 소모/인벤토리 기록/슬라이더 반영은 재계산이 성공한 뒤에만 한다 -
+    // 이 앞에서 먼저 해버리면, computeItemStepResult/describeItemJudgment가
+    // 던지는 예외를 catch가 로그만 남기고 삼키는 사이 장비는 이미 사라졌는데
+    // physicsResult/알림/타임라인은 그대로인 어긋난 상태가 됐다.
+    set({ isComputing: true });
     try {
       const { physics, ml, immediateDeltaEnergy, immediateOutgoingRadiation } = computeItemStepResult(nextValues);
       const balanced = STABLE_LABELS.has(ml.label);
-      const lines = describeItemJudgment(item, physicsResult, physics, ml.label, immediateDeltaEnergy, immediateOutgoingRadiation);
+      const lines = describeItemJudgment(
+        item,
+        physicsResult,
+        physics,
+        ml.label,
+        immediateDeltaEnergy,
+        immediateOutgoingRadiation,
+        sliderChanged,
+      );
+
+      const nextEquipment = { ...equipment };
+      if (nextEquipment[item.id] > 1) nextEquipment[item.id] -= 1;
+      else delete nextEquipment[item.id];
+
+      setValue(item.key, nextValues[item.key]);
+      get().addItem(`${item.emoji} ${item.name}`); // 사용 기록(리포트/하단 사용 슬롯)
       get().pushTimeline("아이템", `${item.emoji} ${item.name}`, physics, ml, {
         immediateDeltaEnergy,
         immediateOutgoingRadiation,
+        sliderChanged,
       });
       set({
+        equipment: nextEquipment,
         physicsResult: physics,
         mlResult: ml,
         notice: { ok: balanced, lines },
@@ -889,12 +916,16 @@ const useGameStore = create(
     }),
     {
       name: "planet-keeper-game",
-      // SOLAR_CONSTANT를 100 -> 297.88로 바꾸면서 ΔE 스케일이 2.9788배가 됐다.
-      // physicsResult/timeline에는 저장 시점 스케일의 ΔE가 그대로 들어 있어서,
-      // 옛 저장본을 그대로 복원하면 새 판정 기준(epsilon 14.894)과 뒤섞인다 -
-      // 예전 "+14.5"(= 지금 +43.2에 해당)가 평형 범위 안으로 잘못 읽혀서
+      // SOLAR_CONSTANT를 100 -> 실측값(297.88, 이후 재수집으로 296.4)으로 바꾸면서
+      // ΔE 스케일이 그 배율(현재 2.964배)만큼 커졌다. physicsResult/timeline에는
+      // 저장 시점 스케일의 ΔE가 그대로 들어 있어서, 옛 저장본을 그대로 복원하면
+      // 새 판정 기준(epsilon, 현재 14.82)과 뒤섞인다 - 예전 스케일(S=100)의
+      // "+14.5"(지금 배율로는 +43.0에 해당)가 평형 범위 안으로 잘못 읽혀서
       // 이상기후가 안 뜨거나, 아이템 후보 선정이 방향을 잃거나, 최종 확인이
-      // 공짜로 통과되는 문제가 생긴다.
+      // 공짜로 통과되는 문제가 생긴다. SOLAR_CONSTANT를 다시 실측 재수집으로
+      // 미세 조정하는 정도(297.88→296.4처럼 배율이 1%도 안 바뀌는 경우)는 이
+      // 드리프트가 무시할 만해 별도 버전을 또 올리지 않는다 - 배율이 크게
+      // 뛸 때만(예: 처음 100→297.88) version을 올린다.
       //
       // 진행 중인 판의 ΔE를 일일이 환산하는 것보다 새로 시작하는 편이 안전하고,
       // 게임 한 판이 짧아 손실도 작다. 빈 객체를 반환하면 초기 상태와 병합되어
@@ -904,7 +935,14 @@ const useGameStore = create(
       // "새 게임인데 이전 판의 행성"이 되어 헷갈린다 - 올린 이유는 useClimateStore.js
       // 주석 참고). 이전 판의 physicsResult/mlResult 스냅샷이 남아 있으면 새 판
       // 시작 화면에 그 온도·판정이 그대로 보이는 문제도 있었다.
-      version: 2,
+      //
+      // version 3: 위 "ΔE 스케일" 축과는 별개로, 온도 판정 임계값 축이 크게
+      // 움직였다 - 재수집으로 지구형 안정 밴드가 281.61~294.69 K에서
+      // 277.22~299.08 K로 넓어져서, 그 사이 구간(예: 278 K는 Cold Stable →
+      // Earth-like Stable, 296 K는 Warm Stable → Earth-like Stable)의 라벨이
+      // 뒤바뀐다. mlResult와 timeline[].ml에는 옛 밴드로 매긴 라벨이 박혀 있어
+      // 리포트에서 새 라벨과 섞이므로 여기서 한 번 비운다.
+      version: 3,
       migrate: () => ({}),
       // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -
       // 저장해두면 새로고침 시 항상 "계산하는 중..."에서 멈춘 것처럼 보인다.
