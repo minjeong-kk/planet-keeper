@@ -35,7 +35,7 @@ React Router가 처리하게 합니다(정적 파일은 파일시스템이 먼�
 
 | 경로 | 화면 | 하는 일 |
 |------|------|---------|
-| `/` | 시작 | 게임 소개 · 기후 개념 도감 |
+| `/` | 시작 | 게임 소개 · 기후 개념 도감 · 다크/라이트 전환 |
 | `/planet-create` | 행성 만들기 | 슬라이더 5종(빙하·바다·구름·대기두께·CO₂)으로 조성 설정, 또는 실측 지점 5곳 중 선택 |
 | `/game` | 플레이 | 1단계 에너지 평형 만들기 → 2단계 지구 유사 온도 맞추기. 문제 풀이·장비 사용·이상기후 대응 |
 | `/report` | 리포트 | 행성 변화 타임라인 · 문제 풀이 결과 · 핵심 개념 정리 |
@@ -52,7 +52,8 @@ planet-keeper/src/
 │  ├─ Planet-Create-Page/     슬라이더 조성 설정, 지점 선택 지도
 │  ├─ Game-Page/              HUD·문제·장비·모달 (플레이 화면 전체)
 │  ├─ Report-Page/            결과 리포트
-│  ├─ common/                 용어 툴팁(Term) · 온보딩(Tutorial) · useEscapeKey
+│  ├─ common/                 용어 툴팁(Term) · 온보딩(Tutorial) · 정답 해설(QuizReview)
+│  │                          · useEscapeKey · useTheme(다크/라이트)
 │  └─ Planet-ui.jsx           three.js 3D 행성 렌더링
 ├─ store/
 │  ├─ useClimateStore.js      행성 조성(슬라이더)과 현재 온도 — "입력"

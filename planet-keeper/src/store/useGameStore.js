@@ -66,7 +66,9 @@ const EARTH_LIKE_STABLE_LABEL = "Earth-like Stable";
 const STABLE_LABELS = new Set(["Cold Stable", EARTH_LIKE_STABLE_LABEL, "Warm Stable"]);
 
 // 2단계 문제를 맞혔는데도 아직 지구형 범위 밖(Warm/Cold Stable)일 때 CO2를 이
-// 폭만큼 +-한다(carbon_capture/greenhouse_emitter 아이템과 같은 스케일 ±25).
+// 폭만큼 +-한다. CO2 아이템(carbon_capture/greenhouse_emitter)의 ±6 보다 일부러
+// 크게 잡았다 - MAX_FINAL_ATTEMPTS(3)번 안에 지구형 범위로 들어와야 하므로 아이템
+// 단계보다 큰 걸음이 필요하다(3번째 시도는 아래 co2PpmForTargetTemperature 로 정확히 맞춘다).
 const FINAL_CO2_STEP = 25;
 // 이 조정을 반복해도 끝나지 않을 수 있으므로, 3번째 시도에서는 무한 루프를 막기
 // 위해 co2PpmForTargetTemperature로 정확히 지구형 평형이 되도록 강제 조정한다.
