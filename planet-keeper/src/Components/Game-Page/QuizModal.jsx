@@ -16,6 +16,13 @@ import { useState } from "react";
 // disabled: 이상기후 경고에 응답하는 중(pendingClimateEvent)에는 true - 문제
 // 풀이와 슬라이더 대응이 동시에 가능하면 어느 쪽에 반응해야 할지 헷갈리므로,
 // 경고가 해소될 때까지 카드 전체를 잠근다.
+//
+// problem.bogi(문자열 배열)가 있으면 문제 제목 아래에 <보기> 상자를 띄운다 -
+// "옳은 것만을 <보기>에서 있는 대로 고른 것은?"처럼 선택지가 "ㄱ, ㄴ"인 문제는
+// 보기 항목 없이는 선택지가 아무 의미가 없다. 항목 텍스트에 이미 "ㄱ." "㉠" 같은
+// 라벨이 들어있으므로 여기서 따로 번호를 붙이지 않는다.
+// problem.bogiLabel을 null로 두면 상자 제목("보기")을 숨긴다 - 5번처럼 보기가
+// 아니라 "과정 나열"인 문제(s3-surplus-sequence)에 쓴다.
 const CHOICE_MARKS = ["①", "②", "③", "④", "⑤"];
 
 function QuizModal({ problem, onAnswer, number, disabled = false, reward }) {
@@ -30,6 +37,19 @@ function QuizModal({ problem, onAnswer, number, disabled = false, reward }) {
       </div>
 
       <h2 className="mission__question">{problem.title}</h2>
+
+      {problem.bogi?.length > 0 && (
+        <div className="mission__bogi">
+          {problem.bogiLabel !== null && (
+            <span className="mission__bogi-title">{problem.bogiLabel ?? "보기"}</span>
+          )}
+          {problem.bogi.map((item) => (
+            <p key={item} className="mission__bogi-item">
+              {item}
+            </p>
+          ))}
+        </div>
+      )}
 
       <ul className="mission__choices">
         {problem.choices.map((choice, i) => (
