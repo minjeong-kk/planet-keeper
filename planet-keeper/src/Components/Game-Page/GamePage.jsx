@@ -34,9 +34,11 @@ import "./GamePage.css";
 
 // 행성 위에 잠깐 뜨는 정답/오답 플래시가 유지되는 시간(ms).
 const FEEDBACK_FLASH_MS = 1600;
-// 문제를 푼 직후 임무 패널 자리에 뜨는 해설 카드가 유지되는 시간(ms).
-// REPORT로 넘어갈 때도 이 시간만큼은 마지막 해설을 보여준 뒤 페이지를 이동한다.
-const RESULT_DISPLAY_MS = 3600;
+// 해설 카드를 닫은 뒤 리포트로 넘어가기까지의 짧은 여유(ms). 예전에는 해설 카드
+// 자체가 이 시간이 지나면 사라졌는데, 읽는 속도가 사람마다 달라서 다 읽기 전에
+// 화면이 넘어가 버렸다. 지금은 카드가 "계속"을 누를 때까지 떠 있고, 이 상수는
+// 누른 뒤 화면이 툭 끊기지 않게 하는 한 박자에만 쓴다.
+const REPORT_LEAVE_MS = 600;
 
 // 이상기후 경고 슬라이더의 조절 폭(±). 행성 만들기 때와 같은 0~100 풀
 // 레인지를 그대로 쓰면 몇 초 안에 미세하게 조정하기엔 한 번 드래그로 너무
@@ -286,12 +288,12 @@ function GamePage() {
   useEffect(() => {
     if (!CLIMATE_TICK_ENABLED) return undefined;
     if (currentStage === GAME_STAGES.REPORT || currentStage === GAME_STAGES.CREATOR) return undefined;
-    // 온보딩·장비 사용 결과를 읽는 동안에는 게임을 멈춘다 - 설명을 읽는 사이
-    // 경과 시간이 쌓이거나 이상기후가 터지면 읽을 수가 없다.
-    if (tutorialOpen || useEffectCard || stageClearOpen) return undefined;
+    // 온보딩·장비 사용 결과·정답 해설을 읽는 동안에는 게임을 멈춘다 - 설명을
+    // 읽는 사이 경과 시간이 쌓이거나 이상기후가 터지면 읽을 수가 없다.
+    if (tutorialOpen || useEffectCard || stageClearOpen || result) return undefined;
     const timer = setInterval(tickSecond, 1000);
     return () => clearInterval(timer);
-  }, [currentStage, tickSecond, tutorialOpen, useEffectCard, stageClearOpen]);
+  }, [currentStage, tickSecond, tutorialOpen, useEffectCard, stageClearOpen, result]);
 
   // 온보딩이 예약된 판에서 실제로 플레이 가능한 화면이 준비되면(문제/장비 단계 + 물리
   // 결과가 채워짐) 한 번만 자동으로 연다.
@@ -358,18 +360,13 @@ function GamePage() {
     }
   };
 
-  // 피드백 플래시 / 해설 카드는 각자 정해진 시간 뒤 자동으로 사라진다.
+  // 행성 위에 뜨는 정답/오답 플래시만 시간이 지나면 사라진다 - 해설 카드는
+  // 플레이어가 "계속"을 누를 때까지 남는다(아래 QuizResult의 onClose).
   useEffect(() => {
     if (!feedback) return undefined;
     const timer = setTimeout(() => setFeedback(null), FEEDBACK_FLASH_MS);
     return () => clearTimeout(timer);
   }, [feedback]);
-
-  useEffect(() => {
-    if (!result) return undefined;
-    const timer = setTimeout(() => setResult(null), RESULT_DISPLAY_MS);
-    return () => clearTimeout(timer);
-  }, [result]);
 
   // 아이템 사용/최종 확인 판정(notice)과 이상기후 결과(climateEvent)는 하단
   // "최근 활동" 로그에 시간 순으로 쌓아 둔다 - 화면 어딘가에 항상 펼쳐져 있지
@@ -391,7 +388,9 @@ function GamePage() {
   }, [climateEvent]);
 
   // 오답 3회 누적 또는 최종 문제 정답으로 REPORT 단계가 되면 리포트 페이지로 이동한다.
-  // 마지막 해설 카드를 읽을 시간을 준 뒤 이동한다.
+  // 마지막 해설 카드가 떠 있으면 플레이어가 "계속"을 누를 때까지 기다린다 - 게임이
+  // 끝나는 그 문제의 해설이 가장 중요한데, 예전에는 정해진 시간이 지나면 읽는 중에
+  // 리포트로 넘어가 버렸다.
   //
   // replace로 이동한다 - push로 쌓으면 리포트에서 뒤로 가기를 눌렀을 때 /game으로
   // 돌아오는데, currentStage는 여전히 REPORT라 이 effect가 다시 돌아 몇 초 뒤 또
@@ -400,9 +399,10 @@ function GamePage() {
   // 히스토리에서 리포트로 갈아끼운다.
   useEffect(() => {
     if (currentStage !== GAME_STAGES.REPORT) return undefined;
-    const timer = setTimeout(() => navigate("/report", { replace: true }), RESULT_DISPLAY_MS);
+    if (result) return undefined;
+    const timer = setTimeout(() => navigate("/report", { replace: true }), REPORT_LEAVE_MS);
     return () => clearTimeout(timer);
-  }, [currentStage, navigate]);
+  }, [currentStage, result, navigate]);
 
   // 보유 장비 총 수량 - 하단 안내 문구에서 "지금 쓸 게 있는지"를 알려주는 데 쓴다.
   const heldEquipmentCount = useMemo(() => equipmentTotalCount(equipment), [equipment]);
@@ -681,7 +681,11 @@ function GamePage() {
 
           {/* 임무 패널 - 문제를 푼 직후에는 같은 자리가 해설 카드로 바뀐다. */}
           {result ? (
-            <QuizResult result={result} onClose={() => setResult(null)} />
+            <QuizResult
+              result={result}
+              onClose={() => setResult(null)}
+              continueLabel={currentStage === GAME_STAGES.REPORT ? "결과 보기" : "계속"}
+            />
           ) : (
             <>
               {isQuizStage && currentProblem && (

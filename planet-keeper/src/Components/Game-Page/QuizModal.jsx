@@ -92,17 +92,19 @@ function QuizModal({ problem, onAnswer, number, disabled = false, reward }) {
 }
 
 /**
- * 문제를 푼 직후 같은 자리에 뜨는 해설 카드. GamePage가 푸는 시점에 복사해 둔
+ * 문제를 푼 직후 같은 자리에 뜨는 해설 카드. 시간이 지나도 사라지지 않고
+ * "계속"(게임이 끝나는 문제라면 "결과 보기")을 눌러야 넘어간다 - 읽는 속도가
+ * 사람마다 달라서, 자동으로 닫으면 다 읽기 전에 화면이 바뀐다. GamePage가 푸는 시점에 복사해 둔
  * { correct, explanation, concepts, reward }를 그대로 보여주기만 한다 - 정답
  * 판정과 보상 지급은 이미 useGameStore가 끝낸 뒤다.
  */
-export function QuizResult({ result, onClose }) {
+export function QuizResult({ result, onClose, continueLabel = "계속" }) {
   return (
     <div className={`mission mission--result mission--result-${result.correct ? "correct" : "wrong"}`}>
       <div className="mission__head">
         <span className="mission__verdict">{result.correct ? "✅ 정답" : "❌ 오답"}</span>
         <button type="button" className="mission__close" onClick={onClose}>
-          계속
+          {continueLabel}
         </button>
       </div>
 
