@@ -10,8 +10,13 @@ import { useState } from "react";
 // GamePage -> useGameStore.solveProblem 경로를 쓴다. 판정 직후에는 GamePage가
 // 이 카드 자리에 아래 QuizResult(해설 카드)를 대신 띄운다.
 //
-// 힌트(problem.explanation)는 예전처럼 💡 모달로 띄우지 않고 패널 안에서 펼친다 -
-// 내용/노출 시점은 같고(원할 때만 열림), 화면 밖으로 나가는 모달이 사라졌다.
+// 힌트(problem.hint)는 💡 모달로 띄우지 않고 패널 안에서 펼친다(원할 때만 열림).
+//
+// 힌트와 해설은 다른 글이다 - 예전에는 힌트 자리에 problem.explanation(해설)을
+// 그대로 넣어서, 힌트를 한 번 열면 정답과 이유가 다 나와 힌트가 아니라 정답
+// 공개였다. 지금은 quizBank가 문제마다 hint를 따로 들고 있고, 그 글은 "무엇을
+// 따져야 하는지"만 가리킨다. 해설(explanation)은 판정 후 아래 QuizResult에서만
+// 보여준다. 새 문제를 넣을 때 hint를 빼먹으면 힌트 카드 자체가 안 뜬다.
 //
 // disabled: 이상기후 경고에 응답하는 중(pendingClimateEvent)에는 true - 문제
 // 풀이와 슬라이더 대응이 동시에 가능하면 어느 쪽에 반응해야 할지 헷갈리므로,
@@ -63,13 +68,13 @@ function QuizModal({ problem, onAnswer, number, disabled = false, reward }) {
       </ul>
 
       <div className="mission__footer">
-        {problem.explanation && (
+        {problem.hint && (
           <div className="mission__card mission__card--hint">
             <button type="button" className="mission__card-toggle" onClick={() => setShowHint((v) => !v)}>
               <span className="mission__card-title">💡 힌트</span>
               <span className="mission__card-chevron">{showHint ? "닫기" : "열기"}</span>
             </button>
-            {showHint && <p>{problem.explanation}</p>}
+            {showHint && <p>{problem.hint}</p>}
           </div>
         )}
 

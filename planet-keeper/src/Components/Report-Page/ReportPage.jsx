@@ -140,7 +140,8 @@ function ReportPage() {
   const final = timeline[timeline.length - 1] ?? null;
   const finalRuleState = final ? planetStateOf(final.physics.deltaEnergy, final.physics.currentTemperature) : null;
 
-  // "핵심 개념 정리"에서 9개 전부가 아니라 이번 판에 실제로 나타난 개념만 고른다.
+  // "핵심 개념 정리"에서 용어집 전체가 아니라 이번 판에 실제로 나타난 개념만
+  // 고른다(개수를 여기 적어두면 climateConcepts.js가 늘 때마다 주석이 낡는다).
   const quizConceptKeys = useMemo(() => {
     const keys = new Set();
     quizLog.forEach((q) => {
