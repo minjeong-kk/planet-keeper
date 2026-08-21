@@ -636,7 +636,9 @@ function GamePage() {
               <span className="hud__balance-label">
                 {severity && severity.tier !== "ok" ? (
                   <>
-                    <span aria-hidden="true">⚠️ </span>
+                    <span className="hud__balance-warn-icon" aria-hidden="true">
+                      ⚠️
+                    </span>
                     {severity.label}
                   </>
                 ) : (
