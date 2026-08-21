@@ -1227,8 +1227,40 @@
   box-shadow: none;
 }
 
-/* 오답일 때 해설 자리에 대신 뜨는 안내 - 재도전으로 다시 나오므로 정답을
-   여기서 알려주지 않는다. */
+/* 오답일 때 해설 자리에 대신 뜨는 안내 + 자세한 힌트. 재도전으로 다시 나오므로
+   정답은 알려주지 않고, 필요한 수치만 풀어 준다. */
+.mission__retry {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.mission__retry-hint {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid rgba(94, 234, 212, 0.24);
+  border-left: 2px solid var(--cyan);
+  border-radius: 10px;
+  background: rgba(45, 212, 191, 0.07);
+}
+
+.mission__retry-hint-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cyan);
+}
+
+.mission__retry-hint p {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.72;
+  color: var(--ink);
+  word-break: keep-all;
+}
+
 .mission__retry-note {
   margin: 0;
   padding: 11px 13px;
