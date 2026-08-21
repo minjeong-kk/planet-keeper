@@ -5,6 +5,21 @@
 // ReportPage.jsx의 KEY_BY_TERM이 term 문자열로 역매핑하기 때문에, 태그와
 // term이 어긋나면(예: "피드백" vs "기후 피드백") CONCEPT_ALIASES에 별도로
 // 등록해야 한다. 새 개념을 추가할 때는 이 파일과 quizBank.js 태그를 같이 본다.
+//
+// 문구에 나오는 기준 수치는 referenceValues.js가 물리엔진에서 유도한 값을 끼워 쓴다 -
+// 손으로 적어 두면 데이터 파이프라인 재수집(SOLAR_CONSTANT / CO2_BASELINE_PPM /
+// 판정 임계값) 뒤에 이 문구만 조용히 낡는다. 실제 지구 관측값(391·240 W/m², 알베도
+// 0.30, 금성 0.77)과 교육용 가상 수치(흡수 270 · 방출 250 등)는 엔진 값이 아니라
+// 그대로 적는다 - 그쪽이 엔진을 따라 움직이면 오히려 틀린 값이 된다.
+
+import {
+  CO2,
+  BASE_ICE_PCT,
+  BASE_OCEAN_PCT,
+  BASE_CLOUD_PCT,
+  BASE_ATM,
+  REFERENCE_TEMP_TEXT,
+} from "./referenceValues.js";
 
 export const CLIMATE_CONCEPTS = {
   // 에너지가 평형(흡수=방출)인 상태 - 예전에는 이 개념과 "복사평형"을 따로
@@ -101,6 +116,6 @@ export const CLIMATE_CONCEPTS = {
   },
   earthBaseline: {
     term: "지구 기준 조성",
-    detail: "빙하 10% · 바다 70% · 구름 30% · 대기 두께 1 · CO₂ 429.53ppm 인 조성입니다. 이 조성과 지구 평균 기온(288.15K)에서 ΔE가 0이 되도록 맞춰 두었기 때문에, 지구를 그대로 재현하면 평형에서 출발합니다.",
+    detail: `빙하 ${BASE_ICE_PCT} · 바다 ${BASE_OCEAN_PCT} · 구름 ${BASE_CLOUD_PCT} · 대기 두께 ${BASE_ATM} · CO₂ ${CO2}ppm 인 조성입니다. 이 조성과 지구 평균 기온(${REFERENCE_TEMP_TEXT}K)에서 ΔE가 0이 되도록 맞춰 두었기 때문에, 지구를 그대로 재현하면 평형에서 출발합니다.`,
   },
 };

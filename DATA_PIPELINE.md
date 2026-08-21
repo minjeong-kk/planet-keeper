@@ -108,6 +108,35 @@ python3 derive_thresholds.py   # observed_kim_dataset.csv → src/data/climateTh
 옮겨 적을 필요는 없습니다 — 값을 확인만 하고 싶다면 `Datasets/physics_reference.csv`의
 `dswrtoa`/`co2` 열을 보면 됩니다.
 
+### 학습 화면의 숫자는 손으로 옮기지 않습니다
+
+문제은행(`quizBank.js`)·용어집(`climateConcepts.js`)·개념 도감(`conceptPages.js`)은
+"S = 296.4 W/m²", "기준 CO₂ 429.53ppm", "알베도 0.27 이라 흡수 216 W/m²",
+"지구형 구간 277.22 ~ 299.08K" 같은 숫자를 문장 안에서 인용합니다. 이 숫자를 손으로
+적어 두면 위 자동 반영(그리고 `derive_thresholds.py`/`build_presets.py`의 재생성)
+뒤에 **그 문구만 조용히 낡습니다** — 화면에는 새 값으로 계산한 ΔE가 뜨는데 문제
+힌트는 옛 숫자로 설명하는, 학생이 검산해 보면 틀리는 상태가 됩니다.
+
+그래서 세 파일은 숫자를 직접 적지 않고 `src/data/referenceValues.js`가 물리엔진과
+`climatePoints.js`에서 **유도한 값을 템플릿 리터럴로 끼워 씁니다.** 재수집해도 문구가
+함께 따라가므로 사람이 손볼 곳이 없습니다.
+
+새 문제나 도감 지면을 쓸 때도 이 원칙을 지킵니다.
+
+| 쓰려는 숫자 | 어떻게 |
+|---|---|
+| 유입 단파복사 S, 그 S로 계산한 W/m² | `referenceValues.js`의 `S` / `asr(a)` / `reflected(a)` |
+| 기준 CO₂ 농도, 그 2배 | `CO2` / `CO2_X2` |
+| 알베도·온실효과 기준값 | `A_BASE` / `G_BASE` / `EMISS_BASE` / `A_ICE20` 등 |
+| 판정 임계값·평형 허용오차 | `COLD_MAX` / `EARTH_MAX` / `EPS` |
+| 지점 실측 반사율 | `climatePoints.js`에서 직접 읽기(도감의 `pointAlbedo`) |
+| **실제 지구 관측값**(지표 복사 391, OLR 240, 알베도 0.30, 금성 0.77 등) | **그대로 적는다** — 엔진 값이 아니므로 엔진을 따라 움직이면 오히려 틀린다 |
+
+마지막 줄이 중요합니다. 이 엔진은 기준 조성이 288.15 K에서 평형이 되도록 유효 σ를
+보정하고, S가 실제 지구(340 W/m²)보다 작아서 **절대 플럭스가 실제의 약 0.87배**입니다
+(LIMITATIONS.md 1번). 비율인 g = 0.386은 관측에서 그대로 옮겨오지만 W/m² 절대량은
+옮겨오지 않으므로, 두 계열을 한 카드에 섞어 적으면 안 됩니다.
+
 관련 파일:
 
 - `Datasets/physics_kim_dataset.csv` — `dswrtoa` 열이 위 표의 대상

@@ -34,18 +34,28 @@ const REASON_LINES = new Set([...Object.values(ALBEDO_REASON), ...Object.values(
 
 // ② 왜? 단계의 각 줄이 말하는 물리량을 before/after 의 실제 숫자와 이어 준다.
 // 문장이 스스로 이름을 밝힌 물리량만 붙이므로, 숫자와 문장이 어긋날 수 없다.
+//
+// 알베도·온실효과·ASR은 조성만의 함수라 after 를 그대로 쓴다. OLR만 온도(T⁴)에도
+// 좌우되므로 immediateOutgoingRadiation(온도를 옮기기 전)을 써야 한다 - 옆에 붙는
+// 문장이 그 값으로 판정되기 때문이다. after.outgoingRadiation 을 쓰면 배경 온도
+// 스텝(최대 3K = OLR 약 4%)이 조성발 변화(구름 아이템은 약 2%)보다 커질 때
+// "OLR이 감소했습니다" 옆에 "↑" 가 붙는다(OLR 줄이 나오는 경우의 11.3%).
+const OLR_MATCH = "우주로 방출되는 에너지";
 const VALUE_BY_SUBJECT = [
   { match: "알베도", pick: (p) => p.albedo, digits: 3, unit: "" },
   { match: "온실효과", pick: (p) => p.greenhouseStrength, digits: 3, unit: "" },
-  { match: "우주로 방출되는 에너지", pick: (p) => p.outgoingRadiation, digits: 1, unit: " W/m²" },
+  { match: OLR_MATCH, pick: (p) => p.outgoingRadiation, digits: 1, unit: " W/m²" },
   { match: "흡수하는 에너지(ASR)", pick: (p) => p.absorbedRadiation, digits: 1, unit: " W/m²" },
 ];
 
-function valueChipFor(line, before, after) {
+function valueChipFor(line, before, after, immediateOutgoingRadiation) {
   const spec = VALUE_BY_SUBJECT.find((v) => line.startsWith(v.match));
   if (!spec) return null;
   const b = spec.pick(before);
-  const a = spec.pick(after);
+  const a =
+    spec.match === OLR_MATCH && immediateOutgoingRadiation != null
+      ? immediateOutgoingRadiation
+      : spec.pick(after);
   if (b == null || a == null) return null;
   const shown = { b: Number(b.toFixed(spec.digits)), a: Number(a.toFixed(spec.digits)) };
   // 화살표는 화면에 찍힌 두 값만 비교해서 붙인다 - 반올림 뒤에도 같은 값이면
@@ -101,9 +111,26 @@ function verdictBadgeOf(finalLine, ok) {
   return null;
 }
 
-function ItemResultModal({ item, before, after, lines, ok, onClose }) {
+function ItemResultModal({
+  item,
+  before,
+  after,
+  lines,
+  ok,
+  // 온도를 옮기기 "전"(조성 변화만 반영한) ΔE/OLR. 판정 문구와 배지가 이 값으로
+  // 만들어지므로 숫자도 같은 값을 써야 한다. 없으면(옛 호출부) after로 대체한다.
+  immediateDeltaEnergy,
+  immediateOutgoingRadiation,
+  onClose,
+}) {
   useEscapeKey(onClose);
   const temperatureChanged = Math.abs(after.currentTemperature - before.currentTemperature) >= 0.05;
+  // "이 조작의 효과"로 보여줄 ΔE. 예전에는 after.deltaEnergy(온도 스텝 포함)를
+  // 큰 숫자로 썼는데, 배지("ΔE 악화")와 바로 아래 본문("-232.9 → -247.1 (이 조작의
+  // 효과)")이 immediate 기준이라 큰 숫자만 개선처럼 보이는 경우가 있었다
+  // (아이템 사용의 5.6%). 큰 숫자도 판정과 같은 값을 쓰고, 온도 스텝 몫은 아래
+  // 본문 줄(deltaEnergyTransitionLines)이 이미 따로 밝힌다.
+  const effectDeltaEnergy = immediateDeltaEnergy ?? after.deltaEnergy;
 
   const blocks = toBlocks(lines.slice(1));
   const deltaIdx = blocks.findIndex((b) => b[0]?.startsWith(DELTA_LINE_PREFIX));
@@ -189,7 +216,7 @@ function ItemResultModal({ item, before, after, lines, ok, onClose }) {
                       );
                     }
                     const family = causeFamilyOf(line);
-                    const chip = valueChipFor(line, before, after);
+                    const chip = valueChipFor(line, before, after, immediateOutgoingRadiation);
                     return (
                       <p key={line} className={`item-result__why${family ? ` item-result__why--${family}` : ""}`}>
                         <span className="item-result__why-text">{renderHighlightedParts(line)}</span>
@@ -211,12 +238,13 @@ function ItemResultModal({ item, before, after, lines, ok, onClose }) {
               <div className="item-result__numbers">
                 <div className="item-result__number">
                   <span>
-                    에너지 불균형 <small className="item-result__number-note">흡수 − 방출</small>
+                    에너지 불균형{" "}
+                    <small className="item-result__number-note">흡수 − 방출 · 이 조작의 효과</small>
                   </span>
                   <strong>
                     {formatSigned(before.deltaEnergy)}
                     <em>→</em>
-                    {formatSigned(after.deltaEnergy)} W/m²
+                    {formatSigned(effectDeltaEnergy)} W/m²
                   </strong>
                 </div>
                 <div className="item-result__number">

@@ -72,7 +72,7 @@ export const MOCK_ITEMS = [
     delta: 6,
   },
   {
-    // 반사판 효과를 구름 슬라이더로 근사함 - "태양 유입 총량"(SOLAR_CONSTANT)은
+    // 반사판 효과를 구름 슬라이더로 근사함 - 유입 단파복사 S(SOLAR_CONSTANT)는
     // 고정 상수라 태양 유입을 직접 줄일 수는 없다. 그 기능이 따로 생기면 연결할 것.
     //
     // 근사라는 사실을 description에도 적는다 - 예전에는 "지표면 알베도를 높인다"고만
@@ -105,7 +105,7 @@ export const MOCK_ITEMS = [
     id: "atm_thinner",
     name: "대기 감압 장치",
     emoji: "🌬️",
-    description: "대기를 강제로 얇게 압축해 온실효과를 줄이고 지표 복사가 우주로 더 잘 빠져나가게 합니다.",
+    description: "대기의 일부를 우주로 흘려보내 대기층을 얇게 만들어, 온실효과를 줄이고 지표 복사가 우주로 더 잘 빠져나가게 합니다.",
     key: "atmThickness",
     delta: -8,
   },

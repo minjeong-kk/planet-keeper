@@ -9,7 +9,7 @@ import {
   BASELINE_ALBEDO,
   BASELINE_ATM_THICKNESS,
   ENERGY_BALANCE_EPSILON,
-  ENERGY_SCALE,
+  ENERGY_CHANGE_EPSILON,
   energyStateOf,
   computeClimateV2,
   mapSlidersToClimateInputs,
@@ -404,7 +404,9 @@ export function labelTone(label) {
 // 예전에는 0.005 하나로 둘 다 재고 있었는데, ΔE 쪽 스케일이 바뀌면 0~1 값(알베도·
 // 온실효과)의 감지 폭까지 같이 흔들리는 구조였다.
 const RATIO_EPSILON = 0.005; // 알베도·온실효과 (0~1 비율)
-const ENERGY_EPSILON = 0.005 * ENERGY_SCALE; // ΔE·OLR·ASR (W/m²)
+// ΔE·OLR·ASR (W/m²) - 물리엔진이 들고 있는 값을 그대로 쓴다(useGameStore의
+// ITEM_EFFECT_EPSILON도 같은 상수라, 설명 문구와 게임 판정이 어긋날 수 없다).
+const ENERGY_EPSILON = ENERGY_CHANGE_EPSILON;
 const TEMPERATURE_EPSILON = 0.01; // 예상 안정 온도(K) - ΔE 스케일과 무관하다
 
 function changeLine(before, after, riseText, fallText, epsilon) {
@@ -853,7 +855,7 @@ function dynamicCloudPreview(item, values, currentTemperature) {
       "표면이 구름보다 밝은 행성(빙하가 아주 많은 경우 등)에서는 구름이 늘수록 오히려 알베도가 낮아져 더워지는 쪽으로 작용할 수 있습니다.",
       ...(isMirror
         ? [
-            "이 게임에서 태양 유입 총량(태양 상수)은 고정값이라 반사판도 구름 비율을 조절하는 것으로 근사해 두었습니다 - 반사만 하는 실제 궤도 반사경과 달리, 여기서는 온실효과 쪽에도 함께 작용합니다.",
+            "이 게임에서 행성에 들어오는 태양 에너지의 총량(S)은 고정값이라 반사판도 구름 비율을 조절하는 것으로 근사해 두었습니다 - 반사만 하는 실제 궤도 반사경과 달리, 여기서는 온실효과 쪽에도 함께 작용합니다.",
           ]
         : []),
     ],

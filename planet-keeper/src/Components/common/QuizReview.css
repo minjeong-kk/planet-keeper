@@ -37,9 +37,9 @@
 
 /* ── 오답 해설의 첫 줄 ─────────────────────────────────────────
    verdict와 같은 자리·같은 크기다(오답 해설도 정답 해설만큼 읽히게 하는 것이
-   목적이므로). 색만 --gold로 갈라서, 이것이 결론이 아니라 "따져볼 것"임을
-   훑기만 해도 알 수 있게 한다. */
-.qreview__ask {
+   목적이므로). 색만 --gold로 갈라서, 이것이 결론이 아니라 근거임을 훑기만 해도
+   알 수 있게 한다. */
+.qreview__fact {
   display: flex;
   align-items: flex-start;
   gap: 8px;
@@ -56,7 +56,7 @@
   word-break: keep-all;
 }
 
-.qreview__ask-mark {
+.qreview__fact-mark {
   flex-shrink: 0;
   font-weight: 700;
 }
@@ -88,23 +88,23 @@
 /* 참고·게임 적용은 본문에서 한 단 물러나게 한다 - 읽는 순서에서 나중이다 */
 .qreview__block--note,
 .qreview__block--game,
-.qreview__block--check {
+.qreview__block--misread {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--panel-line);
 }
 
-/* ── 스스로 판정해 볼 항목(오답 해설의 마지막) ───────────────── */
-.qreview__block--check {
+/* ── 사실과 어긋나는 서술(오답 해설의 마지막) ───────────────── */
+.qreview__block--misread {
   border-color: color-mix(in srgb, var(--gold) 30%, transparent);
   background: color-mix(in srgb, var(--gold) 7%, transparent);
 }
 
-.qreview__block--check .qreview__heading {
+.qreview__block--misread .qreview__heading {
   color: var(--gold);
 }
 
-.qreview__check {
+.qreview__misread {
   display: flex;
   flex-direction: column;
   gap: 6px;
@@ -113,7 +113,7 @@
   list-style: none;
 }
 
-.qreview__check-item {
+.qreview__misread-item {
   position: relative;
   padding-left: 18px;
   font-size: 0.9rem;
@@ -122,9 +122,9 @@
   word-break: keep-all;
 }
 
-/* 번호나 불릿 대신 빈 체크박스 - "아직 정하지 않은 것"이라는 뜻이 형태로 보인다. */
-.qreview__check-item::before {
-  content: "☐";
+/* 불릿 대신 취소 표시 - "이건 사실과 다르다"는 뜻이 형태로 보인다. */
+.qreview__misread-item::before {
+  content: "✕";
   position: absolute;
   left: 0;
   color: var(--gold);

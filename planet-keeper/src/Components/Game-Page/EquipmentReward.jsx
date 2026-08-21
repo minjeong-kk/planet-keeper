@@ -6,7 +6,8 @@ import { itemEffectKeyword, itemDescriptionFor } from "../../utils/planetAnalysi
 // 1단계 문제를 맞힌 뒤 오른쪽 패널에 뜨는 "장비 보급". 여기서 고른 장비는 바로
 // 사용되지 않고 인벤토리(기후 제어 장비)에 들어간다 - 사용 시점은 플레이어가
 // 나중에 직접 고른다. 후보 4개는 useGameStore.pickVisibleItems가 뽑아 둔 것으로,
-// 지금 ΔE 방향에 실제로 도움이 되는 장비가 최소 하나 포함되도록 보장돼 있다.
+// 지금 ΔE 방향에 실제로 도움이 되는 장비가 최소 두 개(GUARANTEED_WORKING_CHOICES)
+// 포함되도록 보장돼 있다.
 //
 // 카드에는 아이콘 + 이름 + 짧은 효과 키워드만 둔다(예: "구름 증가 · 냉각") -
 // 어떤 장비를 확보할지 지금 행성 상태를 보고 판단할 수 있을 만큼만 보여주고,

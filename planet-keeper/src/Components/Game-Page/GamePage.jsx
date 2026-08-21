@@ -96,7 +96,7 @@ const STAGE_META = {
 // 지점 선택(PlanetLocationPicker)으로 시작했을 때, 그 지점의 첫 판정이 직관과
 // 반대로 보일 수 있는 경우를 설명한다 - 이 엔진은 지점마다 실측 온도/알베도는
 // 반영하지만 위도별 실제 일사량 차이나 대기·해류의 열 수송은 반영하지 않고 모든
-// 지점에 같은 태양상수를 쓴다(PlanetLocationPicker의 picker__flag-note와 같은
+// 지점에 같은 유입 단파복사 S를 쓴다(PlanetLocationPicker의 picker__flag-note와 같은
 // 이유). 그래서 실제로는 추운 남극이 "에너지 과다"로, 실제로는 더운 사하라/
 // 태평양/아마존이 "에너지 부족"으로 나온다 - 계산이 틀린 게 아니라 이 세 지점
 // 모두 실제로는 대기·해류가 계속 열을 옮겨줘야 그 온도가 유지된다는 뜻이다.
@@ -109,7 +109,7 @@ const LOCATION_IMBALANCE_EXPECTED = {
 };
 const LOCATION_IMBALANCE_NOTES = {
   antarctica:
-    "남극은 실측 온도가 230K로 매우 낮은데도 \"에너지 과다\"로 나옵니다 - 이 엔진은 모든 지점에 같은 태양상수를 적용해서, 실제로는 대기·해류가 계속 열을 밖으로 옮겨야 유지되는 이 낮은 온도를 그 유출 없이 계산하면 오히려 에너지가 남는 것처럼 보입니다.",
+    "남극은 실측 온도가 230K로 매우 낮은데도 \"에너지 과다\"로 나옵니다 - 이 엔진은 모든 지점에 같은 유입 단파복사를 적용해서, 실제로는 대기·해류가 계속 열을 밖으로 옮겨야 유지되는 이 낮은 온도를 그 유출 없이 계산하면 오히려 에너지가 남는 것처럼 보입니다.",
   sahara:
     "사하라는 실측 온도가 300K로 높은데도 \"에너지 부족\"으로 나옵니다 - 위도에 따라 실제로 크게 다른 일사량 차이를 이 엔진은 반영하지 않아서, 실제로는 대기·해류가 계속 열을 옮겨와야 유지되는 이 온도를 그 유입 없이 계산하면 오히려 에너지가 부족한 것처럼 보입니다.",
   pacific:
@@ -369,11 +369,22 @@ function GamePage() {
   const handleUseEquipment = async (item) => {
     const before = useGameStore.getState().physicsResult;
     setResult(null);
-    await applyEquipment(item);
+    // applyEquipment는 "온도를 옮기기 전"(조성 변화만 반영한) ΔE/OLR을 돌려준다 -
+    // 판정 문구가 그 값으로 만들어지므로, 모달의 숫자도 같은 값을 써야 문장과
+    // 반대로 말하지 않는다(ItemResultModal 주석 참고).
+    const step = await applyEquipment(item);
     const state = useGameStore.getState();
     const after = state.physicsResult;
     if (before && after && after !== before) {
-      setUseEffect({ item, before, after, lines: state.notice?.lines ?? [], ok: !!state.notice?.ok });
+      setUseEffect({
+        item,
+        before,
+        after,
+        lines: state.notice?.lines ?? [],
+        ok: !!state.notice?.ok,
+        immediateDeltaEnergy: step?.immediateDeltaEnergy,
+        immediateOutgoingRadiation: step?.immediateOutgoingRadiation,
+      });
     }
   };
 
@@ -463,12 +474,16 @@ function GamePage() {
     [pendingClimateEvent, climateInputs, currentTemperature],
   );
   const startDeltaEnergy = physicsResult?.deltaEnergy ?? 0;
+  // "변화 없음"으로 볼 폭은 게임 판정과 같은 기준(ENERGY_BALANCE_EPSILON의 1/10)을
+  // 쓴다 - 예전에는 생 0.5 W/m²였는데, ΔE는 SOLAR_CONSTANT 스케일을 따라가므로
+  // 재수집으로 S가 바뀌면 이 표시만 다른 감도로 조용히 어긋난다.
+  const LIVE_TREND_EPSILON = ENERGY_BALANCE_EPSILON / 10;
   const liveTrend =
     livePhysics == null
       ? null
-      : Math.abs(livePhysics.deltaEnergy) < Math.abs(startDeltaEnergy) - 0.5
+      : Math.abs(livePhysics.deltaEnergy) < Math.abs(startDeltaEnergy) - LIVE_TREND_EPSILON
         ? "good"
-        : Math.abs(livePhysics.deltaEnergy) > Math.abs(startDeltaEnergy) + 0.5
+        : Math.abs(livePhysics.deltaEnergy) > Math.abs(startDeltaEnergy) + LIVE_TREND_EPSILON
           ? "bad"
           : "same";
 
@@ -956,6 +971,8 @@ function GamePage() {
           after={useEffectCard.after}
           lines={useEffectCard.lines}
           ok={useEffectCard.ok}
+          immediateDeltaEnergy={useEffectCard.immediateDeltaEnergy}
+          immediateOutgoingRadiation={useEffectCard.immediateOutgoingRadiation}
           onClose={() => setUseEffect(null)}
         />
       )}

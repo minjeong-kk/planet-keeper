@@ -19,6 +19,41 @@
 //
 // 새 블록 종류를 늘리기 전에 위 여섯 개로 표현할 수 있는지 먼저 본다 - 개념마다
 // 전용 블록을 만들면 렌더러가 개념 수만큼 갈라진다.
+//
+// 문구에 나오는 기준 수치는 referenceValues.js가 물리엔진에서 유도한 값을 끼워 쓴다 -
+// 손으로 적어 두면 데이터 파이프라인 재수집(SOLAR_CONSTANT / CO2_BASELINE_PPM /
+// 판정 임계값) 뒤에 이 문구만 조용히 낡는다. 실제 지구 관측값(391·240 W/m², 알베도
+// 0.30, 금성 0.77)과 교육용 가상 수치(흡수 270 · 방출 250 등)는 엔진 값이 아니라
+// 그대로 적는다 - 그쪽이 엔진을 따라 움직이면 오히려 틀린 값이 된다.
+
+import { CLIMATE_POINTS } from "../../data/climatePoints.js";
+import {
+  S,
+  CO2,
+  ASR_BASE,
+  A_BASE,
+  A_ICE,
+  A_OCEAN,
+  A_LAND,
+  A_CLOUD,
+  BASE_ICE_PCT,
+  BASE_OCEAN_PCT,
+  BASE_CLOUD_PCT,
+  BASE_ATM,
+  G_BASE,
+  EPS,
+  COLD_MAX,
+  EARTH_MAX,
+  REFERENCE_TEMP_TEXT,
+} from "../../data/referenceValues.js";
+
+// 도감의 "실제 지점 데이터" 칸 - 숫자를 여기 적으면 build_presets.py가
+// climatePoints.js를 다시 생성할 때 이 칸만 낡는다. 지점 프리셋에서 직접 읽는다.
+const pointAlbedo = (id) => {
+  const point = CLIMATE_POINTS.find((p) => p.id === id);
+  return typeof point?.surfaceAlbedo === "number" ? point.surfaceAlbedo.toFixed(2) : "-";
+};
+
 export const CONCEPT_PAGES = [
   {
     key: "heatBalance",
@@ -76,7 +111,7 @@ export const CONCEPT_PAGES = [
           "|ΔE| 가 0에 가까울수록 에너지 평형에 가까운 상태입니다. 게임에서는 일정 범위 안에 들어오면 '평형'으로 판정합니다.",
           // 예전에는 이 내용을 2단계 문제로 물었는데(지구 기준에서 왜 평형이 나오는지),
           // 게임의 설계 의도를 묻는 메타 문제라 문제 은행에서 빼고 여기로 옮겼다.
-          "엔진은 지구 기준 조성(빙하 10% · 바다 70% · 구름 30% · 대기 두께 1 · CO₂ 429.53ppm)과 지구 평균 기온 288.15K 에서 ΔE 가 0 이 되도록 보정되어 있습니다. 그래서 지구를 그대로 재현하면 평형에서 출발하고, 거기서 무엇을 바꾸든 그 변화만큼의 불균형이 생깁니다.",
+          `엔진은 지구 기준 조성(빙하 ${BASE_ICE_PCT} · 바다 ${BASE_OCEAN_PCT} · 구름 ${BASE_CLOUD_PCT} · 대기 두께 ${BASE_ATM} · CO₂ ${CO2}ppm)과 지구 평균 기온 ${REFERENCE_TEMP_TEXT}K 에서 ΔE 가 0 이 되도록 보정되어 있습니다. 그래서 지구를 그대로 재현하면 평형에서 출발하고, 거기서 무엇을 바꾸든 그 변화만큼의 불균형이 생깁니다.`,
         ],
       },
     ],
@@ -89,7 +124,7 @@ export const CONCEPT_PAGES = [
     summary: "표면이 밝을수록 더 많이 반사하고, 그만큼 덜 흡수한다",
     // physicsEngine.js albedoOf() 와 계수·상수까지 완전히 같은 식을 싣는다.
     formula:
-      "지표 = (빙하·0.8 + 바다·0.08 + 육지·0.2) ÷ 합,   a = 지표·(1 − 구름) + 구름·0.5",
+      `지표 = (빙하·${A_ICE} + 바다·${A_OCEAN} + 육지·${A_LAND}) ÷ 합,   a = 지표·(1 − 구름) + 구름·${A_CLOUD}`,
     sections: [
       {
         type: "note",
@@ -104,21 +139,21 @@ export const CONCEPT_PAGES = [
         heading: "표면별 반사율",
         max: 1,
         items: [
-          { icon: "🧊", label: "빙하", value: 0.8 },
-          { icon: "☁️", label: "구름", value: 0.5 },
-          { icon: "🌍", label: "육지", value: 0.2 },
-          { icon: "🌊", label: "바다", value: 0.08 },
+          { icon: "🧊", label: "빙하", value: Number(A_ICE) },
+          { icon: "☁️", label: "구름", value: Number(A_CLOUD) },
+          { icon: "🌍", label: "육지", value: Number(A_LAND) },
+          { icon: "🌊", label: "바다", value: Number(A_OCEAN) },
         ],
         caption:
-          "표면마다 반사율이 달라서 눈·얼음은 0.8, 육지는 0.2, 어두운 바다는 0.08 정도이고, 구름은 0.5입니다.",
+          `표면마다 반사율이 달라서 눈·얼음은 ${A_ICE}, 육지는 ${A_LAND}, 어두운 바다는 ${A_OCEAN} 정도이고, 구름은 ${A_CLOUD}입니다.`,
       },
       {
         type: "formula",
         icon: "📐",
         heading: "계산 방법",
         lines: [
-          "지표 = (빙하·0.8 + 바다·0.08 + 육지·0.2) ÷ 합",
-          "a = 지표·(1 − 구름) + 구름·0.5",
+          `지표 = (빙하·${A_ICE} + 바다·${A_OCEAN} + 육지·${A_LAND}) ÷ 합`,
+          `a = 지표·(1 − 구름) + 구름·${A_CLOUD}`,
         ],
         caption:
           "먼저 빙하·바다·육지가 차지하는 면적으로 지표의 평균 반사율을 구합니다(육지는 빙하와 바다가 쓰고 남은 면적입니다).",
@@ -128,7 +163,7 @@ export const CONCEPT_PAGES = [
         icon: "☁️",
         heading: "구름이 100%라면?",
         paragraphs: [
-          "그다음 구름이 그 지표를 덮으므로, 덮인 만큼은 구름의 반사율로 바뀝니다 — 그래서 구름이 100%면 지표가 무엇이든 a = 0.5 가 됩니다.",
+          `그다음 구름이 그 지표를 덮으므로, 덮인 만큼은 구름의 반사율로 바뀝니다 — 그래서 구름이 100%면 지표가 무엇이든 a = ${A_CLOUD} 가 됩니다.`,
         ],
       },
       {
@@ -149,23 +184,23 @@ export const CONCEPT_PAGES = [
         icon: "🌐",
         heading: "지구 기준 조성",
         items: [
-          { label: "빙하", value: "10%" },
-          { label: "바다", value: "70%" },
-          { label: "구름", value: "30%" },
-          { label: "알베도 a", value: "≈ 0.27", note: "실제 지구 ≈ 0.30" },
+          { label: "빙하", value: BASE_ICE_PCT },
+          { label: "바다", value: BASE_OCEAN_PCT },
+          { label: "구름", value: BASE_CLOUD_PCT },
+          { label: "알베도 a", value: `≈ ${A_BASE}`, note: "실제 지구 ≈ 0.30" },
         ],
         caption:
-          "지구 기준 조성(빙하 10% · 바다 70% · 구름 30%)을 넣으면 a ≈ 0.27 로, 실제 지구 평균(≈ 0.30)에 가까운 값이 나옵니다.",
+          `지구 기준 조성(빙하 ${BASE_ICE_PCT} · 바다 ${BASE_OCEAN_PCT} · 구름 ${BASE_CLOUD_PCT})을 넣으면 a ≈ ${A_BASE} 로, 실제 지구 평균(≈ 0.30)에 가까운 값이 나옵니다.`,
       },
       {
         type: "stats",
         icon: "📍",
         heading: "실제 지점 데이터",
         items: [
-          { label: "사하라", value: "0.32" },
-          { label: "아마존", value: "0.14" },
-          { label: "남극", value: "0.82" },
-          { label: "태평양", value: "0.04" },
+          { label: "사하라", value: pointAlbedo("sahara") },
+          { label: "아마존", value: pointAlbedo("amazon") },
+          { label: "남극", value: pointAlbedo("antarctica") },
+          { label: "태평양", value: pointAlbedo("pacific") },
         ],
       },
       {
@@ -186,7 +221,7 @@ export const CONCEPT_PAGES = [
     title: "온실효과와 CO₂",
     tab: "온실효과",
     summary: "온실가스가 지표 복사를 되잡아 우주로 나가는 양을 줄인다",
-    formula: "OLR = (1 − g) · σ · T⁴,   g ∝ log₂(CO₂ / 429.53ppm)",
+    formula: `OLR = (1 − g) · σ · T⁴,   g ∝ log₂(CO₂ / ${CO2}ppm)`,
     sections: [
       {
         type: "note",
@@ -215,7 +250,7 @@ export const CONCEPT_PAGES = [
         type: "formula",
         icon: "📐",
         heading: "게임의 물리 모델",
-        lines: ["OLR = (1 − g) · σ · T⁴", "g ∝ log₂(CO₂ / 429.53ppm)"],
+        lines: ["OLR = (1 − g) · σ · T⁴", `g ∝ log₂(CO₂ / ${CO2}ppm)`],
         caption:
           "온실효과 강도를 g 라 하면 방출률은 ε = 1 − g 입니다. CO₂ 는 농도가 2배가 될 때마다 같은 폭으로 효과가 커지는 로그 응답을 보입니다.",
       },
@@ -223,17 +258,25 @@ export const CONCEPT_PAGES = [
         type: "stats",
         icon: "📊",
         heading: "게임의 기준값",
+        // 391 / 240 W/m² 는 실제 지구의 관측값이고 이 게임의 값이 아니다 - 엔진은
+        // 기준 조성이 288.15K에서 평형이 되도록 유효 σ를 보정하는데, 유입 단파복사
+        // S가 실제 지구(340 W/m²)보다 작아서 절대 플럭스가 실제의 약 0.87배가 된다
+        // (LIMITATIONS.md 1번). 예전에는 그 두 숫자가 "게임의 기준값" 항목에 그대로
+        // 들어 있어서, 게임 화면의 ASR(216 W/m²)과 비교하면 맞지 않았다.
+        // 비율인 g = 0.386 은 실제 지구에서 그대로 옮겨오지만 절대값은 옮겨오지
+        // 않는다 - 그래서 게임 값과 관측값을 라벨로 갈라 적는다.
         items: [
-          { label: "기준 CO₂ 농도", value: "429.53 ppm" },
-          { label: "온실효과 강도 g", value: "0.386", note: "지구 기준 조성" },
-          { label: "지표 방출", value: "391 W/m²" },
-          { label: "우주로 방출", value: "240 W/m²" },
+          { label: "기준 CO₂ 농도", value: `${CO2} ppm` },
+          { label: "온실효과 강도 g", value: `${G_BASE}`, note: "지구 기준 조성" },
+          { label: "흡수 = 방출", value: `${ASR_BASE} W/m²`, note: "이 게임의 기준 조성" },
+          { label: "우주로 방출", value: "240 W/m²", note: "실제 지구 관측" },
         ],
         // 원문 두 문장(ppm 출처 / g 근거)을 그대로 두고 문단만 나눴다 - 한
         // 덩어리로 두면 여기만 6~7줄이 되어 다시 통짜 문단이 된다.
         caption: [
-          "기준 농도 429.53 ppm 은 이 게임이 '현재 지구'로 삼는 값으로, 기상청 관측소 3곳(울릉도·독도, 안면도, 고산)의 2024년 월별 실측을 평균한 수치입니다.",
-          "지구 기준 조성에서 g = 0.386 이 되는데, 이는 실제 지구에서 지표가 내보내는 391 W/m² 중 240 W/m² 만 우주로 빠져나간다는 관측과 같은 값입니다.",
+          `기준 농도 ${CO2} ppm 은 이 게임이 '현재 지구'로 삼는 값으로, 기상청 관측소 3곳(울릉도·독도, 안면도, 고산)의 2024년 월별 실측을 평균한 수치입니다.`,
+          `지구 기준 조성에서 g = ${G_BASE} 이 되는데, 이는 실제 지구에서 지표가 내보내는 391 W/m² 중 240 W/m² 만 우주로 빠져나간다는 관측에서 가져온 비율입니다.`,
+          `g 처럼 비율인 값은 실제 지구에서 그대로 옮겨오지만, W/m² 로 적는 절대량은 옮겨오지 않습니다 - 이 게임의 기준 조성은 ${ASR_BASE} W/m² 를 흡수하고 같은 양을 내보내며 평형을 이룹니다(실제 지구는 240 W/m²). 유입 단파복사 S 를 실측값 ${S} W/m² 로 두고 기준 조성이 ${REFERENCE_TEMP_TEXT}K 에서 평형이 되도록 맞춘 결과입니다.`,
         ],
       },
       {
@@ -364,10 +407,10 @@ export const CONCEPT_PAGES = [
         icon: "📊",
         heading: "이 게임의 기준값",
         items: [
-          { label: "지구 기준 알베도", value: "≈ 0.27" },
-          { label: "온실효과 g", value: "0.386" },
-          { label: "평형 판정 기준", value: "±14.8 W/m²" },
-          { label: "지구형 온도 구간", value: "277.22 ~ 299.08K" },
+          { label: "지구 기준 알베도", value: `≈ ${A_BASE}` },
+          { label: "온실효과 g", value: `${G_BASE}` },
+          { label: "평형 판정 기준", value: `±${EPS} W/m²` },
+          { label: "지구형 온도 구간", value: `${COLD_MAX} ~ ${EARTH_MAX}K` },
         ],
         caption:
           "클리어 조건은 평형 하나가 아니라, 평형이면서 그 온도가 지구형 구간 안에 있는 것입니다.",

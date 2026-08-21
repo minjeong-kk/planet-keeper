@@ -6,19 +6,24 @@ import "./QuizReview.css";
 //
 // 정답 해설(quizBank의 review)과 오답 해설(retryReview)도 이 컴포넌트를 같이 쓴다.
 // 예전에는 오답일 때만 긴 문단 하나(retryHint 문자열)를 그려서, 같은 수치를 담고도
-// 정답 해설보다 훨씬 읽기 나빴다. 대신 두 해설의 "맨 앞 블록"이 다르다:
-// 정답은 결론을 먼저 말하는 verdict, 오답은 결론 대신 무엇을 따져야 하는지 묻는 ask다
-// (오답 해설은 재도전이 살아 있어야 하므로 어느 선택지가 맞는지 말하지 않는다).
+// 정답 해설보다 훨씬 읽기 나빴다. 대신 두 해설의 "맨 앞·맨 뒤 블록"이 다르다:
+// 정답은 결론을 먼저 말하는 verdict, 오답은 결론 대신 근거만 놓는 fact다.
+//
+// 오답 해설은 "무엇을 해 보세요" 하고 시키지 않는다 - 퀴즈 화면에서는 조성을 만질 수
+// 없고(조성 조절은 앞 단계인 제작 페이지에서만 한다), 지금 할 수 없는 조작을 지시하는
+// 말이 된다. 대신 관련된 수치와 식을 사실로 놓고, 마지막 misread 블록에서 "어느 서술이
+// 그 사실과 어긋나는지"를 짚는다 - 어느 선택지가 맞는지는 말하지 않으므로 재도전은
+// 살아 있다.
 //
 // 블록 종류는 quizBank.js의 review / retryReview와 1:1이고, 문제마다 필요한 것만
 // 골라 쓴다(모든 해설을 같은 템플릿으로 만들지 않는다):
 //   verdict  핵심 결론 한 문장 - 정답 해설의 맨 앞. 이것만 읽어도 무엇을 배웠는지 알게 한다
-//   ask      무엇을 따져야 하는지 한 문장 - 오답 해설의 맨 앞. 결론을 말하지 않는다
+//   fact     이 문제가 걸려 있는 사실 - 오답 해설의 맨 앞. 결론이 아니라 근거만 놓는다
 //   text     { heading, paragraphs }  짧은 설명
 //   flow     { heading, steps }       원인 → 결과 흐름(단계 사이에 ↓)
 //   compare  { heading, items }       두 개념 / 두 상황 / 수치 비교
 //   formula  { heading, lines, vars } 공식 + 각 값의 의미
-//   check    { heading, items }       스스로 판정해 볼 항목(오답 해설의 마지막)
+//   misread  { items }                그 사실과 어긋나는 서술들(오답 해설의 마지막)
 //   game     이 개념이 게임에서 어떻게 쓰이는지
 //   note     본문 흐름에서 빼도 되는 참고
 //
@@ -37,13 +42,13 @@ function ReviewBlock({ block }) {
     );
   }
 
-  // 오답 해설의 첫 줄. verdict와 같은 자리·같은 크기지만 결론이 아니라 "무엇을
-  // 따져야 하는지"라서, 마크와 색을 달리해 한눈에 구분되게 한다.
-  if (type === "ask") {
+  // 오답 해설의 첫 줄. verdict와 같은 자리·같은 크기지만 결론이 아니라 근거라서,
+  // 마크와 색을 달리해 한눈에 구분되게 한다.
+  if (type === "fact") {
     return (
-      <p className="qreview__ask">
-        <span className="qreview__ask-mark" aria-hidden="true">
-          🔎
+      <p className="qreview__fact">
+        <span className="qreview__fact-mark" aria-hidden="true">
+          📌
         </span>
         {block.text}
       </p>
@@ -128,14 +133,15 @@ function ReviewBlock({ block }) {
     );
   }
 
-  // 오답 해설의 마지막 블록 - 답을 알려주는 대신 "이제 이걸 정해 보세요"로 넘긴다.
-  if (type === "check") {
+  // 오답 해설의 마지막 블록 - 위에 놓은 사실과 어긋나는 서술을 짚는다. 어느 선택지가
+  // 맞는지는 쓰지 않고, 무엇이 사실과 다른지만 적는다.
+  if (type === "misread") {
     return (
-      <section className="qreview__block qreview__block--check">
-        <h5 className="qreview__heading">{block.heading ?? "이제 이걸 정해 보세요"}</h5>
-        <ul className="qreview__check">
+      <section className="qreview__block qreview__block--misread">
+        <h5 className="qreview__heading">{block.heading ?? "이 사실과 어긋나는 것"}</h5>
+        <ul className="qreview__misread">
           {block.items.map((it) => (
-            <li key={it} className="qreview__check-item">
+            <li key={it} className="qreview__misread-item">
               {it}
             </li>
           ))}

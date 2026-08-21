@@ -52,7 +52,7 @@ planet-keeper/src/
 │  ├─ Planet-Create-Page/     슬라이더 조성 설정, 지점 선택 지도
 │  ├─ Game-Page/              HUD·문제·장비·모달 (플레이 화면 전체)
 │  ├─ Report-Page/            결과 리포트
-│  ├─ common/                 용어 툴팁(Term) · 온보딩(Tutorial) · 정답 해설(QuizReview)
+│  ├─ common/                 용어 툴팁(Term) · 온보딩(Tutorial) · 퀴즈 해설(QuizReview)
 │  │                          · useEscapeKey · useTheme(다크/라이트)
 │  └─ Planet-ui.jsx           three.js 3D 행성 렌더링
 ├─ store/
@@ -64,6 +64,8 @@ planet-keeper/src/
 │  ├─ climateVisual.js        슬라이더·온도 → 3D 외형 props
 │  └─ geo.js                  위경도 → 지도 % 좌표
 └─ data/                      문제은행 · 장비 · 용어집 · 지점/임계값(파이프라인 산출물)
+                              · referenceValues.js(학습 문구가 인용하는 기준 수치를
+                                물리엔진에서 유도 — 재수집해도 문구가 낡지 않게)
 ```
 
 물리 결과는 store에 저장하지 않습니다 — 조성과 온도만 있으면 언제든 다시 계산되는
@@ -107,6 +109,10 @@ python3 derive_thresholds.py   # 실측 t2m 분포 → climate_thresholds.json  
 python3 build_presets.py       # preset_kim_cache.csv → src/data/climatePoints.js            [사용]
 ```
 
+> 학습 화면(문제은행·용어집·도감)의 숫자는 재수집 뒤에 손으로 고칠 것이 없습니다 —
+> `src/data/referenceValues.js`가 물리엔진에서 유도한 값을 문구에 끼워 쓰기 때문입니다
+> (DATA_PIPELINE.md "학습 화면의 숫자는 손으로 옮기지 않습니다" 참고).
+>
 > `derive_thresholds.py`와 `build_presets.py`가 각 출력 파일의 유일한 생성자라 값이
 > 어긋날 수 없습니다. `preset-kim.py`는 한 건씩 캐시에 flush하므로 중간에 끊겨도
 > 다시 실행하면 이어받습니다. `physics-merge.py`는 파일을 새로 만드는 대신
