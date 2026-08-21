@@ -325,16 +325,14 @@
   box-shadow: 0 0 16px rgba(45, 212, 191, 0.2);
 }
 
-@media (prefers-color-scheme: dark) {
-  .picker__apply {
-    border-color: rgba(94, 234, 212, 0.55);
-    background: linear-gradient(180deg, rgba(45, 212, 191, 0.96), rgba(13, 148, 136, 0.96));
-    box-shadow: 0 0 16px rgba(45, 212, 191, 0.25);
-  }
+html[data-theme="dark"] .picker__apply {
+  border-color: rgba(94, 234, 212, 0.55);
+  background: linear-gradient(180deg, rgba(45, 212, 191, 0.96), rgba(13, 148, 136, 0.96));
+  box-shadow: 0 0 16px rgba(45, 212, 191, 0.25);
+}
 
-  .picker__apply:hover {
-    box-shadow: 0 0 16px rgba(45, 212, 191, 0.35);
-  }
+html[data-theme="dark"] .picker__apply:hover {
+  box-shadow: 0 0 16px rgba(45, 212, 191, 0.35);
 }
 
 /* 실제 지점이 에너지 불균형일 때만 뜨는 각주 - 작게, 필요할 때만 */

@@ -28,6 +28,22 @@
     <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
+    <!-- 첫 페인트 전에 테마를 확정한다(늦게 붙으면 다크 사용자에게 흰 화면이 한 번
+         번쩍인다). 규칙은 src/Components/common/useTheme.js 와 같다:
+         저장된 선택이 있으면 그것, 없으면 OS 설정. -->
+    <script>
+      (function () {
+        try {
+          var v = localStorage.getItem("planet-keeper-theme");
+          if (v !== "dark" && v !== "light") {
+            v = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          }
+          document.documentElement.dataset.theme = v;
+        } catch (e) {
+          /* localStorage 가 막혀 있으면 CSS 의 color-scheme: light dark 로 넘긴다 */
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

@@ -61,22 +61,20 @@
     linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
 }
 
-@media (prefers-color-scheme: dark) {
-  .hud {
-    --event-bg-a: rgba(48, 16, 20, 0.96);
-    --event-bg-b: rgba(10, 8, 16, 0.97);
-    --event-sub: #fecaca;
-    --event-hint-text: #fde68a;
+html[data-theme="dark"] .hud {
+  --event-bg-a: rgba(48, 16, 20, 0.96);
+  --event-bg-b: rgba(10, 8, 16, 0.97);
+  --event-sub: #fecaca;
+  --event-hint-text: #fde68a;
 
-    background:
-      radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 178, 0.15) 0%, transparent 55%),
-      radial-gradient(80% 60% at 50% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
-      linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
-  }
+  background:
+    radial-gradient(120% 90% at 50% 8%, rgba(13, 148, 178, 0.15) 0%, transparent 55%),
+    radial-gradient(80% 60% at 50% 100%, rgba(45, 212, 191, 0.07) 0%, transparent 60%),
+    linear-gradient(180deg, var(--deep) 0%, var(--void) 100%);
+}
 
-  .hud__starfield {
-    display: block;
-  }
+html[data-theme="dark"] .hud__starfield {
+  display: block;
 }
 
 /* 미세한 별 - 우주 배경 연출이라 다크 모드에서만 보인다(라이트 모드의 흰

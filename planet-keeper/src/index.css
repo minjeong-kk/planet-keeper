@@ -81,6 +81,8 @@
 
   font: 18px/145% var(--sans);
   letter-spacing: 0.18px;
+  /* data-theme 이 붙기 전(첫 페인트 직전)의 아주 짧은 순간만 OS 설정을 따른다 -
+     붙은 뒤에는 아래 두 블록이 테마를 확정한다. */
   color-scheme: light dark;
   color: var(--text);
   background: var(--bg);
@@ -94,67 +96,76 @@
   }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #a3b3a1;
-    --text-h: #f0fdf4;
-    --bg: #121913; /* 답답하지 않은 깊은 딥 그린 톤 배경 */
-    --border: #233325;
-    --code-bg: #1a261c;
-    /* 다크 모드: 시원한 블루-그린 (Teal), --neon과 같은 계열로 통일 */
-    --accent: #2dd4bf;
-    --accent-bg: rgba(45, 212, 191, 0.13);
-    --accent-border: rgba(45, 212, 191, 0.34);
-    --social-bg: rgba(35, 51, 37, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
+/* ── 테마 스위치 ────────────────────────────────────────────────────────
+   예전에는 다크 값이 @media (prefers-color-scheme: dark) 안에 있었다. 지금은
+   같은 값이 html[data-theme="dark"] 에 붙어 있고, 그 속성은 useTheme 이 정한다 -
+   사용자가 시작 화면 버튼으로 고른 값이 있으면 그것, 없으면 OS 설정을 그대로
+   따른다(OS 설정이 바뀌면 실시간으로 따라간다). 그래서 기존 동작은 그대로이고
+   버튼이 하나 늘어난 셈이다. 값은 한 곳에만 적혀 있다. */
+html[data-theme="light"] {
+  color-scheme: light;
+}
 
-    --text-muted: #8a9a88;
-    --text-faint: #7c93ad;
-    --overlay: rgba(0, 0, 0, 0.6);
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --text: #a3b3a1;
+  --text-h: #f0fdf4;
+  --bg: #121913; /* 답답하지 않은 깊은 딥 그린 톤 배경 */
+  --border: #233325;
+  --code-bg: #1a261c;
+  /* 다크 모드: 시원한 블루-그린 (Teal), --neon과 같은 계열로 통일 */
+  --accent: #2dd4bf;
+  --accent-bg: rgba(45, 212, 191, 0.13);
+  --accent-border: rgba(45, 212, 191, 0.34);
+  --social-bg: rgba(35, 51, 37, 0.5);
+  --shadow:
+    rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
 
-    --info: #38bdf8;
-    --info-bg: rgba(56, 189, 248, 0.15);
-    --info-border: rgba(56, 189, 248, 0.4);
+  --text-muted: #8a9a88;
+  --text-faint: #7c93ad;
+  --overlay: rgba(0, 0, 0, 0.6);
 
-    --success: #4ade80;
-    --success-bg: rgba(74, 222, 128, 0.15);
-    --success-border: rgba(74, 222, 128, 0.4);
+  --info: #38bdf8;
+  --info-bg: rgba(56, 189, 248, 0.15);
+  --info-border: rgba(56, 189, 248, 0.4);
 
-    --danger: #f87171;
-    --danger-bg: rgba(248, 113, 113, 0.15);
-    --danger-border: rgba(248, 113, 113, 0.4);
+  --success: #4ade80;
+  --success-bg: rgba(74, 222, 128, 0.15);
+  --success-border: rgba(74, 222, 128, 0.4);
 
-    --warm: #fb923c;
-    --warm-bg: rgba(251, 146, 60, 0.15);
-    --warm-border: rgba(251, 146, 60, 0.4);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.15);
+  --danger-border: rgba(248, 113, 113, 0.4);
 
-    --gold: #fbbf24;
-    --gold-bg: rgba(251, 191, 36, 0.15);
-    --gold-border: rgba(251, 191, 36, 0.4);
+  --warm: #fb923c;
+  --warm-bg: rgba(251, 146, 60, 0.15);
+  --warm-border: rgba(251, 146, 60, 0.4);
 
-    --violet: #a78bfa;
+  --gold: #fbbf24;
+  --gold-bg: rgba(251, 191, 36, 0.15);
+  --gold-border: rgba(251, 191, 36, 0.4);
 
-    /* 콘솔 패널 톤(원래 값) - GamePage/PlanetCreatePage/StartPage 팝업이
-       다크 모드에서 지금까지 쓰던 우주선 콘솔 다크 네이비를 그대로 유지한다. */
-    --neon: #2dd4bf;
-    --holo: #5eead4;
-    --panel: linear-gradient(160deg, #17213a 0%, #0e1524 100%);
-    --panel-solid: #0a1624;
-    --panel-border: rgba(94, 234, 212, 0.18);
-    --panel-line: rgba(94, 234, 212, 0.13);
-    --panel-line-strong: rgba(45, 212, 191, 0.45);
-    --panel-inset: rgba(6, 11, 20, 0.55);
-    --panel-ink: #e9f0fb;
-    --panel-ink-strong: #ffffff;
-    --panel-ink-dim: #9fb2cf;
-    --void: #03060d;
-    --deep: #060d18;
-  }
+  --violet: #a78bfa;
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+  /* 콘솔 패널 톤(원래 값) - GamePage/PlanetCreatePage/StartPage 팝업이
+     다크 모드에서 지금까지 쓰던 우주선 콘솔 다크 네이비를 그대로 유지한다. */
+  --neon: #2dd4bf;
+  --holo: #5eead4;
+  --panel: linear-gradient(160deg, #17213a 0%, #0e1524 100%);
+  --panel-solid: #0a1624;
+  --panel-border: rgba(94, 234, 212, 0.18);
+  --panel-line: rgba(94, 234, 212, 0.13);
+  --panel-line-strong: rgba(45, 212, 191, 0.45);
+  --panel-inset: rgba(6, 11, 20, 0.55);
+  --panel-ink: #e9f0fb;
+  --panel-ink-strong: #ffffff;
+  --panel-ink-dim: #9fb2cf;
+  --void: #03060d;
+  --deep: #060d18;
+}
+
+html[data-theme="dark"] #social .button-icon {
+  filter: invert(1) brightness(2);
 }
 
 html,
@@ -205,10 +216,8 @@ button:hover {
   color: #ffffff; /* 라이트 모드에서는 흰색 글자 유지 */
 }
 
-@media (prefers-color-scheme: dark) {
-  .btn-primary {
-    color: #052e16; /* 다크 모드에서는 밝은 초록 배경 위에 어두운 글자색 적용 */
-  }
+html[data-theme="dark"] .btn-primary {
+  color: #052e16; /* 다크 모드에서는 밝은 초록 배경 위에 어두운 글자색 적용 */
 }
 
 .btn-primary:hover {

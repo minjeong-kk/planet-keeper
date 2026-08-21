@@ -22,47 +22,45 @@
    유지). var(--bg) 등을 여기서 다시 정의하면 이 페이지 안의 모든 하위
    규칙(이미 전부 var()로 되어 있다)이 그대로 새 값을 물려받아서 개별 규칙은
    하나도 안 건드려도 된다. */
-@media (prefers-color-scheme: dark) {
-  .report-page {
-    --bg: #060d18;
-    --text: var(--panel-ink-dim);
-    --text-h: #ffffff;
-    --text-muted: var(--panel-ink-dim);
-    /* GamePage(HUD)의 --line/--line-strong과 같은 cyan 계열로 통일 */
-    --border: rgba(45, 212, 191, 0.2);
-    --code-bg: rgba(255, 255, 255, 0.05);
-    --shadow: 0 14px 32px rgba(3, 7, 16, 0.45);
-    /* GamePage --cyan과 정확히 같은 값 */
-    --accent: #2dd4bf;
-    --accent-bg: rgba(45, 212, 191, 0.16);
-    --accent-border: rgba(45, 212, 191, 0.45);
+html[data-theme="dark"] .report-page {
+  --bg: #060d18;
+  --text: var(--panel-ink-dim);
+  --text-h: #ffffff;
+  --text-muted: var(--panel-ink-dim);
+  /* GamePage(HUD)의 --line/--line-strong과 같은 cyan 계열로 통일 */
+  --border: rgba(45, 212, 191, 0.2);
+  --code-bg: rgba(255, 255, 255, 0.05);
+  --shadow: 0 14px 32px rgba(3, 7, 16, 0.45);
+  /* GamePage --cyan과 정확히 같은 값 */
+  --accent: #2dd4bf;
+  --accent-bg: rgba(45, 212, 191, 0.16);
+  --accent-border: rgba(45, 212, 191, 0.45);
 
-    --info: #38bdf8;
-    --info-bg: rgba(56, 189, 248, 0.15);
-    --info-border: rgba(56, 189, 248, 0.4);
-    /* GamePage --ok와 정확히 같은 값(accent와 겹치던 cyan을 success에서 분리) */
-    --success: #34d399;
-    --success-bg: rgba(52, 211, 153, 0.15);
-    --success-border: rgba(52, 211, 153, 0.4);
-    --danger: #f87171;
-    --danger-bg: rgba(248, 113, 113, 0.15);
-    --danger-border: rgba(248, 113, 113, 0.4);
-    --warm: #fb923c;
-    --warm-bg: rgba(251, 146, 60, 0.15);
-    --warm-border: rgba(251, 146, 60, 0.4);
-    /* GamePage .item-result__step--greenhouse와 같은 값(다크 배경에서 더 밝은 violet) */
-    --violet: #a78bfa;
+  --info: #38bdf8;
+  --info-bg: rgba(56, 189, 248, 0.15);
+  --info-border: rgba(56, 189, 248, 0.4);
+  /* GamePage --ok와 정확히 같은 값(accent와 겹치던 cyan을 success에서 분리) */
+  --success: #34d399;
+  --success-bg: rgba(52, 211, 153, 0.15);
+  --success-border: rgba(52, 211, 153, 0.4);
+  --danger: #f87171;
+  --danger-bg: rgba(248, 113, 113, 0.15);
+  --danger-border: rgba(248, 113, 113, 0.4);
+  --warm: #fb923c;
+  --warm-bg: rgba(251, 146, 60, 0.15);
+  --warm-border: rgba(251, 146, 60, 0.4);
+  /* GamePage .item-result__step--greenhouse와 같은 값(다크 배경에서 더 밝은 violet) */
+  --violet: #a78bfa;
 
-    background: linear-gradient(160deg, #060d18 0%, #03060d 100%);
-    color: var(--panel-ink);
-  }
+  background: linear-gradient(160deg, #060d18 0%, #03060d 100%);
+  color: var(--panel-ink);
+}
 
-  /* .btn-primary는 전역에서 --accent(위에서 그린으로 바뀜)를 배경으로 쓰는데,
+/* .btn-primary는 전역에서 --accent(위에서 그린으로 바뀜)를 배경으로 쓰는데,
      전역 텍스트색(#052e16, 라이트 초록 배경 기준)은 이 어두운 패널 배경과
      어울리지 않는다 - 시작 페이지 CTA와 같은 남색 텍스트로 맞춘다. */
-  .report-page .btn-primary {
-    color: #04121f;
-  }
+  html[data-theme="dark"] .report-page .btn-primary {
+  color: #04121f;
 }
 
 .report-page__masthead {
