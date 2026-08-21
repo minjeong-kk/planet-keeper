@@ -935,7 +935,14 @@ const useGameStore = create(
       // "새 게임인데 이전 판의 행성"이 되어 헷갈린다 - 올린 이유는 useClimateStore.js
       // 주석 참고). 이전 판의 physicsResult/mlResult 스냅샷이 남아 있으면 새 판
       // 시작 화면에 그 온도·판정이 그대로 보이는 문제도 있었다.
-      version: 2,
+      //
+      // version 3: 위 "ΔE 스케일" 축과는 별개로, 온도 판정 임계값 축이 크게
+      // 움직였다 - 재수집으로 지구형 안정 밴드가 281.61~294.69 K에서
+      // 277.22~299.08 K로 넓어져서, 그 사이 구간(예: 278 K는 Cold Stable →
+      // Earth-like Stable, 296 K는 Warm Stable → Earth-like Stable)의 라벨이
+      // 뒤바뀐다. mlResult와 timeline[].ml에는 옛 밴드로 매긴 라벨이 박혀 있어
+      // 리포트에서 새 라벨과 섞이므로 여기서 한 번 비운다.
+      version: 3,
       migrate: () => ({}),
       // isComputing은 새로고침 순간의 진행 중 상태일 뿐이라 저장하지 않는다 -
       // 저장해두면 새로고침 시 항상 "계산하는 중..."에서 멈춘 것처럼 보인다.

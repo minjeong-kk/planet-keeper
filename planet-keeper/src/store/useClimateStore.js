@@ -71,11 +71,15 @@ export function nextValuesForChange(values, key, value) {
 }
 
 // 전부 50(중립값)이면 우연히 이미 평형(Earth-like Stable)에 가까운 조성이 되어
-// 1단계/아이템 단계를 건너뛰는 경우가 잦았다 - 뚜렷한 Energy Surplus(ΔE≈+43.2,
-// 평형 허용범위 ±14.9의 약 3배)로 시작해 실제로 고칠 게 있는 상태에서 게임이
-// 시작되도록 값을 조정했다. 이 값이
-// 유일한 기준점이라 PlanetCreatePage(첫 진입)와 resetClimate(재도전) 둘 다 항상
-// 같은 조성으로 시작한다.
+// 1단계/아이템 단계를 건너뛰는 경우가 잦았다 - 뚜렷한 Energy Surplus로 시작해
+// 실제로 고칠 게 있는 상태에서 게임이 시작되도록 값을 조정했다. 이 값이 유일한
+// 기준점이라 PlanetCreatePage(첫 진입)와 resetClimate(재도전) 둘 다 항상 같은
+// 조성으로 시작한다.
+//
+// 기준 온도(REFERENCE_TEMP_K)에서 이 조성의 ΔE는 약 +47.9이고, 평형 허용범위
+// (ENERGY_BALANCE_EPSILON, 현재 ±14.8)의 약 3.2배다 - 두 숫자 모두 SOLAR_CONSTANT
+// 실측 재수집 때마다 같은 배율로 함께 움직이므로 "허용범위의 약 3배"라는 관계만
+// 유지되면 된다(절대값을 여기 적어 두면 재수집할 때마다 낡는다).
 const DEFAULT_VALUES = { ocean: 50, iceThickness: 20, cloud: 30, atmThickness: 50, co2: 40 };
 
 // store는 "입력"만 들고 있는다 — 슬라이더 값(values)과 현재 온도.
@@ -192,8 +196,15 @@ const useClimateStore = create(
     //   2) "이전 판이 지구형 안정으로 끝난 조성 + 그 평형온도(≈288K)"가 그대로
     //      남아 있어서, 새 게임이 시작부터 ΔE≈0 / 지구형 안정으로 뜨는 문제가
     //      있었다(StartPage가 resetClimate를 부르지 않았음 - 지금은 부른다).
+    //
+    // version 3: 판정 임계값(COLD_STABLE_MAX_K/EARTH_LIKE_MAX_K)을 위성 없이
+    // 재수집한 관측으로 다시 도출하면서 지구형 안정 밴드가 281.61~294.69 K에서
+    // 277.22~299.08 K로 넓어졌다. 저장된 currentTemperature가 그 사이 구간
+    // (예: 278 K, 296 K)이면 복원 시 라벨이 통째로 뒤바뀐다 - useGameStore의
+    // mlResult/timeline에는 옛 밴드로 매긴 라벨이 그대로 박혀 있어서 새 판정과
+    // 섞이므로, 두 store를 함께 비운다.
     // migrate가 빈 객체를 반환하면 초기 상태와 병합되어 사실상 초기화된다.
-    { name: "planet-keeper-climate", version: 2, migrate: () => ({}) },
+    { name: "planet-keeper-climate", version: 3, migrate: () => ({}) },
   ),
 );
 
