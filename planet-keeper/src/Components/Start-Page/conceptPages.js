@@ -42,11 +42,11 @@ export const CONCEPT_PAGES = [
         icon: "☀️",
         heading: "에너지는 어떻게 이동할까?",
         steps: [
-          { icon: "☀️", text: "들어온 태양 에너지 (S)" },
-          { icon: "↩️", text: "일부는 그대로 반사 (S·a)", tone: "loss" },
-          { icon: "🌍", text: "나머지는 지표가 흡수", tone: "gain" },
-          { icon: "♨️", text: "지구 복사로 방출 (ε·σ·T⁴)" },
-          { icon: "🌌", text: "우주로 방출" },
+          { icon: "☀️", text: "태양 에너지가 들어옴" },
+          { icon: "↩️", text: "일부는 반사됨 (S·a)", tone: "loss" },
+          { icon: "🌍", text: "나머지는 지표가 흡수함", tone: "gain" },
+          { icon: "♨️", text: "지표가 열에너지(적외선)로 방출함" },
+          { icon: "🌌", text: "그중 일부가 우주로 빠져나감" },
         ],
         caption:
           "들어온 태양 에너지(S)는 일부가 그대로 반사되고(S·a), 나머지가 흡수된 뒤 지구 복사(ε·σ·T⁴)로 우주로 방출됩니다.",
