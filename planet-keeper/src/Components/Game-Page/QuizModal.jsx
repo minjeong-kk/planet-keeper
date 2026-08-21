@@ -108,11 +108,17 @@ export function QuizResult({ result, onClose, continueLabel = "계속" }) {
         </button>
       </div>
 
-      {/* 해설은 긴 문단 하나가 아니라 블록으로 그린다 - 핵심 결론 한 문장이 맨 위에
-          오고, 그 아래는 문제 성격에 맞는 구조(흐름도/비교/공식)가 붙는다. */}
-      <QuizReview review={reviewOf(result.id)} fallbackText={result.explanation} />
+      {/* 정답일 때만 해설을 펼친다 - 긴 문단 하나가 아니라 블록으로 그리고, 핵심
+          결론 한 문장이 맨 위에 온다. 오답이면 정답이 드러나므로 감춘다. */}
+      {result.correct ? (
+        <QuizReview review={reviewOf(result.id)} fallbackText={result.explanation} />
+      ) : (
+        <p className="mission__retry-note">
+          이 문제는 재도전으로 다시 나옵니다. 정답과 해설은 맞힌 뒤에 볼 수 있습니다.
+        </p>
+      )}
 
-      {result.concepts?.length > 0 && (
+      {result.correct && result.concepts?.length > 0 && (
         <p className="mission__concepts">
           {result.concepts.map((concept) => (
             <span key={concept} className="mission__concept">

@@ -1204,6 +1204,20 @@
   box-shadow: none;
 }
 
+/* 오답일 때 해설 자리에 대신 뜨는 안내 - 재도전으로 다시 나오므로 정답을
+   여기서 알려주지 않는다. */
+.mission__retry-note {
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px dashed var(--line-strong);
+  border-radius: 10px;
+  background: var(--inset);
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--dim);
+  word-break: keep-all;
+}
+
 .mission__concepts {
   display: flex;
   flex-wrap: wrap;
@@ -1980,6 +1994,39 @@
   box-shadow: 0 26px 64px rgba(0, 0, 0, 0.62), 0 0 40px rgba(52, 211, 153, 0.14);
 }
 
+/* 헤더 배지 - ΔE가 좋아졌는지 나빠졌는지를 3~5초 안에 알 수 있게. 문구는
+   판정 문장에서 읽어온 것이라 본문과 반대로 말할 수 없다. */
+.item-result__badge {
+  margin-left: auto;
+  align-self: flex-start;
+  flex-shrink: 0;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line-strong);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.item-result__badge--good {
+  border-color: rgba(94, 234, 212, 0.45);
+  background: color-mix(in srgb, var(--holo) 12%, transparent);
+  color: var(--holo);
+}
+
+.item-result__badge--bad {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.item-result__badge--over {
+  border-color: var(--warm-border);
+  background: var(--warm-bg);
+  color: var(--warm);
+}
+
 .item-result__head {
   display: flex;
   align-items: center;
@@ -2047,6 +2094,177 @@
   line-height: 1.55;
   color: var(--panel-ink-dim);
   word-break: keep-all;
+}
+
+/* ── 사용 결과 4단계(변화 → 왜? → 결과 → 현재 상태/다음 목표) ──────────
+   문구는 전부 describeItemJudgment가 만든 것을 그대로 쓰고, 여기서는 읽는 순서가
+   보이게 크기와 색만 갈라 놓는다.
+
+   색은 index.css의 전역 토큰(--panel-* / --holo / --neon / --violet)만 쓴다 - 이
+   모달은 createPortal(document.body)로 그려져 .hud 밖에 있어서, .hud에만 선언된
+   별칭(--line/--inset/--ink-strong/--dim/--cyan)은 여기서 해석되지 않는다. 그러면
+   border-color가 currentColor로, background가 투명으로 떨어져 카드가 상자로
+   안 보인다(아래 item-info-modal 주석과 같은 이유). */
+.item-result__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 15px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: var(--panel-inset);
+}
+
+.item-result__stage-title {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--holo);
+}
+
+.item-result__stage-text {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+/* ① 변화 - 움직인 슬라이더를 명사형 + 화살표로 크게 */
+.item-result__slider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+}
+
+.item-result__slider-label {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--panel-ink-strong);
+}
+
+.item-result__slider-arrow {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--holo);
+  line-height: 1;
+}
+
+/* ② 왜? - 과정 한 줄 + 그 순간의 실제 수치를 오른쪽에 붙인다 */
+.item-result__why {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0;
+  padding: 7px 10px;
+  border-left: 2px solid var(--panel-line-strong);
+  border-radius: 0 8px 8px 0;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+.item-result__why--albedo {
+  border-left-color: var(--neon);
+}
+
+.item-result__why--greenhouse {
+  border-left-color: var(--violet);
+}
+
+.item-result__why-text {
+  min-width: 0;
+}
+
+.item-result__why-value {
+  flex-shrink: 0;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--holo);
+}
+
+/* 부연 설명("왜 그런지")은 한 단 물러난다 */
+.item-result__reason {
+  margin: 0;
+  padding-left: 12px;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  color: var(--panel-ink-dim);
+  word-break: keep-all;
+}
+
+/* ③ 결과 - 큰 숫자 아래 붙는 판정 문장 */
+.item-result__result-note {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--panel-ink-dim);
+  word-break: keep-all;
+}
+
+/* ④ 현재 상태 / 다음 목표 - 두 칸으로 갈라서 "지금"과 "다음"을 구분 */
+.item-result__verdict {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item-result__verdict-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.item-result__verdict-card {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 11px 13px;
+  border: 1px solid var(--panel-line-strong);
+  border-radius: 12px;
+  background: var(--panel-inset);
+}
+
+.item-result__verdict-card--next {
+  border-color: rgba(94, 234, 212, 0.28);
+  background: color-mix(in srgb, var(--holo) 8%, transparent);
+}
+
+.item-result__verdict-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--panel-ink-dim);
+}
+
+.item-result__verdict-card--next .item-result__verdict-label {
+  color: var(--holo);
+}
+
+.item-result__verdict-card p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+/* 다음 목표가 없는 경우(성공 문구 한 조각뿐일 때)는 한 칸을 다 쓴다 */
+.item-result__verdict-row:has(.item-result__verdict-card:only-child) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1024px) {
+  .item-result__verdict-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 /* 인과 사슬 - 블록 사이의 "↓"만 화살표로 그린다 */
