@@ -35,6 +35,32 @@
   font-weight: 700;
 }
 
+/* ── 오답 해설의 첫 줄 ─────────────────────────────────────────
+   verdict와 같은 자리·같은 크기다(오답 해설도 정답 해설만큼 읽히게 하는 것이
+   목적이므로). 색만 --gold로 갈라서, 이것이 결론이 아니라 "따져볼 것"임을
+   훑기만 해도 알 수 있게 한다. */
+.qreview__ask {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 11px 13px;
+  border: 1px solid var(--panel-border);
+  border-left: 2px solid var(--gold);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--gold) 9%, transparent);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.65;
+  color: var(--panel-ink-strong);
+  word-break: keep-all;
+}
+
+.qreview__ask-mark {
+  flex-shrink: 0;
+  font-weight: 700;
+}
+
 /* ── 블록 공통 ─────────────────────────────────────────────── */
 .qreview__block {
   display: flex;
@@ -61,10 +87,48 @@
 
 /* 참고·게임 적용은 본문에서 한 단 물러나게 한다 - 읽는 순서에서 나중이다 */
 .qreview__block--note,
-.qreview__block--game {
+.qreview__block--game,
+.qreview__block--check {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--panel-line);
+}
+
+/* ── 스스로 판정해 볼 항목(오답 해설의 마지막) ───────────────── */
+.qreview__block--check {
+  border-color: color-mix(in srgb, var(--gold) 30%, transparent);
+  background: color-mix(in srgb, var(--gold) 7%, transparent);
+}
+
+.qreview__block--check .qreview__heading {
+  color: var(--gold);
+}
+
+.qreview__check {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.qreview__check-item {
+  position: relative;
+  padding-left: 18px;
+  font-size: 0.9rem;
+  line-height: 1.62;
+  color: var(--panel-ink);
+  word-break: keep-all;
+}
+
+/* 번호나 불릿 대신 빈 체크박스 - "아직 정하지 않은 것"이라는 뜻이 형태로 보인다. */
+.qreview__check-item::before {
+  content: "☐";
+  position: absolute;
+  left: 0;
+  color: var(--gold);
+  font-weight: 700;
 }
 
 .qreview__block--game {

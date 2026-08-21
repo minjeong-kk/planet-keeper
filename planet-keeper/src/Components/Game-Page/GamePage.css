@@ -1325,15 +1325,14 @@ html[data-theme="dark"] .hud__starfield {
   gap: 10px;
 }
 
+/* 안쪽 해설은 QuizReview가 그린다(QuizReview.css). 그래서 이 자리에는 카드 테두리를
+   두지 않는다 - 블록마다 이미 자기 테두리가 있어서, 카드 안에 카드가 겹쳐 보이고
+   정답 해설(래퍼 없이 블록만 쌓는다)과 층이 달라진다. 제목 + 블록 스택이라는
+   구조를 정답 쪽과 똑같이 맞추고, 색만 --cyan으로 갈라 둔다. */
 .mission__retry-hint {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 12px 14px;
-  border: 1px solid rgba(94, 234, 212, 0.24);
-  border-left: 2px solid var(--cyan);
-  border-radius: 10px;
-  background: rgba(45, 212, 191, 0.07);
+  gap: 8px;
 }
 
 .mission__retry-hint-title {
@@ -1343,6 +1342,8 @@ html[data-theme="dark"] .hud__starfield {
   color: var(--cyan);
 }
 
+/* retryReview가 없는 옛 기록은 QuizReview가 fallbackText 문단 하나로 그린다 -
+   그때도 읽히게 테두리 없는 본문 스타일을 남겨 둔다. */
 .mission__retry-hint p {
   margin: 0;
   font-size: 0.9rem;

@@ -1,16 +1,24 @@
 import "./QuizReview.css";
 
-// 정답 해설을 블록 단위로 그린다. 게임 화면(QuizModal의 QuizResult)과 리포트의
+// 퀴즈 해설을 블록 단위로 그린다. 게임 화면(QuizModal의 QuizResult)과 리포트의
 // 해설 모달이 이 컴포넌트 하나를 같이 쓴다 - 두 곳에 같은 마크업을 복제해두면
 // 한쪽만 고쳤을 때 같은 해설이 화면마다 달라 보인다.
 //
-// 블록 종류는 quizBank.js의 review와 1:1이고, 문제마다 필요한 것만 골라 쓴다
-// (모든 해설을 같은 템플릿으로 만들지 않는다):
-//   verdict  핵심 결론 한 문장 - 항상 맨 앞. 이것만 읽어도 무엇을 배웠는지 알게 한다
+// 정답 해설(quizBank의 review)과 오답 해설(retryReview)도 이 컴포넌트를 같이 쓴다.
+// 예전에는 오답일 때만 긴 문단 하나(retryHint 문자열)를 그려서, 같은 수치를 담고도
+// 정답 해설보다 훨씬 읽기 나빴다. 대신 두 해설의 "맨 앞 블록"이 다르다:
+// 정답은 결론을 먼저 말하는 verdict, 오답은 결론 대신 무엇을 따져야 하는지 묻는 ask다
+// (오답 해설은 재도전이 살아 있어야 하므로 어느 선택지가 맞는지 말하지 않는다).
+//
+// 블록 종류는 quizBank.js의 review / retryReview와 1:1이고, 문제마다 필요한 것만
+// 골라 쓴다(모든 해설을 같은 템플릿으로 만들지 않는다):
+//   verdict  핵심 결론 한 문장 - 정답 해설의 맨 앞. 이것만 읽어도 무엇을 배웠는지 알게 한다
+//   ask      무엇을 따져야 하는지 한 문장 - 오답 해설의 맨 앞. 결론을 말하지 않는다
 //   text     { heading, paragraphs }  짧은 설명
 //   flow     { heading, steps }       원인 → 결과 흐름(단계 사이에 ↓)
 //   compare  { heading, items }       두 개념 / 두 상황 / 수치 비교
 //   formula  { heading, lines, vars } 공식 + 각 값의 의미
+//   check    { heading, items }       스스로 판정해 볼 항목(오답 해설의 마지막)
 //   game     이 개념이 게임에서 어떻게 쓰이는지
 //   note     본문 흐름에서 빼도 되는 참고
 //
@@ -23,6 +31,19 @@ function ReviewBlock({ block }) {
       <p className="qreview__verdict">
         <span className="qreview__verdict-mark" aria-hidden="true">
           ✔
+        </span>
+        {block.text}
+      </p>
+    );
+  }
+
+  // 오답 해설의 첫 줄. verdict와 같은 자리·같은 크기지만 결론이 아니라 "무엇을
+  // 따져야 하는지"라서, 마크와 색을 달리해 한눈에 구분되게 한다.
+  if (type === "ask") {
+    return (
+      <p className="qreview__ask">
+        <span className="qreview__ask-mark" aria-hidden="true">
+          🔎
         </span>
         {block.text}
       </p>
@@ -107,6 +128,22 @@ function ReviewBlock({ block }) {
     );
   }
 
+  // 오답 해설의 마지막 블록 - 답을 알려주는 대신 "이제 이걸 정해 보세요"로 넘긴다.
+  if (type === "check") {
+    return (
+      <section className="qreview__block qreview__block--check">
+        <h5 className="qreview__heading">{block.heading ?? "이제 이걸 정해 보세요"}</h5>
+        <ul className="qreview__check">
+          {block.items.map((it) => (
+            <li key={it} className="qreview__check-item">
+              {it}
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
   if (type === "game") {
     return (
       <section className="qreview__block qreview__block--game">
@@ -129,7 +166,7 @@ function ReviewBlock({ block }) {
 }
 
 /**
- * review 블록 배열을 그린다. review가 없으면(예: 이 기능이 없던 시절에 저장된
+ * 해설 블록 배열을 그린다. review가 없으면(예: 이 기능이 없던 시절에 저장된
  * quizLog 항목) fallbackText를 문단 하나로 그려서 해설이 아예 사라지지 않게 한다.
  */
 function QuizReview({ review, fallbackText }) {

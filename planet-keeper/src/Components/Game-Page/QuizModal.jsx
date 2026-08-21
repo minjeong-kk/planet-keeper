@@ -1,6 +1,6 @@
 import { useState } from "react";
 import QuizReview from "../common/QuizReview.jsx";
-import { reviewOf, retryHintOf } from "../../data/quizBank.js";
+import { reviewOf, retryHintOf, retryReviewOf } from "../../data/quizBank.js";
 
 // 오른쪽 패널의 임무(문제) 카드. PROBLEM1/FINAL 단계가 공유한다.
 // number는 GamePage가 "지금까지 몇 번째로 푸는 문제인지"(quizLog.length + 1)를
@@ -114,13 +114,18 @@ export function QuizResult({ result, onClose, continueLabel = "계속" }) {
         <QuizReview review={reviewOf(result.id)} fallbackText={result.explanation} />
       ) : (
         /* 오답이면 해설 대신 한 단 자세한 힌트를 준다 - 필요한 수치를 다 풀어
-           주지만 어느 선택지가 맞는지는 말하지 않아서, 재도전이 살아 있다. */
+           주지만 어느 선택지가 맞는지는 말하지 않아서, 재도전이 살아 있다.
+           정답 해설과 같은 QuizReview로 그린다(블록만 retryReview) - 예전에는 여기만
+           긴 문단 하나였어서, 같은 수치를 담고도 정답 해설보다 훨씬 읽기 나빴다. */
         <div className="mission__retry">
           <p className="mission__retry-note">이 문제는 재도전으로 다시 나옵니다.</p>
-          {retryHintOf(result.id) && (
+          {(retryReviewOf(result.id) || retryHintOf(result.id)) && (
             <div className="mission__retry-hint">
               <span className="mission__retry-hint-title">🔎 조금 더 자세한 힌트</span>
-              <p>{retryHintOf(result.id)}</p>
+              <QuizReview
+                review={retryReviewOf(result.id)}
+                fallbackText={retryHintOf(result.id)}
+              />
             </div>
           )}
         </div>
